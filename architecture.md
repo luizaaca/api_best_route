@@ -57,7 +57,7 @@ api_best_route/
 │       ├── __init__.py
 │       ├── osmnx_graph_generator.py   # was: osmnx_graph_utils.py
 │       ├── route_calculator.py        # was: route_calculator_utils.py
-│       ├── tsp_genetic_algorithm.py   # includes genetic_algorithm_utils.py
+│       ├── tsp_genetic_algorithm.py   # genetic operators and algorithm (helpers incorporated)
 │       └── pygame_plotter.py          # future implementation of IPlotter
 ├── api/
 │   ├── __init__.py
@@ -460,7 +460,7 @@ Because the graph is only available after `IGraphGenerator.initialize()` is call
 **Location:** `src/infrastructure/tsp_genetic_algorithm.py`
 **Implements:** `IRouteOptimizer`
 
-Receives an `IRouteCalculator` at construction time. The genetic operators (crossover, mutation, population generation) remain as pure functions in `genetic_algorithm_utils.py` — internal helpers with no external contract.
+Receives an `IRouteCalculator` at construction time. The genetic operators (crossover, mutation, population generation) are implemented as private methods within the class. An optional `IPlotter` may also be injected to visualize progress after each generation.
 
 The `solve()` method now returns an `OptimizationResult` dataclass instead of a raw dictionary, providing a typed contract to callers.
 
@@ -724,8 +724,7 @@ No real network calls, no OSMnx, no genetic algorithm execution required by unit
 | `route_optimization_service.py` | Application | Orchestrates the full optimization workflow |
 | `osmnx_graph_generator.py` | Infrastructure | Graph construction and geocoding via OSMnx |
 | `route_calculator.py` | Infrastructure | Segment-level metric computation (ETA, length, cost) |
-| `tsp_genetic_algorithm.py` | Infrastructure | Genetic Algorithm optimization loop |
-| `genetic_algorithm_utils.py` | Infrastructure | Pure functions (crossover, mutation, population gen) |
+| `tsp_genetic_algorithm.py` | Infrastructure | Genetic Algorithm optimization loop with internal operators and optional plotter |
 | `matplotlib_plotter.py` | Infrastructure | Future: visualization of `RouteSegmentsInfo` |
 | `api/main.py` | Entry Point | HTTP request handling via FastAPI |
 | `api/schemas.py` | Entry Point | Pydantic HTTP schemas |

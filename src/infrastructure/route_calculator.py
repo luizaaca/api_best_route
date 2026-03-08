@@ -1,52 +1,16 @@
-from typing import Protocol, Tuple
-from dataclasses import dataclass, field
-from typing import List, Any
+from typing import Protocol, Any, List
 import networkx as nx
 
-from osmnx_graph_utils import convert_from_UTM_to_lat_lon
-
-
-# Classe para armazenar informações dos segmentos e totais
-@dataclass
-class RouteSegmentsInfo:
-    segments: List[dict] = field(default_factory=list)
-    total_eta: float = 0.0
-    total_length: float = 0.0
-    total_cost: float | None = None
-
-
-# Interface para RouteCalculator
-class IRouteCalculator(Protocol):
-    def compute_route_segments_info(
-        self,
-        route: list,
-        weight_function: any = ...,
-        cost_type: str | None = ...,
-    ) -> RouteSegmentsInfo: ...
-
-    def get_weight_function(self): ...
-
-    def get_graph_crs(self): ...
+from src.domain.models import RouteSegmentsInfo
 
 
 class RouteCalculator:
-    """
-    Classe para análise e plotagem de rotas em grafos OSMnx.
-    """
+    """Class responsible for calculating route segments info based on a given graph and route."""
 
     def __init__(self, graph: nx.MultiDiGraph):
-        """
-        Inicializa o RouteCalculator com o grafo projetado.
-
-        Args:
-            graph: Grafo OSMnx projetado.
-        """
         self.graph = graph
 
     def get_graph_crs(self):
-        """
-        Retorna o CRS (sistema de referência de coordenadas) do grafo projetado.
-        """
         return self.graph.graph["crs"]
 
     def compute_route_segments_info(
@@ -55,17 +19,6 @@ class RouteCalculator:
         weight_function: Any = "length",
         cost_type: str | None = None,
     ) -> RouteSegmentsInfo:
-        """
-        Calcula os segmentos, ETA e comprimento total, retornando um objeto RouteSegmentsInfo.
-
-        Args:
-            route: Lista de tuplas (nome, node_id, (x, y)) representando a rota.
-            weight_function: Função para calcular o peso (tempo) de cada aresta.
-            cost_type: Tipo opcional para calcular o custo a partir do ETA (ex: custo de combustível).
-
-        Returns:
-            RouteSegmentsInfo: Objeto contendo informações dos segmentos, ETA e comprimento total.
-        """
         segments = []
         total_eta = 0
         total_length = 0
@@ -107,16 +60,9 @@ class RouteCalculator:
         )
 
     def get_weight_function(self):
-        """
-        Retorna a função de peso (ETA) para o grafo.
-
-        Returns:
-            Função que recebe (u, v, data) e retorna o peso (ETA) da aresta.
-        """
-
         def calculate_weight(u: Any, v: Any, d: dict) -> float:
-            length = d.get("length")  # em metros
-            maxspeed = d.get("maxspeed", 50)  # em km/h
+            length = d.get("length")
+            maxspeed = d.get("maxspeed", 50)
 
             if isinstance(maxspeed, list):
                 maxspeed = min(
@@ -152,16 +98,6 @@ class RouteCalculator:
         return weight_function
 
     def _path_length_sum(self, path: List[Any], weight: str = "length") -> float:
-        """
-        Calcula a soma dos pesos (como length) ao longo de um caminho.
-
-        Args:
-            path: Lista de nós representando o caminho.
-            weight: Nome do atributo a ser somado (default: "length").
-
-        Returns:
-            float: Soma dos pesos ao longo do caminho.
-        """
         total = 0
         for u, v in zip(path[:-1], path[1:]):
             edge_data = self.graph.get_edge_data(u, v)
@@ -173,50 +109,31 @@ class RouteCalculator:
         return total
 
     def _get_path_details(self, path: List[Any]) -> List[dict]:
-        rota_detalhada = []
-
-        # Percorre os pares de nós no caminho (u -> v)
+        detailed_route = []
         for i in range(1, len(path) - 1):
             u, v = path[i - 1], path[i]
-
-            # Pega os dados da aresta (estamos assumindo a chave 0 para simplificar)
             data = self.graph.get_edge_data(u, v, 0)
             node_u = self.graph.nodes[u]
             node_v = self.graph.nodes[v]
-            rota_detalhada.append((node_u["x"], node_u["y"]))
+            detailed_route.append((node_u["x"], node_u["y"]))
 
             if "geometry" in data:
-                # Se a rua for curva, ela tem uma 'geometry' (LineString)
-                # Extraímos os pontos (lon, lat) e invertemos para (lat, lon) pro Leaflet
                 coords = list(data["geometry"].coords)
                 for lat, lon in coords:
-                    rota_detalhada.append((lat, lon))
+                    detailed_route.append((lat, lon))
 
-            rota_detalhada.append((node_v["x"], node_v["y"]))
+            detailed_route.append((node_v["x"], node_v["y"]))
 
-        return rota_detalhada
+        return detailed_route
 
     def _get_cost_function(self, cost_type: str) -> Any:
-        """
-        Retorna uma função de custo baseada no tipo especificado.
-
-        Args:
-            node_id: ID do nó para o qual calcular o custo.
-            cost_type: Tipo de custo (ex: "priority").
-
-        Returns:
-            Função que recebe o ETA e retorna o custo correspondente.
-        """
-
         def priority(node_id, eta: float) -> float:
             node = self.graph.nodes[node_id]
             priority_value = node.get("priority", 1)
-            # Ajuste matemático: cada prioridade aumenta o ETA em 20% sobre o valor base
-            # Exemplo: prioridade 1 = 100%, 2 = 120%, 3 = 140%, ...
             percent = 1 + 0.2 * (priority_value - 1)
             return eta * percent
 
         if cost_type == "priority":
             return priority
         else:
-            raise ValueError(f"Tipo de custo desconhecido: {cost_type}")
+            raise ValueError(f"Unknown cost type: {cost_type}")

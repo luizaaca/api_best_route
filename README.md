@@ -2,6 +2,8 @@
 
 Esta API utiliza um Algoritmo Genético para otimizar rotas entre um ponto de origem e múltiplos destinos, considerando prioridades e estimativas de tempo de chegada (ETA) baseadas em dados do OpenStreetMap.
 
+O código está organizado em pacotes sob `src/` (domínio, aplicação, infraestrutura), com a API em `api/` e uma entrada de console em `console/`. O algoritmo genético contém seus operadores internamente e aceita injeção de um plotter opcional para visualização.
+
 ## Instalação
 
 1. Navegue até o diretório `api_best_route`:
@@ -78,6 +80,12 @@ Otimiza a rota usando o algoritmo genético.
 - O tempo de processamento pode variar dependendo do número de destinos e parâmetros.
 
 ## Dependências
-- FastAPI: Framework para construção da API.
-- Uvicorn: Servidor ASGI.
-- Outras: Ver `requirements.txt` para bibliotecas relacionadas ao algoritmo genético e OSM.
+- FastAPI: framework para construção da API.
+- Uvicorn: servidor ASGI para execução da aplicação.
+- NumPy: pacote numérico usado na seleção de pais no algoritmo genético.
+- NetworkX: estrutura de grafos utilizada para roteamento e cálculo de distâncias.
+- OSMnx: construção e projeção de grafos de ruas a partir de OpenStreetMap.
+- Shapely e PyProj: manipulação de geometrias e transformação entre CRS.
+- Matplotlib: dependência opcional para implementações de `IPlotter`.
+
+O arquivo `requirements.txt` contém todas as dependências necessárias e pode ser instalado com `pip install -r requirements.txt`.  
