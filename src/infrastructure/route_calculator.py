@@ -1,4 +1,4 @@
-from typing import Protocol, Any, List
+from typing import Any, List
 import networkx as nx
 
 from src.domain.models import RouteSegmentsInfo
@@ -9,9 +9,6 @@ class RouteCalculator:
 
     def __init__(self, graph: nx.MultiDiGraph):
         self.graph = graph
-
-    def get_graph_crs(self):
-        return self.graph.graph["crs"]
 
     def compute_route_segments_info(
         self,

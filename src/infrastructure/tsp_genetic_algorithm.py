@@ -8,9 +8,6 @@ from src.domain.models import OptimizationResult, RouteNode
 from src.infrastructure.osmnx_graph_generator import convert_from_UTM_to_lat_lon
 
 
-# genetic_algorithm_utils functions moved into class below
-
-
 class TSPGeneticAlgorithm:
     """
     Genetic Algorithm for the Traveling Salesman Problem using the OSMnx graph.

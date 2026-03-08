@@ -22,8 +22,6 @@ class IRouteCalculator(Protocol):
 
     def get_weight_function(self) -> Callable: ...
 
-    def get_graph_crs(self) -> str: ...
-
 
 @runtime_checkable
 class IRouteOptimizer(Protocol):

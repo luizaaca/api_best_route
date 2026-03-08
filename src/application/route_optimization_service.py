@@ -13,7 +13,9 @@ class RouteOptimizationService:
         self,
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
-        optimizer_factory: Callable[[IRouteCalculator], IRouteOptimizer],
+        optimizer_factory: Callable[
+            [IRouteCalculator, IPlotter | None], IRouteOptimizer
+        ],
         plotter: IPlotter | None = None,
     ):
         self._graph_generator = graph_generator
@@ -31,15 +33,12 @@ class RouteOptimizationService:
         context = self._graph_generator.initialize(origin, destinations)
 
         route_calculator = self._route_calculator_factory(context.graph)
-        optimizer = self._optimizer_factory(route_calculator)
+        optimizer = self._optimizer_factory(route_calculator, self._plotter)
 
         result = optimizer.solve(
             route_nodes=context.route_nodes,
             max_generation=max_generation,
             max_processing_time=max_processing_time,
         )
-
-        if self._plotter is not None:
-            self._plotter.plot(result.best_route)
 
         return result

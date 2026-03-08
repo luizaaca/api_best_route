@@ -224,8 +224,12 @@ classDiagram
 
     class TSPGeneticAlgorithm {
         -route_calculator IRouteCalculator
+        -plotter IPlotter           
         -population_size int
         -mutation_probability float
+        -_generate_random_population(locations, size) list
+        -_order_crossover(p1, p2) list
+        -_mutate(solution, probability) list
         +solve(route_nodes, max_generation, max_processing_time) OptimizationResult
     }
 
@@ -239,6 +243,7 @@ classDiagram
     MatplotlibPlotter ..|> IPlotter : implements
 
     TSPGeneticAlgorithm --> IRouteCalculator : depends on
+    TSPGeneticAlgorithm --> IPlotter : depends on
 ```
 
 ---
@@ -282,7 +287,6 @@ classDiagram
         -graph_generator IGraphGenerator
         -route_calculator_factory Callable
         -optimizer_factory Callable
-        -plotter IPlotter or None
         +optimize(origin, destinations, max_generation, max_processing_time) OptimizationResult
     }
 
@@ -297,7 +301,7 @@ classDiagram
     RouteOptimizationService --> IGraphGenerator
     RouteOptimizationService --> IRouteCalculator : factory
     RouteOptimizationService --> IRouteOptimizer : factory
-    RouteOptimizationService --> IPlotter : optional
+    TSPGeneticAlgorithm --> IPlotter : optional
 
     OSMnxGraphGenerator ..|> IGraphGenerator
     RouteCalculator ..|> IRouteCalculator
