@@ -1,0 +1,20 @@
+# Python standard
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# cache folder
+cache/

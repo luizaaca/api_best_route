@@ -1,0 +1,83 @@
+# TSP Genetic Algorithm API
+
+Esta API utiliza um Algoritmo Genético para otimizar rotas entre um ponto de origem e múltiplos destinos, considerando prioridades e estimativas de tempo de chegada (ETA) baseadas em dados do OpenStreetMap.
+
+## Instalação
+
+1. Navegue até o diretório `api_best_route`:
+   ```
+   cd api_best_route
+   ```
+
+2. Instale as dependências:
+   ```
+   pip install -r requirements.txt
+   ```
+
+## Executando a API
+
+Execute o servidor com Uvicorn:
+```
+uvicorn main:app --reload
+```
+
+A API estará disponível em `http://127.0.0.1:8000`. Acesse `http://127.0.0.1:8000/docs` para a documentação interativa do Swagger.
+
+## Endpoint
+
+### POST /optimize_route
+
+Otimiza a rota usando o algoritmo genético.
+
+#### Parâmetros de Entrada (JSON)
+- `origin` (string): Ponto de origem, como "Praça da Sé, São Paulo".
+- `destinations` (array): Lista de destinos, cada um com:
+  - `location` (string ou array): Nome do lugar (ex: "Edifício Copan, São Paulo") ou coordenadas [latitude, longitude].
+  - `priority` (integer): Prioridade do destino (ex: 1 para alta prioridade).
+- `max_generation` (integer, opcional): Número máximo de gerações (padrão: 50).
+- `max_processing_time` (integer, opcional): Tempo máximo de processamento em milissegundos (padrão: 10000).
+
+#### Exemplo de Requisição
+```json
+{
+  "origin": "Praça da Sé, São Paulo",
+  "destinations": [
+    {"location": "Edifício Copan, São Paulo", "priority": 1},
+    {"location": "Mercado Municipal de São Paulo", "priority": 2},
+    {"location": [-23.5465, -46.6367], "priority": 3}
+  ],
+  "max_generation": 50,
+  "max_processing_time": 10000
+}
+```
+
+#### Resposta (JSON)
+- `best_route` (array): Lista das localizações na ordem otimizada.
+- `best_fitness` (float): Valor do fitness da melhor rota (custo total).
+- `population_size` (integer): Tamanho da população usada.
+- `generations_run` (integer): Número de gerações executadas (aproximado).
+
+#### Exemplo de Resposta
+```json
+{
+  "best_route": [
+    "Praça da Sé, São Paulo",
+    "Edifício Copan, São Paulo",
+    "Mercado Municipal de São Paulo",
+    [-23.5465, -46.6367]
+  ],
+  "best_fitness": 1234.56,
+  "population_size": 10,
+  "generations_run": 50
+}
+```
+
+## Notas
+- O algoritmo considera prioridades ao calcular o fitness da rota.
+- Certifique-se de que as localizações sejam válidas e acessíveis via OpenStreetMap.
+- O tempo de processamento pode variar dependendo do número de destinos e parâmetros.
+
+## Dependências
+- FastAPI: Framework para construção da API.
+- Uvicorn: Servidor ASGI.
+- Outras: Ver `requirements.txt` para bibliotecas relacionadas ao algoritmo genético e OSM.
