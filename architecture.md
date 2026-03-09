@@ -753,7 +753,18 @@ No real network calls, no OSMnx, no genetic algorithm execution required by unit
 - `Transformer.from_crs(source_crs, target_crs, always_xy=True)` — creates a reusable transformer object
 - `Transformer.transform(x, y)` — applies the coordinate transformation
 
-### 11.4 Shapely
+### 11.4 geopy
+
+> "Geopy makes it easy for Python developers to locate the coordinates of addresses, cities, countries, and landmarks across the globe using third-party geocoders and other data sources."
+> — [geopy Documentation](https://geopy.readthedocs.io/)
+
+**Role in this system:** Used in `OSMnxGraphGenerator._get_short_name_from_coord` to reverse‑geocode latitude/longitude pairs into human‑readable place names when the origin or destination is provided as coordinates. A single `geopy.geocoders.Photon` instance is created in the constructor and reused for all lookups.
+
+**Key APIs used:**
+- `Photon(user_agent=...)` — instantiates the Photon geocoder
+- `geolocator.reverse((lat, lon))` — performs reverse geocoding to obtain a location object or string
+
+### 11.5 Shapely
 
 > "Shapely is a BSD-licensed Python package for manipulation and analysis of planar geometric objects."
 > — [Shapely Documentation](https://shapely.readthedocs.io/en/stable/)

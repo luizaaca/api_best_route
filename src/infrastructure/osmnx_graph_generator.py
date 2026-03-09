@@ -1,8 +1,9 @@
-from typing import List, Tuple, Union
+from typing import Union
 from pyproj import Transformer
 from shapely.geometry import MultiPoint
 import osmnx as ox
 import networkx as nx
+from geopy.geocoders import Photon
 import os
 
 from src.domain.models import GraphContext, RouteNode, RouteSegmentsInfo, RouteSegment
@@ -19,6 +20,8 @@ class OSMnxGraphGenerator:
     ):
         self.network_type = network_type
         self.custom_filter = custom_filter
+
+        self.geolocator = Photon(user_agent="geo_app")
 
         print("Configuring OSMnx settings...")
         ox.settings.use_cache = True
@@ -37,8 +40,8 @@ class OSMnxGraphGenerator:
 
     def initialize(
         self,
-        origin: Union[str, Tuple[float, float]],
-        destinations: List[Tuple[Union[str, Tuple[float, float]], int]],
+        origin: Union[str, tuple[float, float]],
+        destinations: list[tuple[Union[str, tuple[float, float]], int]],
     ) -> GraphContext:
         """Builds and returns the projected graph along with resolved nodes."""
         all_locations = [origin] + [dest[0] for dest in destinations]
@@ -59,40 +62,30 @@ class OSMnxGraphGenerator:
         ]
         return GraphContext(graph=g_proj, route_nodes=route_nodes)
 
-    # internal helper methods drawn from previous module
     def _set_coords_and_names(
-        self, locations: List[Union[str, Tuple[float, float]]]
-    ) -> List[Tuple[Tuple[float, float], str]]:
+        self, locations: list[Union[str, tuple[float, float]]]
+    ) -> list[tuple[tuple[float, float], str]]:
         result = []
         for loc in locations:
             if isinstance(loc, str):
-                lat_lon = ox.geocoder.geocode(loc)
-                name = loc
+                print(f"Geocoding location: {loc}")
+                geoloc = self.geolocator.geocode(loc)
+                lat_lon = (geoloc.latitude, geoloc.longitude)  # type: ignore
+                name = geoloc.address  # type: ignore
             else:
+                print(f"Processing coordinates: {loc}")
+                try:
+                    geoloc = self.geolocator.reverse(loc)
+                    name = geoloc.address  # type: ignore
+                except Exception:
+                    name = f"Coords: ({loc[0]:.4f}, {loc[1]:.4f})"
                 lat_lon = loc
-                name = self._get_short_name_from_coord(loc)
             result.append((lat_lon, name))
         return result
 
-    def _get_short_name_from_coord(self, lat_lon, dist=50):
-        try:
-            gdf = ox.features_from_point(
-                lat_lon,
-                tags={"highway": True, "building": True, "amenity": True},
-                dist=dist,
-            )
-
-            if not gdf.empty and "name" in gdf.columns:
-                names = gdf["name"].dropna()
-                if not names.empty:
-                    return names.iloc[0]
-            return f"Coords: {lat_lon:.4f}"
-        except Exception:
-            return "Unknown Location"
-
     def _get_center_and_dist(
-        self, coords: List[Tuple[float, float]]
-    ) -> Tuple[Tuple[float, float], float]:
+        self, coords: list[tuple[float, float]]
+    ) -> tuple[tuple[float, float], float]:
         points = MultiPoint([(lon, lat) for lat, lon in coords])
         centroid = (points.centroid.y, points.centroid.x)
         distances = [
@@ -105,7 +98,7 @@ class OSMnxGraphGenerator:
         return centroid, max_dist
 
     def _create_projected_graph(
-        self, center: Tuple[float, float], dist: float
+        self, center: tuple[float, float], dist: float
     ) -> nx.MultiDiGraph:
         g = ox.graph_from_point(
             center_point=center,
@@ -122,9 +115,8 @@ class OSMnxGraphGenerator:
     def _find_route_nodes(
         self,
         g_proj: nx.MultiDiGraph,
-        locations: List[Tuple[Tuple[float, float], str]],
-        verbose: bool = False,
-    ) -> List[Tuple[str, int, Tuple[float, float]]]:
+        locations: list[tuple[tuple[float, float], str]],
+    ) -> list[tuple[str, int, tuple[float, float]]]:
         transformer = Transformer.from_crs(
             "EPSG:4326", g_proj.graph["crs"], always_xy=True
         )
@@ -136,17 +128,16 @@ class OSMnxGraphGenerator:
             x, y = transformer.transform(lon, lat)
             node_id = ox.distance.nearest_nodes(g_proj, X=x, Y=y)
             route_nodes.append((nome, node_id, (x, y)))
-            if verbose:
-                print(
-                    f"Local: {nome} -> Node ID: {node_id} | (x, y): ({x:.1f}, {y:.1f})"
-                )
+            print(
+                f"Location: {nome} -> Node ID: {node_id} | (x, y): ({x:.1f}, {y:.1f})"
+            )
         return route_nodes
 
     def _set_node_priorities(
         self,
         g_proj: nx.MultiDiGraph,
-        route_nodes: List[Tuple[str, int, Tuple[float, float]]],
-        priorities: List[int],
+        route_nodes: list[tuple[str, int, tuple[float, float]]],
+        priorities: list[int],
     ):
         for (nome, node_id, (x, y)), priority in zip(route_nodes, priorities):
             g_proj.nodes[node_id]["name"] = nome

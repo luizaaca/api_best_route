@@ -94,6 +94,7 @@ Otimiza a rota usando o algoritmo genético.
 - NumPy: pacote numérico usado na seleção de pais no algoritmo genético.
 - NetworkX: estrutura de grafos utilizada para roteamento e cálculo de distâncias.
 - OSMnx: construção e projeção de grafos de ruas a partir de OpenStreetMap.
+- geopy: geocodificação e reverso-geocodificação de coordenadas, usado pelo `OSMnxGraphGenerator` para nomear pontos.
 - Shapely e PyProj: manipulação de geometrias e transformação entre CRS.
 - Matplotlib: dependência opcional para implementações de `IPlotter`.
 

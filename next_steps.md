@@ -15,7 +15,7 @@
 # 5. Permitir injeção de plotter [X]
 - criar função para injetar um plotter personalizado, permitindo a visualização das rotas geradas de forma mais flexível e adaptada às necessidades do usuário, em vez de depender de uma implementação fixa. O método 'plot' deverá receber uma instancia do objeto `RouteSegmentsInfo`. Usar uma interface.
 
-# 6. Verificar aquisição de nomes de locais
+# 6. Verificar aquisição de nomes de locais [X]
 - a função de busca de locais é bidirecional e deve encontrar coordenadas para nomes e nomes para coordenadas, usando a API do Nominatim. Verificar se a função está funcionando corretamente.
 
 # 7. Implementar testes unitários

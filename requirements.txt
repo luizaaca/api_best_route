@@ -5,3 +5,4 @@ matplotlib
 osmnx
 networkx
 shapely
+geopy
