@@ -1,4 +1,5 @@
 from src.domain.interfaces import IPlotter
+from matplotlib.collections import LineCollection
 from src.domain.models import RouteSegmentsInfo, GraphContext
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -10,9 +11,9 @@ class MatplotlibPlotter(IPlotter):
     def __init__(self, context: GraphContext):
         self._context = context
         self.graph = context.graph
-        self._generation = 0
         self._fitness_history: list[float] = []
         self._route_artists: list = []
+        self._last_route_signature: tuple | None = None
 
         plt.ion()
         # layout: left column split into two rows (fitness above empty filler),
@@ -65,56 +66,64 @@ class MatplotlibPlotter(IPlotter):
 
         self.fig.tight_layout()
 
+    def _build_route_signature(self, route_info: RouteSegmentsInfo) -> tuple:
+        """Build a hashable signature of route data that is visible on the map."""
+        return tuple(
+            (
+                tuple(seg.segment),
+                round(seg.length, 2),
+                round(seg.eta, 2),
+                None if seg.cost is None else round(seg.cost, 2),
+            )
+            for seg in route_info.segments
+        )
+
     def plot(self, route_info: RouteSegmentsInfo) -> None:
         """Redraw route lines for the current generation without touching static layers."""
 
-        self._generation += 1
+        # redraw route segments only if the displayed route information changed
+        route_signature = self._build_route_signature(route_info)
+        redraw_segments = (
+            self._last_route_signature is None
+            or route_signature != self._last_route_signature
+        )
+        if redraw_segments:
+            # remove artists added in the previous generation
+            for artist in self._route_artists:
+                try:
+                    artist.remove()
+                except ValueError:
+                    pass
+            self._route_artists.clear()
 
-        # remove artists added in the previous generation
-        for artist in self._route_artists:
-            try:
-                artist.remove()
-            except ValueError:
-                pass
-        self._route_artists.clear()
+            num_segments = len(route_info.segments)
+            palette = plt.get_cmap("turbo", max(1, num_segments))
+            colors = [palette(i) for i in range(num_segments)]
+            random.shuffle(colors)
 
-        num_segments = len(route_info.segments)
-        palette = plt.get_cmap("turbo", max(1, num_segments))
-        colors = [palette(i) for i in range(num_segments)]
-        random.shuffle(colors)
+            hex_colors = [mcolors.to_hex(c) for c in colors]
 
-        # draw each segment route using osmnx; we snapshot existing artists to
-        # remove them later so the updates still work, and use ioﬀ to make all
-        # segments appear simultaneously.
-        hex_colors = [mcolors.to_hex(c) for c in colors]
+            new_artists = []
 
-        with plt.ioff():
+            line_paths = [seg.path for seg in route_info.segments if seg.path]
+            line_colors = [
+                hex_colors[i] for i, seg in enumerate(route_info.segments) if seg.path
+            ]
+
+            if line_paths:
+                lc = LineCollection(
+                    line_paths,
+                    colors=line_colors,
+                    linewidths=3,
+                    zorder=5,
+                )
+                lc.set_visible(False)
+                self.map_ax.add_collection(lc)
+                new_artists.append(lc)
+
             for i, seg in enumerate(route_info.segments):
                 color = hex_colors[i]
-                # record existing artists before osmnx adds new ones
-                line_ids_before = {id(l) for l in self.map_ax.lines}
-                collection_ids_before = {id(c) for c in self.map_ax.collections}
 
-                ox.plot_graph_route(
-                    self.graph,
-                    seg.segment,
-                    route_color=color,
-                    route_linewidth=3,
-                    ax=self.map_ax,
-                    orig_dest_node_color="none",
-                    show=False,
-                    close=False,
-                )
-
-                # capture newly added artists so they can be removed next generation
-                self._route_artists.extend(
-                    l for l in self.map_ax.lines if id(l) not in line_ids_before
-                )
-                self._route_artists.extend(
-                    c
-                    for c in self.map_ax.collections
-                    if id(c) not in collection_ids_before
-                )
                 x_end = self.graph.nodes[seg.end]["x"]
                 y_end = self.graph.nodes[seg.end]["y"]
                 label = self.map_ax.text(
@@ -134,9 +143,9 @@ class MatplotlibPlotter(IPlotter):
                     ),
                     zorder=6,
                 )
-                self._route_artists.append(label)
+                label.set_visible(False)
+                new_artists.append(label)
 
-                # compute midpoint
                 if seg.path:
                     mid_idx = len(seg.path) // 2
                     x_mid, y_mid = seg.path[mid_idx]
@@ -149,6 +158,7 @@ class MatplotlibPlotter(IPlotter):
                 )
                 if seg.cost is not None:
                     info_text += f"\ncost {seg.cost:.2f}"
+
                 info = self.map_ax.text(
                     x_mid,
                     y_mid,
@@ -165,7 +175,16 @@ class MatplotlibPlotter(IPlotter):
                     ),
                     zorder=6,
                 )
-                self._route_artists.append(info)
+                info.set_visible(False)
+                new_artists.append(info)
+
+            for art in new_artists:
+                art.set_visible(True)
+
+            self._route_artists.extend(new_artists)
+
+        # update route cache only after successful draw/update of artists
+        self._last_route_signature = route_signature
 
         # update fitness chart: prefer total_cost, fall back to total_eta
         if route_info.total_cost is not None:
@@ -180,9 +199,14 @@ class MatplotlibPlotter(IPlotter):
             self._fitness_label_set = True
 
         self._fitness_history.append(fitness_value)
-        gens = list(range(len(self._fitness_history)))
+        # x-axis should reflect generation number starting at 1
+        gens = list(range(1, len(self._fitness_history) + 1))
         self._fitness_line.set_data(gens, self._fitness_history)
         self.fitness_ax.relim()
         self.fitness_ax.autoscale_view()
 
-        self.fig.canvas.draw()
+        # force GUI event loop processing so updates are visible every generation,
+        # even when route segments are not re-drawn.
+        self.fig.canvas.draw_idle()
+        self.fig.canvas.flush_events()
+        plt.pause(0.01)

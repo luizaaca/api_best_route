@@ -1,4 +1,4 @@
-# 1. Criar matrix de adjacência
+# 1. Criar matrix de adjacência [X]
 - criar função para calcular distâncias entre os pontos usando a API do networkx com `eta, segment = nx.single_source_dijkstra(grafo, origem, destino, funcao_custo_eta)` e construir a matrix de adjacência a partir das distâncias calculadas, aplicando os modificadores de prioridade e horário conforme necessário.
 
 # 2. Adicionar mais de um veículo
@@ -12,10 +12,7 @@
 # 4. Melhorar mutação
 - implementar mutação de swap com intensidade aleatória, onde dois destinos são trocados de posição na rota, além da mutação de inversão já existente, para aumentar a diversidade das soluções geradas e evitar convergência prematura.
 
-# 5. Recuperar path após otimização
-- criar função para recuperar o caminho otimizado após a execução do algoritmo genético, utilizando o metódo `get_path_details` da classe `RouteCalculator`.
-
-# 5. Permitir injeção de plotter
+# 5. Permitir injeção de plotter [X]
 - criar função para injetar um plotter personalizado, permitindo a visualização das rotas geradas de forma mais flexível e adaptada às necessidades do usuário, em vez de depender de uma implementação fixa. O método 'plot' deverá receber uma instancia do objeto `RouteSegmentsInfo`. Usar uma interface.
 
 # 6. Verificar aquisição de nomes de locais
