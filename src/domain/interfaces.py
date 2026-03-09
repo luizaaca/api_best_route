@@ -10,6 +10,8 @@ class IGraphGenerator(Protocol):
         destinations: list[tuple[str | tuple[float, float], int]],
     ) -> GraphContext: ...
 
+    def convert_segments_to_lat_lon(self, context: GraphContext, route_segments: RouteSegmentsInfo) -> RouteSegmentsInfo: ...
+
 
 @runtime_checkable
 class IRouteCalculator(Protocol):

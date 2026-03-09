@@ -118,6 +118,7 @@ classDiagram
     class IGraphGenerator {
         <<interface>>
         +initialize(origin, destinations) GraphContext
+        +convert_segments_to_lat_lon(context, route_segments) RouteSegmentsInfo
     }
 
     class IRouteCalculator {
@@ -146,6 +147,7 @@ classDiagram
     class GraphContext {
         +graph MultiDiGraph
         +route_nodes List[RouteNode]
+        +crs str
     }
 
     class RouteSegmentsInfo {
@@ -182,6 +184,7 @@ classDiagram
     class IGraphGenerator {
         <<interface>>
         +initialize(origin, destinations) GraphContext
+        +convert_segments_to_lat_lon(context, route_segments) RouteSegmentsInfo
     }
 
     class IRouteCalculator {
@@ -205,6 +208,8 @@ classDiagram
         -network_type str
         -custom_filter str or None
         +initialize(origin, destinations) GraphContext
+        +convert_segments_to_lat_lon(context, route_segments) RouteSegmentsInfo
+        -_convert_from_UTM_to_lat_lon(x, y, crs) [lat, lon]
         -_set_coords_and_names(locations) list
         -_get_center_and_dist(coords) tuple
         -_create_projected_graph(center, dist) MultiDiGraph
@@ -259,6 +264,7 @@ classDiagram
     class IGraphGenerator {
         <<interface>>
         +initialize(origin, destinations) GraphContext
+        +convert_segments_to_lat_lon(context, route_segments) RouteSegmentsInfo
     }
 
     class IRouteCalculator {
@@ -286,7 +292,7 @@ classDiagram
     class RouteOptimizationService {
         -graph_generator IGraphGenerator
         -route_calculator_factory Callable
-        -optimizer_factory Callable
+        -optimizer_factory Callable[IRouteCalculator -> IRouteOptimizer]
         +optimize(origin, destinations, max_generation, max_processing_time) OptimizationResult
     }
 
@@ -332,6 +338,8 @@ class IGraphGenerator(Protocol):
         origin: str | tuple[float, float],
         destinations: list[tuple[str | tuple[float, float], int]],
     ) -> GraphContext: ...
+
+    def convert_segments_to_lat_lon(self, context: GraphContext, route_segments: RouteSegmentsInfo) -> RouteSegmentsInfo: ...
 
 
 @runtime_checkable
@@ -405,6 +413,10 @@ class GraphContext:
     """
     graph: nx.MultiDiGraph
     route_nodes: list[RouteNode]
+    crs: str = field(init=False)
+
+    def __post_init__(self):
+        self.crs = self.graph.graph["crs"]
 
 
 @dataclass
@@ -447,6 +459,7 @@ Encapsulates all OSMnx operations. Migrates the module-level functions from `osm
 - Downloading and projecting a street network via OSMnx
 - Snapping geographic points to the nearest graph node
 - Annotating nodes with priority metadata
+- Converting route segment coordinates from UTM to lat/lon
 
 Configuration (network type, custom filter) is injected at construction time, allowing different instances for different road network scenarios without code changes.
 
@@ -456,6 +469,8 @@ Configuration (network type, custom filter) is injected at construction time, al
 **Implements:** `IRouteCalculator`
 
 Wraps a `networkx.MultiDiGraph` and computes route-level metrics using Dijkstra's algorithm. The graph is injected via the constructor — this class has no knowledge of how the graph was built, satisfying the Dependency Inversion Principle.
+
+Additionally, it removes duplicate coordinates from path details to ensure clean route representations.
 
 Because the graph is only available after `IGraphGenerator.initialize()` is called, this class is not injected as a singleton but rather instantiated on demand via a factory callable in `RouteOptimizationService`.
 
@@ -503,12 +518,10 @@ class RouteOptimizationService:
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
         optimizer_factory: Callable[[IRouteCalculator], IRouteOptimizer],
-        plotter: IPlotter | None = None,
     ):
         self._graph_generator = graph_generator
         self._route_calculator_factory = route_calculator_factory
         self._optimizer_factory = optimizer_factory
-        self._plotter = plotter
 
     def optimize(
         self,
@@ -528,10 +541,13 @@ class RouteOptimizationService:
             max_processing_time=max_processing_time,
         )
 
-        if self._plotter is not None:
-            self._plotter.plot(result.best_route)
-
-        return result
+        converted_route = self._graph_generator.convert_segments_to_lat_lon(context, result.best_route)
+        return OptimizationResult(
+            best_route=converted_route,
+            best_fitness=result.best_fitness,
+            population_size=result.population_size,
+            generations_run=result.generations_run,
+        )
 ```
 
 Note that `route_calculator_factory` and `optimizer_factory` are used per-call rather than per-service-instance. This is necessary because `RouteCalculator` depends on a graph that is only known at request time. The factories act as lightweight constructors bound to the DI container at startup.
@@ -563,7 +579,9 @@ def get_route_optimization_service() -> RouteOptimizationService:
     return RouteOptimizationService(
         graph_generator=get_graph_generator(),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=lambda calc: TSPGeneticAlgorithm(route_calculator=calc),
+        optimizer_factory=lambda calc: TSPGeneticAlgorithm(
+            route_calculator=calc, plotter=None
+        ),
     )
 ```
 
@@ -605,8 +623,9 @@ from src.application.route_optimization_service import RouteOptimizationService
 service = RouteOptimizationService(
     graph_generator=OSMnxGraphGenerator(),
     route_calculator_factory=RouteCalculator,
-    optimizer_factory=lambda calc: TSPGeneticAlgorithm(route_calculator=calc),
-    plotter=MatplotlibPlotter(),
+    optimizer_factory=lambda calc: TSPGeneticAlgorithm(
+        route_calculator=calc, plotter=MatplotlibPlotter()
+    ),
 )
 
 result = service.optimize(origin="...", destinations=[...])

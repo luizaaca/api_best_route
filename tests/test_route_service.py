@@ -4,16 +4,26 @@ import os
 # ensure src directory is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from src.domain.models import (
+    OptimizationResult,
+    RouteNode,
+    RouteSegmentsInfo,
+    GraphContext,
+)
 from src.application.route_optimization_service import RouteOptimizationService
-from src.domain.models import OptimizationResult, RouteNode, RouteSegmentsInfo
+import networkx as nx
 
 
 class DummyGraphGenerator:
     def initialize(self, origin, destinations):
-        # return a simple dummy graph object and nodes list
-        return type("G", (), {"graph": {"crs": "EPSG:3857"}})(), [
-            RouteNode("A", 1, (0, 0))
-        ]
+        # return a GraphContext with dummy graph and nodes
+        graph = nx.MultiDiGraph()
+        graph.graph["crs"] = "EPSG:3857"
+        return GraphContext(graph=graph, route_nodes=[RouteNode("A", 1, (0, 0))])
+
+    def convert_segments_to_lat_lon(self, context, route_segments):
+        self.converted = True
+        return route_segments
 
 
 class DummyRouteCalculator:
@@ -28,10 +38,13 @@ class DummyRouteCalculator:
 
 
 class DummyOptimizer:
-    def __init__(self, calc):
+    def __init__(self, calc, plotter=None):
         self.calc = calc
+        self.plotter = plotter
 
     def solve(self, route_nodes, max_generation, max_processing_time):
+        if self.plotter:
+            self.plotter.plot(RouteSegmentsInfo())
         return OptimizationResult(
             best_route=RouteSegmentsInfo(),
             best_fitness=0,
@@ -50,16 +63,23 @@ class DummyPlotter:
 
 def test_service_uses_generators():
     plotter = DummyPlotter()
+    generator = DummyGraphGenerator()
     service = RouteOptimizationService(
-        graph_generator=DummyGraphGenerator(),
+        graph_generator=generator,
         route_calculator_factory=lambda g: DummyRouteCalculator(g),
-        optimizer_factory=lambda calc: DummyOptimizer(calc),
+        optimizer_factory=lambda calc, plotter: DummyOptimizer(calc, plotter),
         plotter=plotter,
     )
     # run once to trigger plot call
     result = service.optimize("orig", [("dest", 1)])
     assert plotter.called
+    assert generator.converted  # Ensure conversion was called
 
     result = service.optimize("orig", [("dest", 1)])
     assert isinstance(result, OptimizationResult)
     assert result.best_fitness == 0
+
+
+if __name__ == "__main__":
+    test_service_uses_generators()
+    print("All tests passed!")

@@ -1,7 +1,7 @@
-from typing import Any, List
+from typing import Any, cast
 import networkx as nx
 
-from src.domain.models import RouteSegmentsInfo
+from src.domain.models import RouteNode, RouteSegmentsInfo
 
 
 class RouteCalculator:
@@ -12,7 +12,7 @@ class RouteCalculator:
 
     def compute_route_segments_info(
         self,
-        route: List[tuple],
+        route: list[RouteNode],
         weight_function: Any = "length",
         cost_type: str | None = None,
     ) -> RouteSegmentsInfo:
@@ -22,14 +22,16 @@ class RouteCalculator:
         total_cost = 0 if cost_type else None
         num_segments = len(route)
         for i in range(num_segments):
-            start = route[i - 1][1]
-            end = route[i][1]
+            start = route[i - 1].node_id
+            end = route[i].node_id
             eta, segment = nx.single_source_dijkstra(
                 self.graph, start, end, weight=weight_function
             )
+            eta = cast(float, eta)
+            segment = cast(list[int], segment)
             length = self._path_length_sum(segment)
             path = self._get_path_details(segment)
-            total_eta += eta
+            total_eta += int(eta)
             total_length += length
             cost = None
             if cost_type:
@@ -45,8 +47,8 @@ class RouteCalculator:
                     "path": path,
                     "segment": segment,
                     "cost": cost,
-                    "name": route[i][0],
-                    "coords": route[i][2],
+                    "name": route[i].name,
+                    "coords": route[i].coords,
                 }
             )
         return RouteSegmentsInfo(
@@ -60,6 +62,8 @@ class RouteCalculator:
         def calculate_weight(u: Any, v: Any, d: dict) -> float:
             length = d.get("length")
             maxspeed = d.get("maxspeed", 50)
+            if not length:
+                raise ValueError(f"Missing 'length' attribute for edge ({u}, {v})")
 
             if isinstance(maxspeed, list):
                 maxspeed = min(
@@ -94,7 +98,7 @@ class RouteCalculator:
 
         return weight_function
 
-    def _path_length_sum(self, path: List[Any], weight: str = "length") -> float:
+    def _path_length_sum(self, path: list[int], weight: str = "length") -> float:
         total = 0
         for u, v in zip(path[:-1], path[1:]):
             edge_data = self.graph.get_edge_data(u, v)
@@ -105,7 +109,7 @@ class RouteCalculator:
             total += edge.get(weight, 0)
         return total
 
-    def _get_path_details(self, path: List[Any]) -> List[dict]:
+    def _get_path_details(self, path: list[int]) -> list[dict]:
         detailed_route = []
         for i in range(1, len(path) - 1):
             u, v = path[i - 1], path[i]
@@ -121,7 +125,15 @@ class RouteCalculator:
 
             detailed_route.append((node_v["x"], node_v["y"]))
 
-        return detailed_route
+        # Remove duplicates to clean up the path
+        seen = set()
+        deduped_route = []
+        for item in detailed_route:
+            item_tuple = tuple(item)
+            if item_tuple not in seen:
+                seen.add(item_tuple)
+                deduped_route.append(item)
+        return deduped_route
 
     def _get_cost_function(self, cost_type: str) -> Any:
         def priority(node_id, eta: float) -> float:

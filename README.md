@@ -20,10 +20,19 @@ O código está organizado em pacotes sob `src/` (domínio, aplicação, infraes
 
 Execute o servidor com Uvicorn:
 ```
-uvicorn main:app --reload
+uvicorn api.main:app --reload
 ```
 
 A API estará disponível em `http://127.0.0.1:8000`. Acesse `http://127.0.0.1:8000/docs` para a documentação interativa do Swagger.
+
+## Executando o Console
+
+O console é um ponto de entrada alternativo à API, útil para execuções locais e depuração:
+```
+python -m console.main
+```
+
+O script em `console/main.py` demonstra a injeção de dependências: é possível passar um `MatplotlibPlotter` via `optimizer_factory` para visualizar a evolução da rota geração a geração. Edite o arquivo para configurar origem, destinos e parâmetros do algoritmo.
 
 ## Endpoint
 
@@ -88,4 +97,26 @@ Otimiza a rota usando o algoritmo genético.
 - Shapely e PyProj: manipulação de geometrias e transformação entre CRS.
 - Matplotlib: dependência opcional para implementações de `IPlotter`.
 
-O arquivo `requirements.txt` contém todas as dependências necessárias e pode ser instalado com `pip install -r requirements.txt`.  
+O arquivo `requirements.txt` contém todas as dependências necessárias e pode ser instalado com `pip install -r requirements.txt`.
+
+## Configuração
+
+### Cache do OSMnx
+
+O `OSMnxGraphGenerator` aceita um parâmetro `cache_folder` que define onde os dados baixados do OpenStreetMap serão armazenados em disco. Isso evita requisições repetidas à API do OSM durante o desenvolvimento.
+
+O valor é resolvido na seguinte ordem de precedência:
+1. Parâmetro `cache_folder` passado explicitamente ao construtor.
+2. Variável de ambiente `OSMNX_CACHE_FOLDER`.
+3. Valor padrão: `"cache"` (diretório relativo à raiz do projeto).
+
+Exemplo via variável de ambiente:
+```bash
+export OSMNX_CACHE_FOLDER=/tmp/osmnx_cache
+uvicorn api.main:app --reload
+```
+
+Exemplo via parâmetro (em `api/dependencies.py` ou `console/main.py`):
+```python
+OSMnxGraphGenerator(cache_folder="/tmp/osmnx_cache")
+```

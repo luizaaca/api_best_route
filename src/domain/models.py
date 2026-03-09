@@ -24,6 +24,10 @@ class GraphContext:
 
     graph: nx.MultiDiGraph
     route_nodes: list[RouteNode]
+    crs: str = field(init=False)
+
+    def __post_init__(self):
+        self.crs = self.graph.graph["crs"]
 
 
 @dataclass

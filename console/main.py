@@ -9,13 +9,16 @@ def run_console_example():
     service = RouteOptimizationService(
         graph_generator=OSMnxGraphGenerator(),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=lambda calc: TSPGeneticAlgorithm(route_calculator=calc),
-        plotter=MatplotlibPlotter(),
+        optimizer_factory=lambda calc: TSPGeneticAlgorithm(
+            route_calculator=calc, plotter=MatplotlibPlotter()
+        ),
     )
 
     # example usage (coordinates or addresses needed to actually run):
     origin = "Praça da Sé, São Paulo"
-    destinations = [("Avenida Paulista, São Paulo", 1)]
+    destinations: list[tuple[str | tuple[float, float], int]] = [
+        ("Avenida Paulista, São Paulo", 1)
+    ]
     result = service.optimize(origin=origin, destinations=destinations)
     print(result)
 

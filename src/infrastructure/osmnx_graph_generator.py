@@ -3,8 +3,9 @@ from pyproj import Transformer
 from shapely.geometry import MultiPoint
 import osmnx as ox
 import networkx as nx
+import os
 
-from src.domain.models import GraphContext, RouteNode
+from src.domain.models import GraphContext, RouteNode, RouteSegmentsInfo
 
 
 class OSMnxGraphGenerator:
@@ -14,12 +15,15 @@ class OSMnxGraphGenerator:
         self,
         network_type: str = "drive",
         custom_filter: str | None = None,
+        cache_folder: str | None = None,
     ):
         self.network_type = network_type
         self.custom_filter = custom_filter
 
-        # global settings moved here
         ox.settings.use_cache = True
+        ox.settings.cache_folder = cache_folder or os.getenv(
+            "OSMNX_CACHE_FOLDER", "cache"
+        )
         ox.settings.useful_tags_way = [
             "highway",
             "maxspeed",
@@ -105,7 +109,7 @@ class OSMnxGraphGenerator:
             center_point=center,
             dist=dist,
             dist_type="bbox",
-            network_type=self.network_type if self.custom_filter is None else None,
+            network_type=self.network_type,
             custom_filter=self.custom_filter,
             simplify=True,
         )
@@ -146,9 +150,34 @@ class OSMnxGraphGenerator:
             g_proj.nodes[node_id]["name"] = nome
             g_proj.nodes[node_id]["priority"] = priority
 
+    @staticmethod
+    def _convert_from_UTM_to_lat_lon(x, y, crs):
+        """Convert UTM coordinates to lat/lon."""
+        transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+        lon, lat = transformer.transform(x, y)
+        return [lat, lon]
 
-def convert_from_UTM_to_lat_lon(x, y, crs):
-    """Convenience function for use outside the class."""
-    transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
-    lon, lat = transformer.transform(x, y)
-    return [lat, lon]
+    def convert_segments_to_lat_lon(
+        self, context: GraphContext, route_segments: RouteSegmentsInfo
+    ) -> RouteSegmentsInfo:
+        """Return a new RouteSegmentsInfo with coords and paths converted from UTM to lat/lon."""
+        crs = context.crs
+        converted_segments = [
+            {
+                **segment,
+                "coords": self._convert_from_UTM_to_lat_lon(
+                    segment["coords"][0], segment["coords"][1], crs
+                ),
+                "path": [
+                    self._convert_from_UTM_to_lat_lon(x, y, crs)
+                    for x, y in segment["path"]
+                ],
+            }
+            for segment in route_segments.segments
+        ]
+        return RouteSegmentsInfo(
+            segments=converted_segments,
+            total_eta=route_segments.total_eta,
+            total_length=route_segments.total_length,
+            total_cost=route_segments.total_cost,
+        )

@@ -1,3 +1,4 @@
+from typing import cast
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -32,12 +33,26 @@ async def optimize_route(
     service: RouteOptimizationService = Depends(get_route_optimization_service),
 ):
     try:
-        destinations_formatted = [
-            (dest.location, dest.priority) for dest in request.destinations
+        destinations_formatted: list[tuple[str | tuple[float, float], int]] = [
+            (
+                (
+                    cast(tuple[float, float], (dest.location[0], dest.location[1]))
+                    if isinstance(dest.location, list)
+                    else dest.location
+                ),
+                dest.priority,
+            )
+            for dest in request.destinations
         ]
 
+        origin_converted: str | tuple[float, float]
+        if isinstance(request.origin, list):
+            origin_converted = (request.origin[0], request.origin[1])
+        else:
+            origin_converted = request.origin
+
         result = service.optimize(
-            origin=request.origin,
+            origin=origin_converted,
             destinations=destinations_formatted,
             max_generation=request.max_generation,
             max_processing_time=request.max_processing_time,

@@ -3,7 +3,6 @@ from src.domain.interfaces import (
     IGraphGenerator,
     IRouteCalculator,
     IRouteOptimizer,
-    IPlotter,
 )
 from src.domain.models import OptimizationResult
 
@@ -13,15 +12,11 @@ class RouteOptimizationService:
         self,
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
-        optimizer_factory: Callable[
-            [IRouteCalculator, IPlotter | None], IRouteOptimizer
-        ],
-        plotter: IPlotter | None = None,
+        optimizer_factory: Callable[[IRouteCalculator], IRouteOptimizer],
     ):
         self._graph_generator = graph_generator
         self._route_calculator_factory = route_calculator_factory
         self._optimizer_factory = optimizer_factory
-        self._plotter = plotter
 
     def optimize(
         self,
@@ -30,15 +25,30 @@ class RouteOptimizationService:
         max_generation: int = 50,
         max_processing_time: int = 10000,
     ) -> OptimizationResult:
+        print("Initializing graph and route nodes...")
         context = self._graph_generator.initialize(origin, destinations)
 
+        print("Creating route calculator...")
         route_calculator = self._route_calculator_factory(context.graph)
-        optimizer = self._optimizer_factory(route_calculator, self._plotter)
+        print("Creating optimizer with route calculator...")
+        optimizer = self._optimizer_factory(route_calculator)
 
+        print("Running optimization...")
         result = optimizer.solve(
             route_nodes=context.route_nodes,
             max_generation=max_generation,
             max_processing_time=max_processing_time,
+        )
+
+        print("Converting optimized route segments back to lat/lon...")
+        converted_route = self._graph_generator.convert_segments_to_lat_lon(
+            context, result.best_route
+        )
+        result = OptimizationResult(
+            best_route=converted_route,
+            best_fitness=result.best_fitness,
+            population_size=result.population_size,
+            generations_run=result.generations_run,
         )
 
         return result

@@ -1,11 +1,9 @@
 import random
 import time
-import traceback
 import numpy as np
 from typing import List, Tuple
 from src.domain.interfaces import IRouteCalculator, IPlotter
-from src.domain.models import OptimizationResult, RouteNode
-from src.infrastructure.osmnx_graph_generator import convert_from_UTM_to_lat_lon
+from src.domain.models import OptimizationResult, RouteNode, RouteSegmentsInfo
 
 
 class TSPGeneticAlgorithm:
@@ -95,10 +93,11 @@ class TSPGeneticAlgorithm:
         max_generation=50,
         max_processing_time=10000,
     ) -> OptimizationResult:
+        # TODO: generate adjacency matrix with self.route_calculator.compute_route_segments_info(...)
         population = self._generate_random_population(route_nodes, self.population_size)
         weight_function = self.route_calculator.get_weight_function()
         best_fitness = float("inf")
-        best_individual = (None, None)
+        best_individual: Tuple[list, RouteSegmentsInfo] = ([], RouteSegmentsInfo())
         generation = 0
         start_time = time.time() * 1000
 
@@ -110,6 +109,7 @@ class TSPGeneticAlgorithm:
                 )
                 break
 
+            print(f"Processing generation {generation}...")
             generation += 1
             population_calculated = [
                 self.route_calculator.compute_route_segments_info(
@@ -151,32 +151,7 @@ class TSPGeneticAlgorithm:
 
             population = new_population
 
-        def remove_duplicates(seq):
-            seen = set()
-            result = []
-            for item in seq:
-                if tuple(item) not in seen:
-                    seen.add(tuple(item))
-                    result.append(item)
-            return result
-
-        print("Retrieving graph CRS for coordinate conversion...")
-        try:
-            crs = self.route_calculator.get_graph_crs()
-            print(f"Graph CRS: {crs}")
-        except Exception as e:
-            print(f"Error retrieving graph CRS: {e}")
-            traceback.print_exc()
-            crs = None
         best_route = best_individual[1]
-        for segment in best_route.segments:
-            segment["coords"] = convert_from_UTM_to_lat_lon(
-                segment["coords"][0], segment["coords"][1], crs
-            )
-            segment["path"] = [
-                convert_from_UTM_to_lat_lon(x, y, crs)
-                for x, y in remove_duplicates(segment["path"])
-            ]
 
         print(
             "Best route: ",
