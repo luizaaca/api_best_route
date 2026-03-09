@@ -28,7 +28,7 @@ def run_console_example():
     ]
 
     max_generation = 50
-    max_processing_time = 10000
+    max_processing_time = 30000
 
     result = service.optimize(
         origin=origin,

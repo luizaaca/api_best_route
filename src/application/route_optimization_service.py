@@ -43,7 +43,7 @@ class RouteOptimizationService:
         plotter = None
         if self._plotter_factory:
             print("Creating plotter...")
-            plotter = self._plotter_factory(context.graph)
+            plotter = self._plotter_factory(context)
 
         print("Creating optimizer with route calculator...")
         optimizer = self._optimizer_factory(route_calculator, plotter)

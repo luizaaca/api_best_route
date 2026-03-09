@@ -256,6 +256,7 @@ classDiagram
     }
 
     class MatplotlibPlotter {
+        -_context GraphContext
         -graph MultiDiGraph
         +plot(route_info RouteSegmentsInfo) None
     }
@@ -267,6 +268,7 @@ classDiagram
 
     TSPGeneticAlgorithm --> IRouteCalculator : depends on
     TSPGeneticAlgorithm --> IPlotter : depends on
+    MatplotlibPlotter --> GraphContext : constructed with
 ```
 
 ---
@@ -530,12 +532,19 @@ Receives an `IRouteCalculator` at construction time. The genetic operators (cros
 
 The `solve()` method now returns an `OptimizationResult` dataclass instead of a raw dictionary, providing a typed contract to callers.
 
-### 8.4 MatplotlibPlotter (future)
+### 8.4 MatplotlibPlotter
 
 **Location:** `src/infrastructure/matplotlib_plotter.py`
 **Implements:** `IPlotter`
 
-Will implement the single-method `IPlotter` interface:
+Receives a `GraphContext` in its constructor, giving it access to both the projected street graph and the full list of `RouteNode` objects. At construction time it:
+
+- Opens a two-panel interactive figure (`plt.ion()`): left panel is the street-map, right panel is a distance-per-generation line chart.
+- Draws the base street graph once (static layer, never cleared).
+- Places crimson `X` markers for **all** `route_nodes` — including the origin — as a static POI layer.
+- Initialises a persistent summary text box (bottom-left of the map) that is updated each generation.
+
+Each call to `plot(route_info)` removes only the route-line artists from the previous generation (tracked in `_route_artists`), draws the new route with per-segment colours, updates the summary block, and appends the total distance to the right-panel chart. Static layers (base graph, POI markers, summary widget) are never redrawn, keeping updates fast.
 
 ```python
 def plot(self, route_info: RouteSegmentsInfo) -> None: ...
