@@ -123,9 +123,10 @@ classDiagram
 
     class IRouteCalculator {
         <<interface>>
-        +compute_route_segments_info(route, weight_function, cost_type) RouteSegmentsInfo
+        +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
+        +compute_route_segments_info(segments) RouteSegmentsInfo
         +get_weight_function() Callable
-        +get_graph_crs() str
+        +get_cost_function(cost_type) Callable
     }
 
     class IRouteOptimizer {
@@ -146,12 +147,24 @@ classDiagram
 
     class GraphContext {
         +graph MultiDiGraph
-        +route_nodes List[RouteNode]
+        +route_nodes list[RouteNode]
         +crs str
     }
 
+    class RouteSegment {
+        +start int
+        +end int
+        +eta float
+        +length float
+        +path list[tuple[float, float]]
+        +segment list[int]
+        +name str
+        +coords tuple[float, float]
+        +cost float or None
+    }
+
     class RouteSegmentsInfo {
-        +segments List[dict]
+        +segments list[RouteSegment]
         +total_eta float
         +total_length float
         +total_cost float or None
@@ -165,9 +178,11 @@ classDiagram
     }
 
     IGraphGenerator ..> GraphContext : returns
+    IRouteCalculator ..> RouteSegment : returns
     IRouteCalculator ..> RouteSegmentsInfo : returns
     IRouteOptimizer ..> OptimizationResult : returns
     GraphContext *-- RouteNode : contains
+    RouteSegmentsInfo *-- RouteSegment : contains
     OptimizationResult *-- RouteSegmentsInfo : contains
 ```
 
@@ -189,9 +204,10 @@ classDiagram
 
     class IRouteCalculator {
         <<interface>>
-        +compute_route_segments_info(route, weight_function, cost_type) RouteSegmentsInfo
+        +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
+        +compute_route_segments_info(segments) RouteSegmentsInfo
         +get_weight_function() Callable
-        +get_graph_crs() str
+        +get_cost_function(cost_type) Callable
     }
 
     class IRouteOptimizer {
@@ -219,12 +235,12 @@ classDiagram
 
     class RouteCalculator {
         -graph MultiDiGraph
-        +compute_route_segments_info(route, weight_function, cost_type) RouteSegmentsInfo
+        +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
+        +compute_route_segments_info(segments) RouteSegmentsInfo
         +get_weight_function() Callable
-        +get_graph_crs() str
+        +get_cost_function(cost_type) Callable
         -_path_length_sum(path, weight) float
-        -_get_path_details(path) List[dict]
-        -_get_cost_function(cost_type) Callable
+        -_get_path_details(path) list[tuple[float, float]]
     }
 
     class TSPGeneticAlgorithm {
@@ -233,12 +249,14 @@ classDiagram
         -population_size int
         -mutation_probability float
         -_generate_random_population(locations, size) list
+        -_generate_adjacency_matrix(route_nodes, weight_function, cost_function) dict
         -_order_crossover(p1, p2) list
         -_mutate(solution, probability) list
         +solve(route_nodes, max_generation, max_processing_time) OptimizationResult
     }
 
     class MatplotlibPlotter {
+        -graph MultiDiGraph
         +plot(route_info RouteSegmentsInfo) None
     }
 
@@ -269,9 +287,10 @@ classDiagram
 
     class IRouteCalculator {
         <<interface>>
-        +compute_route_segments_info(route, weight_function, cost_type) RouteSegmentsInfo
+        +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
+        +compute_route_segments_info(segments) RouteSegmentsInfo
         +get_weight_function() Callable
-        +get_graph_crs() str
+        +get_cost_function(cost_type) Callable
     }
 
     class IRouteOptimizer {
@@ -328,7 +347,7 @@ All interfaces are defined as Python `Protocol` classes (PEP 544, `typing.Protoc
 # src/domain/interfaces.py
 
 from typing import Protocol, Callable, Any, runtime_checkable
-from .models import RouteSegmentsInfo, OptimizationResult, GraphContext
+from .models import RouteSegment, RouteSegmentsInfo, OptimizationResult, GraphContext, RouteNode
 
 
 @runtime_checkable
@@ -344,16 +363,22 @@ class IGraphGenerator(Protocol):
 
 @runtime_checkable
 class IRouteCalculator(Protocol):
+    def compute_segment(
+        self,
+        start_node: RouteNode,
+        end_node: RouteNode,
+        weight_function: Any = ...,
+        cost_function: Any | None = ...,
+    ) -> RouteSegment: ...
+
     def compute_route_segments_info(
         self,
-        route: list,
-        weight_function: Any = ...,
-        cost_type: str | None = ...,
+        segments: list[RouteSegment],
     ) -> RouteSegmentsInfo: ...
 
     def get_weight_function(self) -> Callable: ...
 
-    def get_graph_crs(self) -> str: ...
+    def get_cost_function(self, cost_type: str) -> Callable: ...
 
 
 @runtime_checkable
@@ -420,12 +445,28 @@ class GraphContext:
 
 
 @dataclass
+class RouteSegment:
+    """
+    Typed representation of a single computed route segment between two graph nodes.
+    """
+    start: int
+    end: int
+    eta: float
+    length: float
+    path: list[tuple[float, float]]
+    segment: list[int]
+    name: str
+    coords: tuple[float, float]
+    cost: float | None = None
+
+
+@dataclass
 class RouteSegmentsInfo:
     """
     Stores computed metrics for an ordered sequence of route segments.
     Each segment maps to one destination in the optimized route.
     """
-    segments: List[dict] = field(default_factory=list)
+    segments: list[RouteSegment] = field(default_factory=list)
     total_eta: float = 0.0
     total_length: float = 0.0
     total_cost: float | None = None
@@ -471,6 +512,12 @@ Configuration (network type, custom filter) is injected at construction time, al
 Wraps a `networkx.MultiDiGraph` and computes route-level metrics using Dijkstra's algorithm. The graph is injected via the constructor — this class has no knowledge of how the graph was built, satisfying the Dependency Inversion Principle.
 
 Additionally, it removes duplicate coordinates from path details to ensure clean route representations.
+
+The class exposes two public methods with distinct responsibilities:
+
+- `compute_segment(start_node_id, end_node, weight_function, cost_function)` — runs Dijkstra between a single pair of nodes and returns a typed `RouteSegment` dataclass containing ETA, length, path details, and optional cost. The cost function is passed in already resolved, so the same callable is reused across all segments in a route.
+- `compute_route_segments_info(segments)` — the consolidating entry point. It receives a pre-built `list[RouteSegment]`, sums ETA, length, and cost totals, and packages the result into `RouteSegmentsInfo`. Callers are responsible for building the segment list (e.g., via `compute_segment` for each consecutive node pair) before invoking this method.
+- `get_cost_function(cost_type)` — resolves and returns the cost callable by name, allowing callers to pre-resolve it once before iterating over route pairs.
 
 Because the graph is only available after `IGraphGenerator.initialize()` is called, this class is not injected as a singleton but rather instantiated on demand via a factory callable in `RouteOptimizationService`.
 
@@ -609,7 +656,7 @@ async def optimize_route(
     ...
 ```
 
-### 10.2 Console Entry Point (future)
+### 10.2 Console Entry Point
 
 ```python
 # console/main.py

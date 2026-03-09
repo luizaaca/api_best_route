@@ -5,7 +5,7 @@ import osmnx as ox
 import networkx as nx
 import os
 
-from src.domain.models import GraphContext, RouteNode, RouteSegmentsInfo
+from src.domain.models import GraphContext, RouteNode, RouteSegmentsInfo, RouteSegment
 
 
 class OSMnxGraphGenerator:
@@ -20,6 +20,7 @@ class OSMnxGraphGenerator:
         self.network_type = network_type
         self.custom_filter = custom_filter
 
+        print("Configuring OSMnx settings...")
         ox.settings.use_cache = True
         ox.settings.cache_folder = cache_folder or os.getenv(
             "OSMNX_CACHE_FOLDER", "cache"
@@ -32,6 +33,7 @@ class OSMnxGraphGenerator:
             "surface",
             "oneway",
         ]
+        print(f"OSMnx cache folder set to: {ox.settings.cache_folder}")
 
     def initialize(
         self,
@@ -162,19 +164,39 @@ class OSMnxGraphGenerator:
     ) -> RouteSegmentsInfo:
         """Return a new RouteSegmentsInfo with coords and paths converted from UTM to lat/lon."""
         crs = context.crs
-        converted_segments = [
-            {
-                **segment,
-                "coords": self._convert_from_UTM_to_lat_lon(
-                    segment["coords"][0], segment["coords"][1], crs
-                ),
-                "path": [
-                    self._convert_from_UTM_to_lat_lon(x, y, crs)
-                    for x, y in segment["path"]
-                ],
-            }
-            for segment in route_segments.segments
-        ]
+        converted_segments: list[RouteSegment] = []
+
+        for seg in route_segments.segments:
+            start = seg.start
+            end = seg.end
+            eta = seg.eta
+            length = seg.length
+            segment_nodes = seg.segment
+            name = seg.name
+            cost = seg.cost
+            x, y = seg.coords
+            path_utm = seg.path
+
+            coords_latlon = tuple(self._convert_from_UTM_to_lat_lon(x, y, crs))
+            path_latlon = [
+                tuple(self._convert_from_UTM_to_lat_lon(px, py, crs))
+                for px, py in path_utm
+            ]
+
+            converted_segments.append(
+                RouteSegment(
+                    start=start,
+                    end=end,
+                    eta=eta,
+                    length=length,
+                    path=path_latlon,
+                    segment=segment_nodes,
+                    name=name,
+                    coords=coords_latlon,
+                    cost=cost,
+                )
+            )
+
         return RouteSegmentsInfo(
             segments=converted_segments,
             total_eta=route_segments.total_eta,

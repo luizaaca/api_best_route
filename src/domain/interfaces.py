@@ -1,5 +1,11 @@
 from typing import Protocol, Callable, Any, runtime_checkable
-from .models import RouteSegmentsInfo, OptimizationResult, GraphContext
+from .models import (
+    RouteSegment,
+    RouteSegmentsInfo,
+    OptimizationResult,
+    GraphContext,
+    RouteNode,
+)
 
 
 @runtime_checkable
@@ -10,19 +16,29 @@ class IGraphGenerator(Protocol):
         destinations: list[tuple[str | tuple[float, float], int]],
     ) -> GraphContext: ...
 
-    def convert_segments_to_lat_lon(self, context: GraphContext, route_segments: RouteSegmentsInfo) -> RouteSegmentsInfo: ...
+    def convert_segments_to_lat_lon(
+        self, context: GraphContext, route_segments: RouteSegmentsInfo
+    ) -> RouteSegmentsInfo: ...
 
 
 @runtime_checkable
 class IRouteCalculator(Protocol):
+    def compute_segment(
+        self,
+        start_node: RouteNode,
+        end_node: RouteNode,
+        weight_function: Any = ...,
+        cost_function: Any | None = ...,
+    ) -> RouteSegment: ...
+
     def compute_route_segments_info(
         self,
-        route: list,
-        weight_function: Any = ...,
-        cost_type: str | None = ...,
+        segments: list[RouteSegment],
     ) -> RouteSegmentsInfo: ...
 
     def get_weight_function(self) -> Callable: ...
+
+    def get_cost_function(self, cost_type: str) -> Callable: ...
 
 
 @runtime_checkable

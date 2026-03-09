@@ -12,8 +12,17 @@
 # 4. Melhorar mutação
 - implementar mutação de swap com intensidade aleatória, onde dois destinos são trocados de posição na rota, além da mutação de inversão já existente, para aumentar a diversidade das soluções geradas e evitar convergência prematura.
 
+# 5. Recuperar path após otimização
+- criar função para recuperar o caminho otimizado após a execução do algoritmo genético, utilizando o metódo `get_path_details` da classe `RouteCalculator`.
+
 # 5. Permitir injeção de plotter
 - criar função para injetar um plotter personalizado, permitindo a visualização das rotas geradas de forma mais flexível e adaptada às necessidades do usuário, em vez de depender de uma implementação fixa. O método 'plot' deverá receber uma instancia do objeto `RouteSegmentsInfo`. Usar uma interface.
 
 # 6. Verificar aquisição de nomes de locais
 - a função de busca de locais é bidirecional e deve encontrar coordenadas para nomes e nomes para coordenadas, usando a API do Nominatim. Verificar se a função está funcionando corretamente.
+
+# 7. Implementar testes unitários
+- criar testes unitários para as funções principais do código, como a função de cálculo de distância.
+
+# 8. Verificar possibilidade de capacidade de veículos e lista de entregas
+- implementar lógica para considerar a capacidade dos veículos e a lista de entregas, garantindo que as rotas geradas sejam viáveis em termos de carga e demanda, e que os veículos não sejam sobrecarregados.

@@ -3,6 +3,7 @@ from src.domain.interfaces import (
     IGraphGenerator,
     IRouteCalculator,
     IRouteOptimizer,
+    IPlotter,
 )
 from src.domain.models import OptimizationResult
 
@@ -12,11 +13,19 @@ class RouteOptimizationService:
         self,
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
-        optimizer_factory: Callable[[IRouteCalculator], IRouteOptimizer],
+        optimizer_factory: Callable[
+            [IRouteCalculator, IPlotter | None], IRouteOptimizer
+        ],
+        plotter_factory: Callable[..., IPlotter] | None = None,
     ):
-        self._graph_generator = graph_generator
-        self._route_calculator_factory = route_calculator_factory
-        self._optimizer_factory = optimizer_factory
+        self._graph_generator: IGraphGenerator = graph_generator
+        self._route_calculator_factory: Callable[..., IRouteCalculator] = (
+            route_calculator_factory
+        )
+        self._optimizer_factory: Callable[
+            [IRouteCalculator, IPlotter | None], IRouteOptimizer
+        ] = optimizer_factory
+        self._plotter_factory: Callable[..., IPlotter] | None = plotter_factory
 
     def optimize(
         self,
@@ -30,8 +39,14 @@ class RouteOptimizationService:
 
         print("Creating route calculator...")
         route_calculator = self._route_calculator_factory(context.graph)
+
+        plotter = None
+        if self._plotter_factory:
+            print("Creating plotter...")
+            plotter = self._plotter_factory(context.graph)
+
         print("Creating optimizer with route calculator...")
-        optimizer = self._optimizer_factory(route_calculator)
+        optimizer = self._optimizer_factory(route_calculator, plotter)
 
         print("Running optimization...")
         result = optimizer.solve(

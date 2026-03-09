@@ -14,7 +14,8 @@ def get_route_optimization_service() -> RouteOptimizationService:
     return RouteOptimizationService(
         graph_generator=get_graph_generator(),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=lambda calc: TSPGeneticAlgorithm(
-            route_calculator=calc, plotter=None
+        optimizer_factory=lambda calc, plotter: TSPGeneticAlgorithm(
+            route_calculator=calc, plotter=plotter
         ),
+        plotter_factory=None,
     )

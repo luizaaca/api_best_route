@@ -10,6 +10,7 @@ from api.schemas import (
     OptimizeRouteResponse,
 )
 from api.dependencies import get_route_optimization_service
+from src.domain.models import RouteSegment
 from src.application.route_optimization_service import RouteOptimizationService
 
 app = FastAPI(
@@ -60,18 +61,18 @@ async def optimize_route(
 
         best_route = []
         for node in result.best_route.segments:
-            location = node["name"]
-            coords = list(node["coords"])
-            path = node["path"]
-            length = node["length"]
-            eta = node["eta"]
-            cost = node.get("cost")
+            location = node.name
+            coords = list(node.coords)
+            path = node.path
+            length = node.length
+            eta = node.eta
+            cost = node.cost
             best_route.append(
                 RouteItem(
                     location=location,
                     coords=coords,
                     length=length,
-                    path=path,
+                    path=[list(p) for p in path],
                     eta=eta,
                     cost=cost,
                 )

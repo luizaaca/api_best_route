@@ -1,19 +1,19 @@
-from typing import List, Union, Optional
+from typing import Union, Optional
 from pydantic import BaseModel
 
 
 class Destination(BaseModel):
-    location: Union[str, List[float]]
+    location: Union[str, list[float]]
     priority: int
 
 
 class RouteItem(BaseModel):
-    location: Union[str, List[float]]
-    coords: List[float]
+    location: Union[str, list[float]]
+    coords: list[float]
     length: float
     eta: float
     cost: Optional[float] = None
-    path: List[List[float]]
+    path: list[list[float]]
 
 
 class RouteTotals(BaseModel):
@@ -23,14 +23,14 @@ class RouteTotals(BaseModel):
 
 
 class OptimizeRouteRequest(BaseModel):
-    origin: Union[str, List[float]]
-    destinations: List[Destination]
+    origin: Union[str, list[float]]
+    destinations: list[Destination]
     max_generation: int = 50
     max_processing_time: int = 10000
 
 
 class OptimizeRouteResponse(BaseModel):
-    best_route: List[RouteItem]
+    best_route: list[RouteItem]
     totals: RouteTotals
     best_fitness: float
     population_size: int

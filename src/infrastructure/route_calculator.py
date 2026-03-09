@@ -1,7 +1,7 @@
 from typing import Any, cast
 import networkx as nx
 
-from src.domain.models import RouteNode, RouteSegmentsInfo
+from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
 
 
 class RouteCalculator:
@@ -10,47 +10,48 @@ class RouteCalculator:
     def __init__(self, graph: nx.MultiDiGraph):
         self.graph = graph
 
+    def compute_segment(
+        self,
+        start_node: RouteNode,
+        end_node: RouteNode,
+        weight_function: Any = "length",
+        cost_function: Any | None = None,
+    ) -> RouteSegment:
+        """Compute route metrics for a single segment between two graph nodes."""
+        eta, segment = nx.single_source_dijkstra(
+            self.graph, start_node.node_id, end_node.node_id, weight=weight_function
+        )
+        eta = cast(float, eta)
+        segment = cast(list[int], segment)
+        length = self._path_length_sum(segment)
+        path = self._get_path_details(segment)
+        cost = cost_function(end_node.node_id, eta) if cost_function else None
+        return RouteSegment(
+            start=start_node.node_id,
+            end=end_node.node_id,
+            eta=eta,
+            length=length,
+            path=path,
+            segment=segment,
+            cost=cost,
+            name=end_node.name,
+            coords=end_node.coords,
+        )
+
     def compute_route_segments_info(
         self,
-        route: list[RouteNode],
-        weight_function: Any = "length",
-        cost_type: str | None = None,
+        segments: list[RouteSegment],
     ) -> RouteSegmentsInfo:
-        segments = []
+        """Consolidate a list of computed segments into a RouteSegmentsInfo aggregate."""
         total_eta = 0
-        total_length = 0
-        total_cost = 0 if cost_type else None
-        num_segments = len(route)
-        for i in range(num_segments):
-            start = route[i - 1].node_id
-            end = route[i].node_id
-            eta, segment = nx.single_source_dijkstra(
-                self.graph, start, end, weight=weight_function
-            )
-            eta = cast(float, eta)
-            segment = cast(list[int], segment)
-            length = self._path_length_sum(segment)
-            path = self._get_path_details(segment)
-            total_eta += int(eta)
-            total_length += length
-            cost = None
-            if cost_type:
-                cost_function = self._get_cost_function(cost_type)
-                cost = cost_function(end, eta)
-                total_cost += cost
-            segments.append(
-                {
-                    "start": start,
-                    "end": end,
-                    "eta": eta,
-                    "length": length,
-                    "path": path,
-                    "segment": segment,
-                    "cost": cost,
-                    "name": route[i].name,
-                    "coords": route[i].coords,
-                }
-            )
+        total_length = 0.0
+        has_cost = any(seg.cost is not None for seg in segments)
+        total_cost = 0.0 if has_cost else None
+        for seg in segments:
+            total_eta += int(seg.eta)
+            total_length += seg.length
+            if seg.cost is not None:
+                total_cost = (total_cost or 0.0) + seg.cost
         return RouteSegmentsInfo(
             segments=segments,
             total_eta=total_eta,
@@ -109,7 +110,7 @@ class RouteCalculator:
             total += edge.get(weight, 0)
         return total
 
-    def _get_path_details(self, path: list[int]) -> list[dict]:
+    def _get_path_details(self, path: list[int]) -> list[tuple[float, float]]:
         detailed_route = []
         for i in range(1, len(path) - 1):
             u, v = path[i - 1], path[i]
@@ -135,7 +136,9 @@ class RouteCalculator:
                 deduped_route.append(item)
         return deduped_route
 
-    def _get_cost_function(self, cost_type: str) -> Any:
+    def get_cost_function(self, cost_type: str) -> Any:
+        """Resolve and return the cost callable for the given cost_type."""
+
         def priority(node_id, eta: float) -> float:
             node = self.graph.nodes[node_id]
             priority_value = node.get("priority", 1)

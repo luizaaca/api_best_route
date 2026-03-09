@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from typing import List
 import networkx as nx
 
 
@@ -31,13 +30,31 @@ class GraphContext:
 
 
 @dataclass
+class RouteSegment:
+    """
+    Typed representation of a single computed route segment between two graph nodes.
+    Replaces the raw dict previously returned by RouteCalculator.compute_segment.
+    """
+
+    start: int
+    end: int
+    eta: float
+    length: float
+    path: list[tuple[float, float]]
+    segment: list[int]
+    name: str
+    coords: tuple[float, float]
+    cost: float | None = None
+
+
+@dataclass
 class RouteSegmentsInfo:
     """
     Stores computed metrics for an ordered sequence of route segments.
     Each segment maps to one destination in the optimized route.
     """
 
-    segments: List[dict] = field(default_factory=list)
+    segments: list[RouteSegment] = field(default_factory=list)
     total_eta: float = 0.0
     total_length: float = 0.0
     total_cost: float | None = None

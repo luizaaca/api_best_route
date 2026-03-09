@@ -1,9 +1,14 @@
 import random
 import time
 import numpy as np
-from typing import List, Tuple
+from typing import Tuple
 from src.domain.interfaces import IRouteCalculator, IPlotter
-from src.domain.models import OptimizationResult, RouteNode, RouteSegmentsInfo
+from src.domain.models import (
+    OptimizationResult,
+    RouteNode,
+    RouteSegmentsInfo,
+    RouteSegment,
+)
 
 
 class TSPGeneticAlgorithm:
@@ -31,9 +36,9 @@ class TSPGeneticAlgorithm:
 
     @staticmethod
     def _order_crossover(
-        parent1: List[Tuple[str, int, Tuple[float, float]]],
-        parent2: List[Tuple[str, int, Tuple[float, float]]],
-    ) -> List[Tuple[str, int, Tuple[float, float]]]:
+        parent1: list[RouteNode],
+        parent2: list[RouteNode],
+    ) -> list[RouteNode]:
         first = parent1[0]
         p1 = parent1[1:]
         p2 = parent2[1:]
@@ -53,9 +58,9 @@ class TSPGeneticAlgorithm:
 
     @staticmethod
     def _mutate(
-        solution: List[Tuple[str, int, Tuple[float, float]]],
+        solution: list[RouteNode],
         mutation_probability: float,
-    ) -> List[Tuple[str, int, Tuple[float, float]]]:
+    ) -> list[RouteNode]:
         if len(solution) < 2:
             return solution
         first = solution[0]
@@ -72,6 +77,34 @@ class TSPGeneticAlgorithm:
                 mutated_rest[index],
             )
         return [first] + mutated_rest
+
+    def _generate_adjacency_matrix(
+        self, route_nodes: list[RouteNode], weight_function, cost_function
+    ) -> dict[tuple[int, int], RouteSegment]:
+        """
+        Generate an adjacency mapping of travel calculations between every pair of nodes.
+
+        Parameters:
+        - route_nodes (list[RouteNode]): Resolved graph nodes.
+        - weight_function: Callable to compute the weight (e.g., distance) of a segment.
+        - cost_function: Callable to compute the cost of a segment based on its eta and node priority.
+
+        Returns:
+        dict[tuple[int, int], RouteSegment]: Mapping of (start_node_id, end_node_id) -> RouteSegment.
+        """
+        matrix: dict[tuple[int, int], RouteSegment] = {}
+        for i, from_node in enumerate(route_nodes):
+            for j, to_node in enumerate(route_nodes):
+                if i == j:
+                    continue
+                seg = self.route_calculator.compute_segment(
+                    start_node=from_node,
+                    end_node=to_node,
+                    weight_function=weight_function,
+                    cost_function=cost_function,
+                )
+                matrix[(from_node.node_id, to_node.node_id)] = seg
+        return matrix
 
     # ----------------------------------------------------------
 
@@ -93,11 +126,39 @@ class TSPGeneticAlgorithm:
         max_generation=50,
         max_processing_time=10000,
     ) -> OptimizationResult:
-        # TODO: generate adjacency matrix with self.route_calculator.compute_route_segments_info(...)
-        population = self._generate_random_population(route_nodes, self.population_size)
+        """
+        Solve the Traveling Salesman Problem using a genetic algorithm.
+
+        Pre-computes a full adjacency matrix of `RouteSegment` objects for every ordered
+        pair of nodes, then runs a generational loop that evaluates, selects, crosses over,
+        and mutates candidate routes. Each generation's fitness is derived from
+        `RouteSegmentsInfo.total_cost`, which aggregates the priority-weighted ETA across
+        all segments in a route. The best individual found across all generations is returned.
+
+        Args:
+            route_nodes (list[RouteNode]): Ordered list of resolved graph nodes that define
+                the set of locations to visit. The first node is treated as the fixed origin.
+            max_generation (int, optional): Maximum number of generations to run before
+                stopping, regardless of convergence. Defaults to 50.
+            max_processing_time (int, optional): Wall-clock time limit in milliseconds.
+                The loop exits early if this threshold is reached. Defaults to 10000.
+
+        Returns:
+            OptimizationResult: Contains the best route found (`RouteSegmentsInfo`),
+                its fitness value (`best_fitness`), the final population size, and the
+                number of generations actually executed.
+        """
         weight_function = self.route_calculator.get_weight_function()
+        cost_function = self.route_calculator.get_cost_function("priority")
+        adjacency_matrix: dict[tuple[int, int], RouteSegment] = (
+            self._generate_adjacency_matrix(route_nodes, weight_function, cost_function)
+        )
+        population = self._generate_random_population(route_nodes, self.population_size)
         best_fitness = float("inf")
-        best_individual: Tuple[list, RouteSegmentsInfo] = ([], RouteSegmentsInfo())
+        best_individual: Tuple[list[RouteNode], RouteSegmentsInfo] = (
+            [],
+            RouteSegmentsInfo(),
+        )
         generation = 0
         start_time = time.time() * 1000
 
@@ -113,7 +174,12 @@ class TSPGeneticAlgorithm:
             generation += 1
             population_calculated = [
                 self.route_calculator.compute_route_segments_info(
-                    individual, weight_function, "priority"
+                    [
+                        adjacency_matrix[
+                            (individual[i].node_id, individual[i + 1].node_id)
+                        ]
+                        for i in range(len(individual) - 1)
+                    ]
                 )
                 for individual in population
             ]
@@ -155,7 +221,7 @@ class TSPGeneticAlgorithm:
 
         print(
             "Best route: ",
-            " -> ".join([segment["name"] for segment in best_route.segments]),
+            " -> ".join([segment.name for segment in best_route.segments]),
         )
 
         return OptimizationResult(
