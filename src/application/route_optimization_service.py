@@ -33,6 +33,7 @@ class RouteOptimizationService:
         destinations: list[tuple[str | tuple[float, float], int]],
         max_generation: int = 50,
         max_processing_time: int = 10000,
+        vehicle_count: int = 1,
     ) -> OptimizationResult:
         print("Initializing graph and route nodes...")
         context = self._graph_generator.initialize(origin, destinations)
@@ -53,6 +54,7 @@ class RouteOptimizationService:
             route_nodes=context.route_nodes,
             max_generation=max_generation,
             max_processing_time=max_processing_time,
+            vehicle_count=vehicle_count,
         )
 
         print("Converting optimized route segments back to lat/lon...")

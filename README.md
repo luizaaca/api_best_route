@@ -47,6 +47,7 @@ Otimiza a rota usando o algoritmo genético.
   - `priority` (integer): Prioridade do destino (ex: 1 para alta prioridade).
 - `max_generation` (integer, opcional): Número máximo de gerações (padrão: 50).
 - `max_processing_time` (integer, opcional): Tempo máximo de processamento em milissegundos (padrão: 10000).
+- `vehicle_count` (integer, opcional): Número de veículos disponíveis. Atualmente tem efeito apenas no payload e não altera a rota (padrão: 1).
 
 #### Exemplo de Requisição
 ```json
@@ -58,7 +59,8 @@ Otimiza a rota usando o algoritmo genético.
     {"location": [-23.5465, -46.6367], "priority": 3}
   ],
   "max_generation": 50,
-  "max_processing_time": 10000
+  "max_processing_time": 10000,
+  "vehicle_count": 2
 }
 ```
 

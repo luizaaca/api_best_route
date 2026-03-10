@@ -131,7 +131,7 @@ classDiagram
 
     class IRouteOptimizer {
         <<interface>>
-        +solve(route_nodes, max_generation, max_processing_time) OptimizationResult
+        +solve(route_nodes, max_generation, max_processing_time, vehicle_count) OptimizationResult
     }
 
     class IPlotter {
@@ -252,7 +252,7 @@ classDiagram
         -_generate_adjacency_matrix(route_nodes, weight_function, cost_function) dict
         -_order_crossover(p1, p2) list
         -_mutate(solution, probability) list
-        +solve(route_nodes, max_generation, max_processing_time) OptimizationResult
+        +solve(route_nodes, max_generation, max_processing_time, vehicle_count) OptimizationResult
     }
 
     class MatplotlibPlotter {
@@ -314,7 +314,7 @@ classDiagram
         -graph_generator IGraphGenerator
         -route_calculator_factory Callable
         -optimizer_factory Callable[IRouteCalculator -> IRouteOptimizer]
-        +optimize(origin, destinations, max_generation, max_processing_time) OptimizationResult
+        +optimize(origin, destinations, max_generation, max_processing_time, vehicle_count) OptimizationResult
     }
 
     class FastAPIApp {
@@ -390,6 +390,7 @@ class IRouteOptimizer(Protocol):
         route_nodes: list,
         max_generation: int = ...,
         max_processing_time: int = ...,
+        vehicle_count: int = ...,
     ) -> OptimizationResult: ...
 
 
@@ -558,7 +559,7 @@ Because the interface is defined in the domain layer and the concrete implementa
 
 **Location:** `src/application/route_optimization_service.py`
 
-`RouteOptimizationService` is the single orchestrator. It depends exclusively on interfaces and on factory callables that produce interface-typed instances. It contains no business logic of its own beyond sequencing the steps of the optimization workflow.
+`RouteOptimizationService` is the single orchestrator. It depends exclusively on interfaces and on factory callables that produce interface-typed instances. Its `optimize` method now accepts an additional `vehicle_count` parameter which is forwarded to the optimizer; currently the value is recorded but has no effect on single-vehicle routing. The service contains no business logic of its own beyond sequencing the steps of the optimization workflow.
 
 ```python
 # src/application/route_optimization_service.py
@@ -585,6 +586,7 @@ class RouteOptimizationService:
         destinations: list[tuple[str | tuple[float, float], int]],
         max_generation: int = 50,
         max_processing_time: int = 10000,
+        vehicle_count: int = 1,
     ) -> OptimizationResult:
         context = self._graph_generator.initialize(origin, destinations)
 
@@ -595,6 +597,7 @@ class RouteOptimizationService:
             route_nodes=context.route_nodes,
             max_generation=max_generation,
             max_processing_time=max_processing_time,
+            vehicle_count=vehicle_count,
         )
 
         converted_route = self._graph_generator.convert_segments_to_lat_lon(context, result.best_route)
@@ -660,6 +663,7 @@ async def optimize_route(
         destinations=[(d.location, d.priority) for d in request.destinations],
         max_generation=request.max_generation,
         max_processing_time=request.max_processing_time,
+        vehicle_count=request.vehicle_count,
     )
     # map result to response schema
     ...
@@ -684,7 +688,7 @@ service = RouteOptimizationService(
     ),
 )
 
-result = service.optimize(origin="...", destinations=[...])
+result = service.optimize(origin="...", destinations=[...], vehicle_count=2)
 ```
 
 The application service and all infrastructure classes are identical in both entry points. Only the wiring and data translation (HTTP vs. stdin/stdout) differ.
@@ -701,7 +705,7 @@ class MockGraphGenerator:
         return mock_graph, mock_route_nodes
 
 class MockOptimizer:
-    def solve(self, route_nodes, max_generation, max_processing_time):
+    def solve(self, route_nodes, max_generation, max_processing_time, vehicle_count=1):
         return OptimizationResult(...)
 
 service = RouteOptimizationService(

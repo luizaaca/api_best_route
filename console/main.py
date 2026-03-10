@@ -35,6 +35,7 @@ def run_console_example():
         destinations=destinations,
         max_generation=max_generation,
         max_processing_time=max_processing_time,
+        vehicle_count=2,  # example value
     )
     # resultado formatado para exibição no console
     print("\nResumo da otimização:")

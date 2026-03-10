@@ -41,8 +41,11 @@ class DummyOptimizer:
     def __init__(self, calc, plotter=None):
         self.calc = calc
         self.plotter = plotter
+        self.last_vehicle_count = None
 
-    def solve(self, route_nodes, max_generation, max_processing_time):
+    def solve(self, route_nodes, max_generation, max_processing_time, vehicle_count=1):
+        # record argument for verification
+        self.last_vehicle_count = vehicle_count
         if self.plotter:
             self.plotter.plot(RouteSegmentsInfo())
         return OptimizationResult(
@@ -64,20 +67,32 @@ class DummyPlotter:
 def test_service_uses_generators():
     plotter = DummyPlotter()
     generator = DummyGraphGenerator()
+    # capture optimizer instance so we can inspect arguments later
+    last_optimizer = None
+
+    def optimizer_factory(calc, plt):
+        nonlocal last_optimizer
+        last_optimizer = DummyOptimizer(calc, plt)
+        return last_optimizer
+
     service = RouteOptimizationService(
         graph_generator=generator,
         route_calculator_factory=lambda g: DummyRouteCalculator(g),
-        optimizer_factory=lambda calc, plotter: DummyOptimizer(calc, plotter),
-        plotter=plotter,
+        optimizer_factory=optimizer_factory,
+        plotter_factory=lambda context: plotter,
     )
-    # run once to trigger plot call
-    result = service.optimize("orig", [("dest", 1)])
+    # run once to trigger plot call and record optimizer
+    result = service.optimize("orig", [("dest", 1)], vehicle_count=3)
     assert plotter.called
     assert generator.converted  # Ensure conversion was called
+    assert last_optimizer is not None
+    assert last_optimizer.last_vehicle_count == 3
 
+    # run again without specifying vehicle_count to exercise default
     result = service.optimize("orig", [("dest", 1)])
     assert isinstance(result, OptimizationResult)
     assert result.best_fitness == 0
+    assert last_optimizer.last_vehicle_count == 1
 
 
 if __name__ == "__main__":

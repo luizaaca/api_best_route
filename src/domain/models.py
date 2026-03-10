@@ -67,7 +67,7 @@ class OptimizationResult:
     Replaces the raw dict previously returned by TSPGeneticAlgorithm.solve().
     """
 
-    best_route: RouteSegmentsInfo
+    best_route: list[RouteSegmentsInfo]
     best_fitness: float
     population_size: int
     generations_run: int

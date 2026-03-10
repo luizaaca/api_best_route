@@ -57,6 +57,7 @@ async def optimize_route(
             destinations=destinations_formatted,
             max_generation=request.max_generation,
             max_processing_time=request.max_processing_time,
+            vehicle_count=request.vehicle_count,
         )
 
         best_route = []

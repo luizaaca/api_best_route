@@ -48,6 +48,7 @@ class IRouteOptimizer(Protocol):
         route_nodes: list,
         max_generation: int = ...,
         max_processing_time: int = ...,
+        vehicle_count: int = ...,
     ) -> OptimizationResult: ...
 
 

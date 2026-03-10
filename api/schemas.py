@@ -27,6 +27,7 @@ class OptimizeRouteRequest(BaseModel):
     destinations: list[Destination]
     max_generation: int = 50
     max_processing_time: int = 10000
+    vehicle_count: int = 1  # number of vehicles available for routing
 
 
 class OptimizeRouteResponse(BaseModel):
