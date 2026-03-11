@@ -47,7 +47,9 @@ api_best_route/
 ├── src/
 │   ├── domain/
 │   │   ├── __init__.py
-│   │   ├── models.py              # RouteSegmentsInfo, OptimizationResult
+│   │   ├── models.py              # RouteMetrics, RouteSegmentsInfo,
+│   │   │                         # VehicleRouteInfo, FleetRouteInfo,
+│   │   │                         # OptimizationResult
 │   │   └── interfaces.py          # IGraphGenerator, IRouteCalculator,
 │   │                              # IRouteOptimizer, IPlotter
 │   ├── application/
@@ -89,7 +91,8 @@ api_best_route/
 | IGraphGenerator|  |IRouteOptimizer |  |   IPlotter     |
 +----------------+  +----------------+  +----------------+
         |                   |
-        | (factory)         |  (factory)
+    | (context +        |  (factory)
+    | coordinate delegate)|
         v                   v
 +----------------+  +----------------+
 |OSMnxGraph      |  |TSPGenetic      |    IRouteCalculator
@@ -97,7 +100,8 @@ api_best_route/
 +----------------+  +----------------+
 +---------------------------------------------------------------+
 |                    Domain Layer                               |
-|         RouteSegmentsInfo    /    OptimizationResult          |
+| RouteMetrics / VehicleRouteInfo / FleetRouteInfo /            |
+| OptimizationResult                                             |
 +---------------------------------------------------------------+
 ```
 
@@ -118,7 +122,7 @@ classDiagram
     class IGraphGenerator {
         <<interface>>
         +initialize(origin, destinations) GraphContext
-        +convert_segments_to_lat_lon(context, route_segments) RouteSegmentsInfo
+        +build_coordinate_converter(context) Callable[(x, y) -> (lat, lon)]
     }
 
     class IRouteCalculator {
@@ -136,7 +140,7 @@ classDiagram
 
     class IPlotter {
         <<interface>>
-        +plot(route_info RouteSegmentsInfo) None
+        +plot(route_info FleetRouteInfo) None
     }
 
     class RouteNode {
@@ -163,15 +167,27 @@ classDiagram
         +cost float or None
     }
 
-    class RouteSegmentsInfo {
-        +segments list[RouteSegment]
+    class RouteMetrics {
         +total_eta float
         +total_length float
         +total_cost float or None
     }
 
+    class RouteSegmentsInfo {
+        +segments list[RouteSegment]
+    }
+
+    class VehicleRouteInfo {
+        +vehicle_id int
+        +segments list[RouteSegment]
+    }
+
+    class FleetRouteInfo {
+        +routes_by_vehicle list[VehicleRouteInfo]
+    }
+
     class OptimizationResult {
-        +best_route RouteSegmentsInfo
+        +best_route FleetRouteInfo
         +best_fitness float
         +population_size int
         +generations_run int
@@ -182,8 +198,12 @@ classDiagram
     IRouteCalculator ..> RouteSegmentsInfo : returns
     IRouteOptimizer ..> OptimizationResult : returns
     GraphContext *-- RouteNode : contains
+    RouteMetrics <|-- RouteSegmentsInfo
+    RouteSegmentsInfo <|-- VehicleRouteInfo
+    RouteMetrics <|-- FleetRouteInfo
     RouteSegmentsInfo *-- RouteSegment : contains
-    OptimizationResult *-- RouteSegmentsInfo : contains
+    FleetRouteInfo *-- VehicleRouteInfo : contains
+    OptimizationResult *-- FleetRouteInfo : contains
 ```
 
 ---
@@ -199,7 +219,7 @@ classDiagram
     class IGraphGenerator {
         <<interface>>
         +initialize(origin, destinations) GraphContext
-        +convert_segments_to_lat_lon(context, route_segments) RouteSegmentsInfo
+        +build_coordinate_converter(context) Callable[(x, y) -> (lat, lon)]
     }
 
     class IRouteCalculator {
@@ -217,15 +237,15 @@ classDiagram
 
     class IPlotter {
         <<interface>>
-        +plot(route_info RouteSegmentsInfo) None
+        +plot(route_info FleetRouteInfo) None
     }
 
     class OSMnxGraphGenerator {
         -network_type str
         -custom_filter str or None
         +initialize(origin, destinations) GraphContext
-        +convert_segments_to_lat_lon(context, route_segments) RouteSegmentsInfo
-        -_convert_from_UTM_to_lat_lon(x, y, crs) [lat, lon]
+        +build_coordinate_converter(context) Callable[(x, y) -> (lat, lon)]
+        -_build_utm_to_lat_lon_converter(crs) Callable
         -_set_coords_and_names(locations) list
         -_get_center_and_dist(coords) tuple
         -_create_projected_graph(center, dist) MultiDiGraph
@@ -250,15 +270,15 @@ classDiagram
         -mutation_probability float
         -_generate_random_population(locations, size) list
         -_generate_adjacency_matrix(route_nodes, weight_function, cost_function) dict
-        -_order_crossover(p1, p2) list
-        -_mutate(solution, probability) list
+        -_order_crossover(p1, p2) Individual
+        -_mutate(solution, probability) Individual
         +solve(route_nodes, max_generation, max_processing_time, vehicle_count) OptimizationResult
     }
 
     class MatplotlibPlotter {
         -_context GraphContext
         -graph MultiDiGraph
-        +plot(route_info RouteSegmentsInfo) None
+        +plot(route_info FleetRouteInfo) None
     }
 
     OSMnxGraphGenerator ..|> IGraphGenerator : implements
@@ -284,7 +304,7 @@ classDiagram
     class IGraphGenerator {
         <<interface>>
         +initialize(origin, destinations) GraphContext
-        +convert_segments_to_lat_lon(context, route_segments) RouteSegmentsInfo
+        +build_coordinate_converter(context) Callable[(x, y) -> (lat, lon)]
     }
 
     class IRouteCalculator {
@@ -302,7 +322,7 @@ classDiagram
 
     class IPlotter {
         <<interface>>
-        +plot(route_info RouteSegmentsInfo) None
+        +plot(route_info FleetRouteInfo) None
     }
 
     class OSMnxGraphGenerator { <<infrastructure>> }
@@ -313,8 +333,8 @@ classDiagram
     class RouteOptimizationService {
         -graph_generator IGraphGenerator
         -route_calculator_factory Callable
-        -optimizer_factory Callable[IRouteCalculator -> IRouteOptimizer]
-        +optimize(origin, destinations, max_generation, max_processing_time, vehicle_count) OptimizationResult
+        -optimizer_factory Callable[IRouteCalculator, IPlotter, int -> IRouteOptimizer]
+        +optimize(origin, destinations, max_generation, max_processing_time, vehicle_count, population_size) OptimizationResult
     }
 
     class FastAPIApp {
@@ -349,7 +369,7 @@ All interfaces are defined as Python `Protocol` classes (PEP 544, `typing.Protoc
 # src/domain/interfaces.py
 
 from typing import Protocol, Callable, Any, runtime_checkable
-from .models import RouteSegment, RouteSegmentsInfo, OptimizationResult, GraphContext, RouteNode
+from .models import RouteSegment, RouteSegmentsInfo, FleetRouteInfo, OptimizationResult, GraphContext, RouteNode
 
 
 @runtime_checkable
@@ -360,7 +380,7 @@ class IGraphGenerator(Protocol):
         destinations: list[tuple[str | tuple[float, float], int]],
     ) -> GraphContext: ...
 
-    def convert_segments_to_lat_lon(self, context: GraphContext, route_segments: RouteSegmentsInfo) -> RouteSegmentsInfo: ...
+    def build_coordinate_converter(self, context: GraphContext) -> Callable[[float, float], tuple[float, float]]: ...
 
 
 @runtime_checkable
@@ -396,7 +416,7 @@ class IRouteOptimizer(Protocol):
 
 @runtime_checkable
 class IPlotter(Protocol):
-    def plot(self, route_info: RouteSegmentsInfo) -> None: ...
+    def plot(self, route_info: FleetRouteInfo) -> None: ...
 ```
 
 ### Interface Responsibilities
@@ -470,9 +490,16 @@ class RouteSegmentsInfo:
     Each segment maps to one destination in the optimized route.
     """
     segments: list[RouteSegment] = field(default_factory=list)
-    total_eta: float = 0.0
-    total_length: float = 0.0
-    total_cost: float | None = None
+
+
+@dataclass
+class VehicleRouteInfo(RouteSegmentsInfo):
+    vehicle_id: int = 0
+
+
+@dataclass
+class FleetRouteInfo(RouteMetrics):
+    routes_by_vehicle: list[VehicleRouteInfo] = field(default_factory=list)
 
 
 @dataclass
@@ -481,7 +508,7 @@ class OptimizationResult:
     The output of a single optimization run.
     Replaces the raw dict previously returned by TSPGeneticAlgorithm.solve().
     """
-    best_route: RouteSegmentsInfo
+    best_route: FleetRouteInfo
     best_fitness: float
     population_size: int
     generations_run: int
@@ -503,9 +530,9 @@ Encapsulates all OSMnx operations. Migrates the module-level functions from `osm
 - Downloading and projecting a street network via OSMnx
 - Snapping geographic points to the nearest graph node
 - Annotating nodes with priority metadata
-- Converting route segment coordinates from UTM to lat/lon
+- Providing a coordinate-conversion delegate `(x, y) -> (lat, lon)` for the application service
 
-Configuration (network type, custom filter) is injected at construction time, allowing different instances for different road network scenarios without code changes.
+Configuration (network type, custom filter) is injected at construction time, allowing different instances for different road network scenarios without code changes. The generator remains cohesive by not depending on route aggregate models; only coordinate conversion primitives are exposed to higher layers.
 
 ### 8.2 RouteCalculator
 
@@ -531,7 +558,7 @@ Because the graph is only available after `IGraphGenerator.initialize()` is call
 
 Receives an `IRouteCalculator` at construction time. The genetic operators (crossover, mutation, population generation) are implemented as private methods within the class. An optional `IPlotter` may also be injected to visualize progress after each generation.
 
-The `solve()` method now returns an `OptimizationResult` dataclass instead of a raw dictionary, providing a typed contract to callers.
+The `solve()` method returns an `OptimizationResult` whose `best_route` is a `FleetRouteInfo`, containing one `VehicleRouteInfo` per vehicle plus fleet-level totals. Population generation now allows empty vehicles, crossover chooses between parent1 distribution, parent2 distribution, or a positional mean distribution, and mutation can both reorder stops within a vehicle and move stops across vehicles.
 
 ### 8.4 MatplotlibPlotter
 
@@ -545,10 +572,10 @@ Receives a `GraphContext` in its constructor, giving it access to both the proje
 - Places crimson `X` markers for **all** `route_nodes` — including the origin — as a static POI layer.
 - Initialises a persistent summary text box (bottom-left of the map) that is updated each generation.
 
-Each call to `plot(route_info)` removes only the route-line artists from the previous generation (tracked in `_route_artists`), draws the new route with per-segment colours, updates the summary block, and appends the total distance to the right-panel chart. Static layers (base graph, POI markers, summary widget) are never redrawn, keeping updates fast.
+Each call to `plot(route_info)` removes only the route-line artists from the previous generation (tracked in `_route_artists`), draws the new fleet solution with colours grouped by vehicle, updates the summary block, and appends the total fleet fitness to the right-panel chart. Static layers (base graph and POI markers) are never redrawn, keeping updates fast.
 
 ```python
-def plot(self, route_info: RouteSegmentsInfo) -> None: ...
+def plot(self, route_info: FleetRouteInfo) -> None: ...
 ```
 
 Because the interface is defined in the domain layer and the concrete implementation in the infrastructure layer, the application service has no dependency on Matplotlib. Any renderer (web-based, PNG file, interactive Folium map) can be swapped in by providing a different `IPlotter` implementation.
@@ -559,7 +586,7 @@ Because the interface is defined in the domain layer and the concrete implementa
 
 **Location:** `src/application/route_optimization_service.py`
 
-`RouteOptimizationService` is the single orchestrator. It depends exclusively on interfaces and on factory callables that produce interface-typed instances. Its `optimize` method now accepts an additional `vehicle_count` parameter which is forwarded to the optimizer; currently the value is recorded but has no effect on single-vehicle routing. The service contains no business logic of its own beyond sequencing the steps of the optimization workflow.
+`RouteOptimizationService` is the single orchestrator. It depends exclusively on interfaces and on factory callables that produce interface-typed instances. Its `optimize` method accepts both `vehicle_count` and `population_size`, obtains a coordinate-conversion delegate from the graph generator, forwards optimization parameters to the GA, and then applies the coordinate delegate over the multi-vehicle aggregate before returning. The service contains no routing heuristics of its own beyond sequencing the workflow and mapping coordinate conversion over the result structure.
 
 ```python
 # src/application/route_optimization_service.py
@@ -574,7 +601,7 @@ class RouteOptimizationService:
         self,
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
-        optimizer_factory: Callable[[IRouteCalculator], IRouteOptimizer],
+        optimizer_factory: Callable[[IRouteCalculator, IPlotter | None, int], IRouteOptimizer],
     ):
         self._graph_generator = graph_generator
         self._route_calculator_factory = route_calculator_factory
@@ -587,11 +614,13 @@ class RouteOptimizationService:
         max_generation: int = 50,
         max_processing_time: int = 10000,
         vehicle_count: int = 1,
+        population_size: int = 10,
     ) -> OptimizationResult:
         context = self._graph_generator.initialize(origin, destinations)
 
         route_calculator = self._route_calculator_factory(context.graph)
-        optimizer = self._optimizer_factory(route_calculator)
+        optimizer = self._optimizer_factory(route_calculator, None, population_size)
+        coordinate_converter = self._graph_generator.build_coordinate_converter(context)
 
         result = optimizer.solve(
             route_nodes=context.route_nodes,
@@ -600,7 +629,7 @@ class RouteOptimizationService:
             vehicle_count=vehicle_count,
         )
 
-        converted_route = self._graph_generator.convert_segments_to_lat_lon(context, result.best_route)
+        converted_route = self._convert_fleet_route_coordinates(result.best_route, coordinate_converter)
         return OptimizationResult(
             best_route=converted_route,
             best_fitness=result.best_fitness,
@@ -638,8 +667,10 @@ def get_route_optimization_service() -> RouteOptimizationService:
     return RouteOptimizationService(
         graph_generator=get_graph_generator(),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=lambda calc: TSPGeneticAlgorithm(
-            route_calculator=calc, plotter=None
+        optimizer_factory=lambda calc, plotter, population_size: TSPGeneticAlgorithm(
+            route_calculator=calc,
+            plotter=plotter,
+            population_size=population_size,
         ),
     )
 ```
@@ -664,6 +695,7 @@ async def optimize_route(
         max_generation=request.max_generation,
         max_processing_time=request.max_processing_time,
         vehicle_count=request.vehicle_count,
+        population_size=request.population_size,
     )
     # map result to response schema
     ...
@@ -683,12 +715,14 @@ from src.application.route_optimization_service import RouteOptimizationService
 service = RouteOptimizationService(
     graph_generator=OSMnxGraphGenerator(),
     route_calculator_factory=RouteCalculator,
-    optimizer_factory=lambda calc: TSPGeneticAlgorithm(
-        route_calculator=calc, plotter=MatplotlibPlotter()
+    optimizer_factory=lambda calc, plotter, population_size: TSPGeneticAlgorithm(
+        route_calculator=calc,
+        plotter=plotter,
+        population_size=population_size,
     ),
 )
 
-result = service.optimize(origin="...", destinations=[...], vehicle_count=2)
+result = service.optimize(origin="...", destinations=[...], vehicle_count=2, population_size=20)
 ```
 
 The application service and all infrastructure classes are identical in both entry points. Only the wiring and data translation (HTTP vs. stdin/stdout) differ.
@@ -814,12 +848,12 @@ No real network calls, no OSMnx, no genetic algorithm execution required by unit
 | Class / Module | Layer | Responsibility |
 |---|---|---|
 | `interfaces.py` | Domain | Defines contracts (`IGraphGenerator`, `IRouteCalculator`, `IRouteOptimizer`, `IPlotter`) |
-| `models.py` | Domain | `RouteNode`, `GraphContext`, `RouteSegmentsInfo`, `OptimizationResult` — pure data |
+| `models.py` | Domain | `RouteNode`, `GraphContext`, `RouteMetrics`, `RouteSegmentsInfo`, `VehicleRouteInfo`, `FleetRouteInfo`, `OptimizationResult` — pure data |
 | `route_optimization_service.py` | Application | Orchestrates the full optimization workflow |
-| `osmnx_graph_generator.py` | Infrastructure | Graph construction and geocoding via OSMnx |
+| `osmnx_graph_generator.py` | Infrastructure | Graph construction, geocoding, and coordinate-conversion delegate creation |
 | `route_calculator.py` | Infrastructure | Segment-level metric computation (ETA, length, cost) |
-| `tsp_genetic_algorithm.py` | Infrastructure | Genetic Algorithm optimization loop with internal operators and optional plotter |
-| `matplotlib_plotter.py` | Infrastructure | Future: visualization of `RouteSegmentsInfo` |
+| `tsp_genetic_algorithm.py` | Infrastructure | Multi-vehicle Genetic Algorithm optimization loop with internal operators and optional plotter |
+| `matplotlib_plotter.py` | Infrastructure | Visualization of `FleetRouteInfo` |
 | `api/main.py` | Entry Point | HTTP request handling via FastAPI |
 | `api/schemas.py` | Entry Point | Pydantic HTTP schemas |
 | `api/dependencies.py` | Entry Point | Dependency wiring for FastAPI |

@@ -9,8 +9,10 @@ def run_console_example():
     service = RouteOptimizationService(
         graph_generator=OSMnxGraphGenerator(),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=lambda calc, plotter: TSPGeneticAlgorithm(
-            route_calculator=calc, plotter=plotter
+        optimizer_factory=lambda calc, plotter, population_size: TSPGeneticAlgorithm(
+            route_calculator=calc,
+            plotter=plotter,
+            population_size=population_size,
         ),
         plotter_factory=MatplotlibPlotter,
     )
@@ -36,13 +38,21 @@ def run_console_example():
         max_generation=max_generation,
         max_processing_time=max_processing_time,
         vehicle_count=2,  # example value
+        population_size=10,
     )
     # resultado formatado para exibição no console
     print("\nResumo da otimização:")
-    print(f"Melhor rota encontrada: {[seg.name for seg in result.best_route.segments]}")
+    for vehicle_route in result.best_route.routes_by_vehicle:
+        print(
+            f"Veículo {vehicle_route.vehicle_id}: "
+            f"{[seg.name for seg in vehicle_route.segments]}"
+        )
+        print(f"  Distância: {vehicle_route.total_length:.1f} m")
+        print(f"  ETA: {vehicle_route.total_eta/60:.1f} min")
+        print(f"  Custo: {(vehicle_route.total_cost or 0.0):.2f}")
     print(f"Distância total: {result.best_route.total_length:.1f} m")
     print(f"Tempo total estimado: {result.best_route.total_eta/60:.1f} min")
-    print(f"Custo total: {result.best_route.total_cost:.2f}")
+    print(f"Custo total: {(result.best_route.total_cost or 0.0):.2f}")
     input("\nPressione Enter para sair...")
 
 

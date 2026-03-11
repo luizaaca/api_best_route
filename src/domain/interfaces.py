@@ -2,6 +2,7 @@ from typing import Protocol, Callable, Any, runtime_checkable
 from .models import (
     RouteSegment,
     RouteSegmentsInfo,
+    FleetRouteInfo,
     OptimizationResult,
     GraphContext,
     RouteNode,
@@ -16,9 +17,10 @@ class IGraphGenerator(Protocol):
         destinations: list[tuple[str | tuple[float, float], int]],
     ) -> GraphContext: ...
 
-    def convert_segments_to_lat_lon(
-        self, context: GraphContext, route_segments: RouteSegmentsInfo
-    ) -> RouteSegmentsInfo: ...
+    def build_coordinate_converter(
+        self,
+        context: GraphContext,
+    ) -> Callable[[float, float], tuple[float, float]]: ...
 
 
 @runtime_checkable
@@ -54,4 +56,4 @@ class IRouteOptimizer(Protocol):
 
 @runtime_checkable
 class IPlotter(Protocol):
-    def plot(self, route_info: RouteSegmentsInfo) -> None: ...
+    def plot(self, route_info: FleetRouteInfo) -> None: ...

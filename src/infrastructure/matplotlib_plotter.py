@@ -1,13 +1,14 @@
 from src.domain.interfaces import IPlotter
 from matplotlib.collections import LineCollection
-from src.domain.models import RouteSegmentsInfo, GraphContext
+from src.domain.models import FleetRouteInfo, GraphContext
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import osmnx as ox
-import random
 
 
 class MatplotlibPlotter(IPlotter):
+    _MAX_FIXED_LABEL_LENGTH = 20
+
     def __init__(self, context: GraphContext):
         self._context = context
         self.graph = context.graph
@@ -40,6 +41,10 @@ class MatplotlibPlotter(IPlotter):
             show=False,
             close=False,
         )
+        self._map_limits = (self.map_ax.get_xlim(), self.map_ax.get_ylim())
+        self.map_ax.set_autoscale_on(False)
+        self.map_ax.set_aspect("equal", adjustable="box")
+        self.map_ax.margins(0)
 
         # static POI markers for ALL route nodes (origin + all destinations)
         # draw these with a low z-order so the evolving routes and info boxes sit on top
@@ -47,14 +52,17 @@ class MatplotlibPlotter(IPlotter):
             x, y = node.coords
             self.map_ax.scatter(x, y, c="crimson", s=200, marker="X", zorder=1)
             self.map_ax.annotate(
-                node.name,
+                self._truncate_fixed_label(node.name),
                 (x, y),
                 xytext=(6, 6),
                 textcoords="offset points",
                 fontsize=9,
                 fontweight="bold",
                 zorder=2,
+                annotation_clip=True,
+                clip_on=True,
             )
+        self._restore_map_limits()
 
         # fitness chart setup (left-upper panel) — label determined at first plot() call
         self.fitness_ax.set_title("Best Fitness per Generation", fontsize=11)
@@ -64,21 +72,55 @@ class MatplotlibPlotter(IPlotter):
         (self._fitness_line,) = self.fitness_ax.plot([], [], color="steelblue", lw=2)
         self._fitness_label_set = False
 
-        self.fig.tight_layout()
+        self.fig.subplots_adjust(
+            left=0.04, right=0.99, top=0.98, bottom=0.04, wspace=0.04, hspace=0.04
+        )
 
-    def _build_route_signature(self, route_info: RouteSegmentsInfo) -> tuple:
+    @classmethod
+    def _truncate_fixed_label(cls, label: str) -> str:
+        if len(label) <= cls._MAX_FIXED_LABEL_LENGTH:
+            return label
+        return f"{label[: cls._MAX_FIXED_LABEL_LENGTH - 3]}..."
+
+    def _restore_map_limits(self) -> None:
+        xlim, ylim = self._map_limits
+        self.map_ax.set_xlim(xlim)
+        self.map_ax.set_ylim(ylim)
+
+    @staticmethod
+    def _build_segment_info_text(
+        vehicle_id: int,
+        segment_index: int,
+        length: float,
+        eta: float,
+        cost: float | None,
+    ) -> str:
+        info_text = (
+            f"v{vehicle_id}.{segment_index}\nL {length:.0f}m | E {eta/60:.1f}min"
+        )
+        if cost is not None:
+            info_text += f"\nC {cost:.1f}"
+        return info_text
+
+    def _build_route_signature(self, route_info: FleetRouteInfo) -> tuple:
         """Build a hashable signature of route data that is visible on the map."""
         return tuple(
             (
-                tuple(seg.segment),
-                round(seg.length, 2),
-                round(seg.eta, 2),
-                None if seg.cost is None else round(seg.cost, 2),
+                vehicle_route.vehicle_id,
+                tuple(
+                    (
+                        tuple(seg.segment),
+                        round(seg.length, 2),
+                        round(seg.eta, 2),
+                        None if seg.cost is None else round(seg.cost, 2),
+                    )
+                    for seg in vehicle_route.segments
+                ),
             )
-            for seg in route_info.segments
+            for vehicle_route in route_info.routes_by_vehicle
         )
 
-    def plot(self, route_info: RouteSegmentsInfo) -> None:
+    def plot(self, route_info: FleetRouteInfo) -> None:
         """Redraw route lines for the current generation without touching static layers."""
 
         # redraw route segments only if the displayed route information changed
@@ -96,92 +138,88 @@ class MatplotlibPlotter(IPlotter):
                     pass
             self._route_artists.clear()
 
-            num_segments = len(route_info.segments)
-            palette = plt.get_cmap("turbo", max(1, num_segments))
-            colors = [palette(i) for i in range(num_segments)]
-            random.shuffle(colors)
-
-            hex_colors = [mcolors.to_hex(c) for c in colors]
+            num_routes = len(route_info.routes_by_vehicle)
+            palette = plt.get_cmap("turbo", max(1, num_routes))
+            hex_colors = [mcolors.to_hex(palette(i)) for i in range(num_routes)]
 
             new_artists = []
 
-            line_paths = [seg.path for seg in route_info.segments if seg.path]
-            line_colors = [
-                hex_colors[i] for i, seg in enumerate(route_info.segments) if seg.path
-            ]
+            for route_index, vehicle_route in enumerate(route_info.routes_by_vehicle):
+                color = hex_colors[route_index]
+                line_paths = [seg.path for seg in vehicle_route.segments if seg.path]
+                if line_paths:
+                    lc = LineCollection(
+                        line_paths,
+                        colors=[color] * len(line_paths),
+                        linewidths=3,
+                        zorder=5,
+                    )
+                    lc.set_visible(False)
+                    self.map_ax.add_collection(lc)
+                    new_artists.append(lc)
 
-            if line_paths:
-                lc = LineCollection(
-                    line_paths,
-                    colors=line_colors,
-                    linewidths=3,
-                    zorder=5,
-                )
-                lc.set_visible(False)
-                self.map_ax.add_collection(lc)
-                new_artists.append(lc)
+                for segment_index, seg in enumerate(vehicle_route.segments, start=1):
+                    x_end = self.graph.nodes[seg.end]["x"]
+                    y_end = self.graph.nodes[seg.end]["y"]
+                    label = self.map_ax.text(
+                        x_end,
+                        y_end,
+                        f"{vehicle_route.vehicle_id}.{segment_index}",
+                        color=color,
+                        fontsize=12,
+                        fontweight="bold",
+                        ha="center",
+                        va="center",
+                        bbox=dict(
+                            facecolor="white",
+                            edgecolor=color,
+                            boxstyle="circle,pad=0.3",
+                            alpha=0.9,
+                        ),
+                        zorder=6,
+                    )
+                    label.set_visible(False)
+                    new_artists.append(label)
 
-            for i, seg in enumerate(route_info.segments):
-                color = hex_colors[i]
+                    if seg.path:
+                        mid_idx = len(seg.path) // 2
+                        x_mid, y_mid = seg.path[mid_idx]
+                    else:
+                        x_mid = self.graph.nodes[seg.end]["x"]
+                        y_mid = self.graph.nodes[seg.end]["y"]
 
-                x_end = self.graph.nodes[seg.end]["x"]
-                y_end = self.graph.nodes[seg.end]["y"]
-                label = self.map_ax.text(
-                    x_end,
-                    y_end,
-                    str(i + 1),
-                    color=color,
-                    fontsize=16,
-                    fontweight="bold",
-                    ha="center",
-                    va="center",
-                    bbox=dict(
-                        facecolor="white",
-                        edgecolor=color,
-                        boxstyle="circle,pad=0.3",
-                        alpha=0.9,
-                    ),
-                    zorder=6,
-                )
-                label.set_visible(False)
-                new_artists.append(label)
+                    info_text = self._build_segment_info_text(
+                        vehicle_route.vehicle_id,
+                        segment_index,
+                        seg.length,
+                        seg.eta,
+                        seg.cost,
+                    )
 
-                if seg.path:
-                    mid_idx = len(seg.path) // 2
-                    x_mid, y_mid = seg.path[mid_idx]
-                else:
-                    x_mid = self.graph.nodes[seg.end]["x"]
-                    y_mid = self.graph.nodes[seg.end]["y"]
-
-                info_text = (
-                    f"seg {i+1}\nlen {seg.length:.1f} m\neta {seg.eta/60:.1f} min"
-                )
-                if seg.cost is not None:
-                    info_text += f"\ncost {seg.cost:.2f}"
-
-                info = self.map_ax.text(
-                    x_mid,
-                    y_mid,
-                    info_text,
-                    fontsize=8,
-                    color="black",
-                    ha="center",
-                    va="center",
-                    bbox=dict(
-                        facecolor="white",
-                        edgecolor=color,
-                        boxstyle="round,pad=0.3",
-                        alpha=0.8,
-                    ),
-                    zorder=6,
-                )
-                info.set_visible(False)
-                new_artists.append(info)
+                    info = self.map_ax.text(
+                        x_mid,
+                        y_mid,
+                        info_text,
+                        fontsize=7,
+                        color="black",
+                        ha="center",
+                        va="center",
+                        bbox=dict(
+                            facecolor="white",
+                            edgecolor=color,
+                            boxstyle="round,pad=0.3",
+                            alpha=0.8,
+                        ),
+                        zorder=6,
+                    )
+                    info.set_visible(False)
+                    new_artists.append(info)
 
             for art in new_artists:
                 art.set_visible(True)
 
             self._route_artists.extend(new_artists)
+            self._restore_map_limits()
 
         # update route cache only after successful draw/update of artists
         self._last_route_signature = route_signature

@@ -3,14 +3,13 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.schemas import (
-    Destination,
     RouteItem,
     RouteTotals,
     OptimizeRouteRequest,
     OptimizeRouteResponse,
+    VehicleRouteResponse,
 )
 from api.dependencies import get_route_optimization_service
-from src.domain.models import RouteSegment
 from src.application.route_optimization_service import RouteOptimizationService
 
 app = FastAPI(
@@ -58,24 +57,32 @@ async def optimize_route(
             max_generation=request.max_generation,
             max_processing_time=request.max_processing_time,
             vehicle_count=request.vehicle_count,
+            population_size=request.population_size,
         )
 
-        best_route = []
-        for node in result.best_route.segments:
-            location = node.name
-            coords = list(node.coords)
-            path = node.path
-            length = node.length
-            eta = node.eta
-            cost = node.cost
-            best_route.append(
-                RouteItem(
-                    location=location,
-                    coords=coords,
-                    length=length,
-                    path=[list(p) for p in path],
-                    eta=eta,
-                    cost=cost,
+        routes_by_vehicle = []
+        for vehicle_route in result.best_route.routes_by_vehicle:
+            route_items = []
+            for node in vehicle_route.segments:
+                route_items.append(
+                    RouteItem(
+                        location=node.name,
+                        coords=list(node.coords),
+                        length=node.length,
+                        path=[list(point) for point in node.path],
+                        eta=node.eta,
+                        cost=node.cost,
+                    )
+                )
+            routes_by_vehicle.append(
+                VehicleRouteResponse(
+                    vehicle_id=vehicle_route.vehicle_id,
+                    route=route_items,
+                    totals=RouteTotals(
+                        total_length=vehicle_route.total_length,
+                        total_eta=vehicle_route.total_eta,
+                        total_cost=vehicle_route.total_cost,
+                    ),
                 )
             )
 
@@ -86,7 +93,7 @@ async def optimize_route(
         )
 
         return OptimizeRouteResponse(
-            best_route=best_route,
+            routes_by_vehicle=routes_by_vehicle,
             totals=totals,
             best_fitness=result.best_fitness,
             population_size=result.population_size,

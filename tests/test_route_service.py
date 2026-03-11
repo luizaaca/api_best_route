@@ -5,10 +5,13 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.domain.models import (
+    FleetRouteInfo,
     OptimizationResult,
     RouteNode,
+    RouteSegment,
     RouteSegmentsInfo,
     GraphContext,
+    VehicleRouteInfo,
 )
 from src.application.route_optimization_service import RouteOptimizationService
 import networkx as nx
@@ -21,9 +24,9 @@ class DummyGraphGenerator:
         graph.graph["crs"] = "EPSG:3857"
         return GraphContext(graph=graph, route_nodes=[RouteNode("A", 1, (0, 0))])
 
-    def convert_segments_to_lat_lon(self, context, route_segments):
-        self.converted = True
-        return route_segments
+    def build_coordinate_converter(self, context):
+        self.converter_built = True
+        return lambda x, y: (x + 100.0, y + 200.0)
 
 
 class DummyRouteCalculator:
@@ -38,20 +41,52 @@ class DummyRouteCalculator:
 
 
 class DummyOptimizer:
-    def __init__(self, calc, plotter=None):
+    def __init__(self, calc, plotter=None, population_size=10):
         self.calc = calc
         self.plotter = plotter
         self.last_vehicle_count = None
+        self.last_population_size = population_size
 
     def solve(self, route_nodes, max_generation, max_processing_time, vehicle_count=1):
         # record argument for verification
         self.last_vehicle_count = vehicle_count
+        route_info = VehicleRouteInfo(
+            vehicle_id=1,
+            segments=[
+                RouteSegment(
+                    start=1,
+                    end=1,
+                    eta=0,
+                    length=0,
+                    path=[],
+                    segment=[1],
+                    name="A",
+                    coords=(0.0, 0.0),
+                    cost=0,
+                ),
+                RouteSegment(
+                    start=1,
+                    end=1,
+                    eta=5,
+                    length=10,
+                    path=[(1.0, 2.0), (3.0, 4.0)],
+                    segment=[1],
+                    name="A",
+                    coords=(5.0, 6.0),
+                    cost=7,
+                ),
+            ],
+            total_eta=5,
+            total_length=10,
+            total_cost=7,
+        )
+        fleet_route = FleetRouteInfo.from_vehicle_routes([route_info])
         if self.plotter:
-            self.plotter.plot(RouteSegmentsInfo())
+            self.plotter.plot(fleet_route)
         return OptimizationResult(
-            best_route=RouteSegmentsInfo(),
+            best_route=fleet_route,
             best_fitness=0,
-            population_size=1,
+            population_size=self.last_population_size,
             generations_run=1,
         )
 
@@ -70,9 +105,9 @@ def test_service_uses_generators():
     # capture optimizer instance so we can inspect arguments later
     last_optimizer = None
 
-    def optimizer_factory(calc, plt):
+    def optimizer_factory(calc, plotter, population_size):
         nonlocal last_optimizer
-        last_optimizer = DummyOptimizer(calc, plt)
+        last_optimizer = DummyOptimizer(calc, plotter, population_size)
         return last_optimizer
 
     service = RouteOptimizationService(
@@ -82,11 +117,27 @@ def test_service_uses_generators():
         plotter_factory=lambda context: plotter,
     )
     # run once to trigger plot call and record optimizer
-    result = service.optimize("orig", [("dest", 1)], vehicle_count=3)
+    result = service.optimize(
+        "orig",
+        [("dest", 1)],
+        vehicle_count=3,
+        population_size=17,
+    )
     assert plotter.called
-    assert generator.converted  # Ensure conversion was called
+    assert generator.converter_built
     assert last_optimizer is not None
     assert last_optimizer.last_vehicle_count == 3
+    assert last_optimizer.last_population_size == 17
+    assert result.best_route.routes_by_vehicle[0].vehicle_id == 1
+    assert result.best_route.routes_by_vehicle[0].total_length == 10
+    origin_segment = result.best_route.routes_by_vehicle[0].segments[0]
+    destination_segment = result.best_route.routes_by_vehicle[0].segments[1]
+    assert origin_segment.start == 1
+    assert origin_segment.end == 1
+    assert origin_segment.coords == (100.0, 200.0)
+    assert origin_segment.length == 0
+    assert destination_segment.coords == (105.0, 206.0)
+    assert destination_segment.path == [(101.0, 202.0), (103.0, 204.0)]
 
     # run again without specifying vehicle_count to exercise default
     result = service.optimize("orig", [("dest", 1)])

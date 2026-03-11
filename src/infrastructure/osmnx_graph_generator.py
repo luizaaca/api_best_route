@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Callable, Union
 from pyproj import Transformer
 from shapely.geometry import MultiPoint
 import osmnx as ox
@@ -6,7 +6,7 @@ import networkx as nx
 from geopy.geocoders import Photon
 import os
 
-from src.domain.models import GraphContext, RouteNode, RouteSegmentsInfo, RouteSegment
+from src.domain.models import GraphContext, RouteNode
 
 
 class OSMnxGraphGenerator:
@@ -144,53 +144,20 @@ class OSMnxGraphGenerator:
             g_proj.nodes[node_id]["priority"] = priority
 
     @staticmethod
-    def _convert_from_UTM_to_lat_lon(x, y, crs):
-        """Convert UTM coordinates to lat/lon."""
+    def _build_utm_to_lat_lon_converter(
+        crs: str,
+    ) -> Callable[[float, float], tuple[float, float]]:
+        """Create a converter that transforms projected coordinates to lat/lon."""
         transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
-        lon, lat = transformer.transform(x, y)
-        return [lat, lon]
 
-    def convert_segments_to_lat_lon(
-        self, context: GraphContext, route_segments: RouteSegmentsInfo
-    ) -> RouteSegmentsInfo:
-        """Return a new RouteSegmentsInfo with coords and paths converted from UTM to lat/lon."""
-        crs = context.crs
-        converted_segments: list[RouteSegment] = []
+        def convert(x: float, y: float) -> tuple[float, float]:
+            lon, lat = transformer.transform(x, y)
+            return (lat, lon)
 
-        for seg in route_segments.segments:
-            start = seg.start
-            end = seg.end
-            eta = seg.eta
-            length = seg.length
-            segment_nodes = seg.segment
-            name = seg.name
-            cost = seg.cost
-            x, y = seg.coords
-            path_utm = seg.path
+        return convert
 
-            coords_latlon = tuple(self._convert_from_UTM_to_lat_lon(x, y, crs))
-            path_latlon = [
-                tuple(self._convert_from_UTM_to_lat_lon(px, py, crs))
-                for px, py in path_utm
-            ]
-
-            converted_segments.append(
-                RouteSegment(
-                    start=start,
-                    end=end,
-                    eta=eta,
-                    length=length,
-                    path=path_latlon,
-                    segment=segment_nodes,
-                    name=name,
-                    coords=coords_latlon,
-                    cost=cost,
-                )
-            )
-
-        return RouteSegmentsInfo(
-            segments=converted_segments,
-            total_eta=route_segments.total_eta,
-            total_length=route_segments.total_length,
-            total_cost=route_segments.total_cost,
-        )
+    def build_coordinate_converter(
+        self,
+        context: GraphContext,
+    ) -> Callable[[float, float], tuple[float, float]]:
+        return self._build_utm_to_lat_lon_converter(context.crs)

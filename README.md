@@ -1,6 +1,6 @@
 # TSP Genetic Algorithm API
 
-Esta API utiliza um Algoritmo Genético para otimizar rotas entre um ponto de origem e múltiplos destinos, considerando prioridades e estimativas de tempo de chegada (ETA) baseadas em dados do OpenStreetMap.
+Esta API utiliza um Algoritmo Genético para otimizar rotas entre um ponto de origem e múltiplos destinos, considerando prioridades e estimativas de tempo de chegada (ETA) baseadas em dados do OpenStreetMap. A solução agora é distribuída entre `n` veículos, retornando explicitamente a rota de cada veículo e os totais agregados da frota.
 
 O código está organizado em pacotes sob `src/` (domínio, aplicação, infraestrutura), com a API em `api/` e uma entrada de console em `console/`. O algoritmo genético contém seus operadores internamente e aceita injeção de um plotter opcional para visualização.
 
@@ -32,7 +32,7 @@ O console é um ponto de entrada alternativo à API, útil para execuções loca
 python -m console.main
 ```
 
-O script em `console/main.py` demonstra a injeção de dependências: é possível passar um `MatplotlibPlotter` via `optimizer_factory` para visualizar a evolução da rota geração a geração. Edite o arquivo para configurar origem, destinos e parâmetros do algoritmo.
+O script em `console/main.py` demonstra a injeção de dependências: é possível passar um `MatplotlibPlotter` via `optimizer_factory` para visualizar a evolução da melhor solução geração a geração. Edite o arquivo para configurar origem, destinos, número de veículos e parâmetros do algoritmo.
 
 ## Endpoint
 
@@ -47,7 +47,8 @@ Otimiza a rota usando o algoritmo genético.
   - `priority` (integer): Prioridade do destino (ex: 1 para alta prioridade).
 - `max_generation` (integer, opcional): Número máximo de gerações (padrão: 50).
 - `max_processing_time` (integer, opcional): Tempo máximo de processamento em milissegundos (padrão: 10000).
-- `vehicle_count` (integer, opcional): Número de veículos disponíveis. Atualmente tem efeito apenas no payload e não altera a rota (padrão: 1).
+- `population_size` (integer, opcional): Tamanho da população inicial do algoritmo genético (padrão: 10).
+- `vehicle_count` (integer, opcional): Número de veículos disponíveis para distribuir os destinos (padrão: 1).
 
 #### Exemplo de Requisição
 ```json
@@ -60,12 +61,16 @@ Otimiza a rota usando o algoritmo genético.
   ],
   "max_generation": 50,
   "max_processing_time": 10000,
+  "population_size": 20,
   "vehicle_count": 2
 }
 ```
 
 #### Resposta (JSON)
-- `best_route` (array): Lista das localizações na ordem otimizada.
+- `routes_by_vehicle` (array): Lista de veículos com sua rota otimizada, `vehicle_id` explícito e totais do veículo.
+  - `route[0]`: sempre representa a origem do veículo.
+  - `route[1:]`: destinos atribuídos ao veículo, na ordem otimizada.
+- `totals` (objeto): Totais agregados da solução inteira.
 - `best_fitness` (float): Valor do fitness da melhor rota (custo total).
 - `population_size` (integer): Tamanho da população usada.
 - `generations_run` (integer): Número de gerações executadas (aproximado).
@@ -73,20 +78,99 @@ Otimiza a rota usando o algoritmo genético.
 #### Exemplo de Resposta
 ```json
 {
-  "best_route": [
-    "Praça da Sé, São Paulo",
-    "Edifício Copan, São Paulo",
-    "Mercado Municipal de São Paulo",
-    [-23.5465, -46.6367]
+  "routes_by_vehicle": [
+    {
+      "vehicle_id": 1,
+      "route": [
+        {
+          "location": "Praça da Sé, São Paulo",
+          "coords": [-23.5501, -46.6339],
+          "length": 0.0,
+          "eta": 0.0,
+          "cost": 0.0,
+          "path": []
+        },
+        {
+          "location": "Edifício Copan, São Paulo",
+          "coords": [-23.5489, -46.6388],
+          "length": 1520.5,
+          "eta": 420.0,
+          "cost": 420.0,
+          "path": [[-23.5501, -46.6339], [-23.5489, -46.6388]]
+        }
+      ],
+      "totals": {
+        "total_length": 1520.5,
+        "total_eta": 420.0,
+        "total_cost": 420.0
+      }
+    },
+    {
+      "vehicle_id": 2,
+      "route": [
+        {
+          "location": "Praça da Sé, São Paulo",
+          "coords": [-23.5501, -46.6339],
+          "length": 0.0,
+          "eta": 0.0,
+          "cost": 0.0,
+          "path": []
+        },
+        {
+          "location": "Mercado Municipal de São Paulo",
+          "coords": [-23.5416, -46.6291],
+          "length": 980.2,
+          "eta": 315.0,
+          "cost": 378.0,
+          "path": [[-23.5501, -46.6339], [-23.5416, -46.6291]]
+        }
+      ],
+      "totals": {
+        "total_length": 980.2,
+        "total_eta": 315.0,
+        "total_cost": 378.0
+      }
+    }
   ],
-  "best_fitness": 1234.56,
-  "population_size": 10,
-  "generations_run": 50
+  "totals": {
+    "total_length": 2500.7,
+    "total_eta": 735.0,
+    "total_cost": 798.0
+  },
+  "best_fitness": 798.0,
+  "population_size": 20,
+  "generations_run": 37
+}
+```
+
+Veículos sem entregas continuam presentes na resposta com `vehicle_id`, rota contendo apenas o segmento nulo da origem e totais zerados:
+
+```json
+{
+  "vehicle_id": 3,
+  "route": [
+    {
+      "location": "Praça da Sé, São Paulo",
+      "coords": [-23.5501, -46.6339],
+      "length": 0.0,
+      "eta": 0.0,
+      "cost": 0.0,
+      "path": []
+    }
+  ],
+  "totals": {
+    "total_length": 0.0,
+    "total_eta": 0.0,
+    "total_cost": 0.0
+  }
 }
 ```
 
 ## Notas
 - O algoritmo considera prioridades ao calcular o fitness da rota.
+- O fitness da solução é calculado a partir dos totais agregados de todos os veículos.
+- O primeiro item de cada `route` é sempre a origem, mesmo quando o veículo também possui destinos atribuídos.
+- A população pode distribuir zero destinos para um veículo quando isso fizer parte de uma solução candidata; nesse caso o veículo permanece apenas com a origem.
 - Certifique-se de que as localizações sejam válidas e acessíveis via OpenStreetMap.
 - O tempo de processamento pode variar dependendo do número de destinos e parâmetros.
 

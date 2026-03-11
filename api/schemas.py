@@ -27,11 +27,18 @@ class OptimizeRouteRequest(BaseModel):
     destinations: list[Destination]
     max_generation: int = 50
     max_processing_time: int = 10000
+    population_size: int = 10
     vehicle_count: int = 1  # number of vehicles available for routing
 
 
+class VehicleRouteResponse(BaseModel):
+    vehicle_id: int
+    route: list[RouteItem]
+    totals: RouteTotals
+
+
 class OptimizeRouteResponse(BaseModel):
-    best_route: list[RouteItem]
+    routes_by_vehicle: list[VehicleRouteResponse]
     totals: RouteTotals
     best_fitness: float
     population_size: int
