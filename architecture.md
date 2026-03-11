@@ -48,8 +48,8 @@ api_best_route/
 │   ├── domain/
 │   │   ├── __init__.py
 │   │   ├── models.py              # RouteMetrics, RouteSegmentsInfo,
-│   │   │                         # VehicleRouteInfo, FleetRouteInfo,
-│   │   │                         # OptimizationResult
+│   │   │                          # VehicleRouteInfo, FleetRouteInfo,
+│   │   │                          # OptimizationResult
 │   │   └── interfaces.py          # IGraphGenerator, IRouteCalculator,
 │   │                              # IRouteOptimizer, IPlotter
 │   ├── application/
@@ -60,7 +60,7 @@ api_best_route/
 │       ├── osmnx_graph_generator.py   # was: osmnx_graph_utils.py
 │       ├── route_calculator.py        # was: route_calculator_utils.py
 │       ├── tsp_genetic_algorithm.py   # genetic operators and algorithm (helpers incorporated)
-│       └── pygame_plotter.py          # future implementation of IPlotter
+│       └── matplotlib_plotter.py      # implementation of IPlotter
 ├── api/
 │   ├── __init__.py
 │   ├── main.py                    # FastAPI application
@@ -91,8 +91,8 @@ api_best_route/
 | IGraphGenerator|  |IRouteOptimizer |  |   IPlotter     |
 +----------------+  +----------------+  +----------------+
         |                   |
-    | (context +        |  (factory)
-    | coordinate delegate)|
+        | (context +        |  (factory)
+        | coord delegate)   |
         v                   v
 +----------------+  +----------------+
 |OSMnxGraph      |  |TSPGenetic      |    IRouteCalculator
@@ -106,6 +106,31 @@ api_best_route/
 ```
 
 Entry points are responsible solely for wiring concrete implementations and translating transport-level data (HTTP request/response, CLI arguments) to and from domain objects. No business logic lives in entry points.
+
+### 4.1 High-Level Genetic Algorithm Flow
+
+The diagram below summarizes the high-level execution flow of the genetic algorithm after the introduction of hybrid clustered seeding.
+
+```mermaid
+flowchart TD
+    A[Receive route nodes and optimization parameters] --> B[Build adjacency matrix for all ordered node pairs]
+    B --> C[Generate initial population]
+    C --> C1[Hybrid seeding]
+    C1 --> C2[Heuristic seeds via KMeans clustering on projected coords]
+    C1 --> C3[Random seeds for diversity]
+    C2 --> C4[Order each cluster with nearest-neighbor or hull-guided heuristic]
+    C4 --> D[Evaluate each individual as FleetRouteInfo]
+    C3 --> D
+    D --> E[Sort population by fitness]
+    E --> F{Stop condition reached?}
+    F -- yes --> G[Return best fleet route found]
+    F -- no --> H[Keep elite individual]
+    H --> I[Select parents by roulette weights]
+    I --> J[Apply order crossover]
+    J --> K[Apply mutation]
+    K --> L[Build next generation]
+    L --> D
+```
 
 ---
 
@@ -268,7 +293,11 @@ classDiagram
         -plotter IPlotter           
         -population_size int
         -mutation_probability float
+        -_generate_initial_population(locations, size, vehicle_count) Population
         -_generate_random_population(locations, size) list
+        -_cluster_destinations(destinations, vehicle_count, random_state) list
+        -_build_clustered_individual(origin, clustered_destinations, strategy) Individual
+        -_order_cluster_destinations(origin, cluster_nodes, strategy) list
         -_generate_adjacency_matrix(route_nodes, weight_function, cost_function) dict
         -_order_crossover(p1, p2) Individual
         -_mutate(solution, probability) Individual
@@ -560,6 +589,16 @@ Receives an `IRouteCalculator` at construction time. The genetic operators (cros
 
 The `solve()` method returns an `OptimizationResult` whose `best_route` is a `FleetRouteInfo`, containing one `VehicleRouteInfo` per vehicle plus fleet-level totals. Population generation now allows empty vehicles, crossover chooses between parent1 distribution, parent2 distribution, or a positional mean distribution, and mutation can both reorder stops within a vehicle and move stops across vehicles.
 
+The initial population bootstrap is now hybrid instead of purely random:
+
+- `_generate_initial_population(...)` orchestrates the seed generation;
+- `_cluster_destinations(...)` applies `KMeans` over `RouteNode.coords`, which are already stored in the graph projected CRS;
+- `_build_clustered_individual(...)` materializes one valid multi-vehicle individual from the resulting clusters;
+- `_order_cluster_destinations(...)` uses nearest-neighbor by default and may switch to a convex-hull-guided ordering for larger, more spatially dispersed clusters;
+- `_perturb_clustered_individual(...)` introduces small local variations so heuristic seeds do not collapse into a single repeated solution.
+
+This design preserves compatibility with the existing evaluation, selection, crossover, and mutation stages while improving the quality of the starting population.
+
 ### 8.4 MatplotlibPlotter
 
 **Location:** `src/infrastructure/matplotlib_plotter.py`
@@ -807,7 +846,7 @@ No real network calls, no OSMnx, no genetic algorithm execution required by unit
 > "Shapely is a BSD-licensed Python package for manipulation and analysis of planar geometric objects."
 > — [Shapely Documentation](https://shapely.readthedocs.io/en/stable/)
 
-**Role in this system:** Used inside `OSMnxGraphGenerator` to calculate the geographic centroid of a set of points (the center of the bounding area to pass to OSMnx) and to extract detailed path geometry from edges that carry a `LineString` geometry attribute.
+**Role in this system:** Used inside `OSMnxGraphGenerator` to calculate the geographic centroid of a set of points (the center of the bounding area to pass to OSMnx) and to extract detailed path geometry from edges that carry a `LineString` geometry attribute. It is also used inside `TSPGeneticAlgorithm` to compute convex hulls for larger clusters during heuristic ordering of the initial population.
 
 **Key APIs used:**
 - `MultiPoint(coords).centroid` — computes the centroid of a collection of geographic points
@@ -834,7 +873,18 @@ No real network calls, no OSMnx, no genetic algorithm execution required by unit
 
 **Role in this system:** Used inside `TSPGeneticAlgorithm` to compute selection probabilities for the roulette-wheel parent selection mechanism (`1 / np.array(fitness_values)`). NumPy's vectorized operations replace an explicit Python loop for this weighted random selection step.
 
-### 11.8 Matplotlib
+### 11.8 scikit-learn
+
+> "Simple and efficient tools for predictive data analysis."
+> — [scikit-learn Documentation](https://scikit-learn.org/stable/)
+
+**Role in this system:** Used inside `TSPGeneticAlgorithm` to run `KMeans` over projected node coordinates and generate clustered seeds for the initial population. This allows the optimizer to assign geographically close destinations to the same vehicle before the evolutionary loop begins.
+
+**Key APIs used:**
+- `sklearn.cluster.KMeans` — partitions destination coordinates into `vehicle_count` spatial clusters
+- `KMeans.fit_predict(...)` — returns the cluster label for each destination node
+
+### 11.9 Matplotlib
 
 > "Matplotlib is a comprehensive library for creating static, animated, and interactive visualizations in Python."
 > — [Matplotlib Documentation](https://matplotlib.org/stable/)
@@ -852,7 +902,7 @@ No real network calls, no OSMnx, no genetic algorithm execution required by unit
 | `route_optimization_service.py` | Application | Orchestrates the full optimization workflow |
 | `osmnx_graph_generator.py` | Infrastructure | Graph construction, geocoding, and coordinate-conversion delegate creation |
 | `route_calculator.py` | Infrastructure | Segment-level metric computation (ETA, length, cost) |
-| `tsp_genetic_algorithm.py` | Infrastructure | Multi-vehicle Genetic Algorithm optimization loop with internal operators and optional plotter |
+| `tsp_genetic_algorithm.py` | Infrastructure | Multi-vehicle Genetic Algorithm optimization loop with hybrid clustered seeding, internal operators, and optional plotter |
 | `matplotlib_plotter.py` | Infrastructure | Visualization of `FleetRouteInfo` |
 | `api/main.py` | Entry Point | HTTP request handling via FastAPI |
 | `api/schemas.py` | Entry Point | Pydantic HTTP schemas |

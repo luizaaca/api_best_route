@@ -2,6 +2,8 @@
 
 Esta API utiliza um Algoritmo Genético para otimizar rotas entre um ponto de origem e múltiplos destinos, considerando prioridades e estimativas de tempo de chegada (ETA) baseadas em dados do OpenStreetMap. A solução agora é distribuída entre `n` veículos, retornando explicitamente a rota de cada veículo e os totais agregados da frota.
 
+A população inicial do algoritmo deixou de ser puramente aleatória: ela agora é gerada por uma estratégia híbrida que combina sementes heurísticas e indivíduos aleatórios. As sementes heurísticas usam `k-means` sobre as coordenadas projetadas (`RouteNode.coords`) para separar destinos por veículo e, em seguida, ordenam os pontos de cada cluster com heurísticas espaciais como nearest-neighbor e convex hull quando o formato do cluster justificar esse refinamento.
+
 O código está organizado em pacotes sob `src/` (domínio, aplicação, infraestrutura), com a API em `api/` e uma entrada de console em `console/`. O algoritmo genético contém seus operadores internamente e aceita injeção de um plotter opcional para visualização.
 
 ## Instalação
@@ -33,6 +35,24 @@ python -m console.main
 ```
 
 O script em `console/main.py` demonstra a injeção de dependências: é possível passar um `MatplotlibPlotter` via `optimizer_factory` para visualizar a evolução da melhor solução geração a geração. Edite o arquivo para configurar origem, destinos, número de veículos e parâmetros do algoritmo.
+
+## Inicialização da população
+
+O `TSPGeneticAlgorithm` agora inicializa a população em modo híbrido:
+
+- uma fração da população nasce de sementes heurísticas baseadas em agrupamento espacial por veículo;
+- a fração restante continua sendo gerada aleatoriamente para preservar diversidade genética.
+
+O fluxo heurístico atual é:
+
+1. separar a origem dos destinos;
+2. aplicar `k-means` sobre `RouteNode.coords`, que já estão em coordenadas projetadas do grafo;
+3. gerar um cluster por veículo, permitindo clusters vazios quando há mais veículos do que destinos;
+4. ordenar os destinos de cada cluster com nearest-neighbor;
+5. aplicar convex hull apenas em clusters maiores e geometricamente mais espalhados;
+6. perturbar parte das sementes heurísticas com pequenas trocas locais para aumentar a diversidade inicial.
+
+Essa estratégia acelera a busca inicial por boas soluções sem remover a capacidade exploratória do algoritmo genético.
 
 ## Endpoint
 
@@ -171,6 +191,8 @@ Veículos sem entregas continuam presentes na resposta com `vehicle_id`, rota co
 - O fitness da solução é calculado a partir dos totais agregados de todos os veículos.
 - O primeiro item de cada `route` é sempre a origem, mesmo quando o veículo também possui destinos atribuídos.
 - A população pode distribuir zero destinos para um veículo quando isso fizer parte de uma solução candidata; nesse caso o veículo permanece apenas com a origem.
+- O agrupamento espacial usa `RouteNode.coords` em coordenadas projetadas do grafo, e não latitude/longitude brutas.
+- A inicialização híbrida combina indivíduos heurísticos e aleatórios para equilibrar qualidade inicial e diversidade da população.
 - Certifique-se de que as localizações sejam válidas e acessíveis via OpenStreetMap.
 - O tempo de processamento pode variar dependendo do número de destinos e parâmetros.
 
@@ -181,6 +203,7 @@ Veículos sem entregas continuam presentes na resposta com `vehicle_id`, rota co
 - NetworkX: estrutura de grafos utilizada para roteamento e cálculo de distâncias.
 - OSMnx: construção e projeção de grafos de ruas a partir de OpenStreetMap.
 - geopy: geocodificação e reverso-geocodificação de coordenadas, usado pelo `OSMnxGraphGenerator` para nomear pontos.
+- scikit-learn: implementação do `KMeans` usada para agrupar destinos por veículo durante a geração heurística da população inicial.
 - Shapely e PyProj: manipulação de geometrias e transformação entre CRS.
 - Matplotlib: dependência opcional para implementações de `IPlotter`.
 
