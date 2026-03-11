@@ -69,6 +69,8 @@ Otimiza a rota usando o algoritmo genético.
 - `max_processing_time` (integer, opcional): Tempo máximo de processamento em milissegundos (padrão: 10000).
 - `population_size` (integer, opcional): Tamanho da população inicial do algoritmo genético (padrão: 10).
 - `vehicle_count` (integer, opcional): Número de veículos disponíveis para distribuir os destinos (padrão: 1).
+- `weight_type` (string, opcional): Estratégia de peso usada no cálculo dos caminhos do grafo (padrão: `"eta"`). Atualmente o único valor suportado é `eta`.
+- `cost_type` (string, opcional): Estratégia de custo/fitness agregada sobre os segmentos (padrão: `"priority"`). Use `null` para desabilitar o custo agregado e otimizar pelo critério temporal da frota.
 
 #### Exemplo de Requisição
 ```json
@@ -82,7 +84,9 @@ Otimiza a rota usando o algoritmo genético.
   "max_generation": 50,
   "max_processing_time": 10000,
   "population_size": 20,
-  "vehicle_count": 2
+  "vehicle_count": 2,
+  "weight_type": "eta",
+  "cost_type": "priority"
 }
 ```
 
@@ -90,7 +94,11 @@ Otimiza a rota usando o algoritmo genético.
 - `routes_by_vehicle` (array): Lista de veículos com sua rota otimizada, `vehicle_id` explícito e totais do veículo.
   - `route[0]`: sempre representa a origem do veículo.
   - `route[1:]`: destinos atribuídos ao veículo, na ordem otimizada.
-- `totals` (objeto): Totais agregados da solução inteira.
+- `totals` (objeto): Métricas agregadas da solução inteira.
+  - `total_length`: soma das distâncias percorridas pela frota.
+  - `min_vehicle_eta`: menor ETA entre os veículos.
+  - `max_vehicle_eta`: maior ETA entre os veículos, representando o tempo de conclusão da frota.
+  - `total_cost`: soma do custo agregado dos veículos, quando `cost_type` estiver habilitado.
 - `best_fitness` (float): Valor do fitness da melhor rota (custo total).
 - `population_size` (integer): Tamanho da população usada.
 - `generations_run` (integer): Número de gerações executadas (aproximado).
@@ -154,7 +162,8 @@ Otimiza a rota usando o algoritmo genético.
   ],
   "totals": {
     "total_length": 2500.7,
-    "total_eta": 735.0,
+    "min_vehicle_eta": 315.0,
+    "max_vehicle_eta": 420.0,
     "total_cost": 798.0
   },
   "best_fitness": 798.0,
@@ -187,12 +196,15 @@ Veículos sem entregas continuam presentes na resposta com `vehicle_id`, rota co
 ```
 
 ## Notas
-- O algoritmo considera prioridades ao calcular o fitness da rota.
-- O fitness da solução é calculado a partir dos totais agregados de todos os veículos.
+- O algoritmo resolve estratégias por identificador string: hoje `weight_type="eta"` e `cost_type="priority"` são os defaults suportados.
+- Quando `cost_type` está habilitado, o fitness da solução é calculado a partir do custo agregado da frota.
+- Quando `cost_type` é `null`, o fallback temporal do fitness considera `max_vehicle_eta`, isto é, o makespan da frota.
 - O primeiro item de cada `route` é sempre a origem, mesmo quando o veículo também possui destinos atribuídos.
 - A população pode distribuir zero destinos para um veículo quando isso fizer parte de uma solução candidata; nesse caso o veículo permanece apenas com a origem.
+- O objeto `totals` da frota não soma mais ETAs dos veículos; como eles podem rodar em paralelo, ele expõe tempos mínimo e máximo entre os veículos.
 - O agrupamento espacial usa `RouteNode.coords` em coordenadas projetadas do grafo, e não latitude/longitude brutas.
 - A inicialização híbrida combina indivíduos heurísticos e aleatórios para equilibrar qualidade inicial e diversidade da população.
+- A matriz de adjacência deixou de ser montada dentro do algoritmo genético; ela é preparada na composição da infraestrutura e injetada no otimizador.
 - Certifique-se de que as localizações sejam válidas e acessíveis via OpenStreetMap.
 - O tempo de processamento pode variar dependendo do número de destinos e parâmetros.
 

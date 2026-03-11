@@ -8,6 +8,7 @@ from src.domain.interfaces import (
 from src.domain.models import (
     FleetRouteInfo,
     OptimizationResult,
+    RouteNode,
     RouteSegment,
     VehicleRouteInfo,
 )
@@ -19,7 +20,15 @@ class RouteOptimizationService:
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
         optimizer_factory: Callable[
-            [IRouteCalculator, IPlotter | None, int], IRouteOptimizer
+            [
+                IRouteCalculator,
+                list[RouteNode],
+                str,
+                str | None,
+                IPlotter | None,
+                int,
+            ],
+            IRouteOptimizer,
         ],
         plotter_factory: Callable[..., IPlotter] | None = None,
     ):
@@ -28,7 +37,15 @@ class RouteOptimizationService:
             route_calculator_factory
         )
         self._optimizer_factory: Callable[
-            [IRouteCalculator, IPlotter | None, int], IRouteOptimizer
+            [
+                IRouteCalculator,
+                list[RouteNode],
+                str,
+                str | None,
+                IPlotter | None,
+                int,
+            ],
+            IRouteOptimizer,
         ] = optimizer_factory
         self._plotter_factory: Callable[..., IPlotter] | None = plotter_factory
 
@@ -40,6 +57,8 @@ class RouteOptimizationService:
         max_processing_time: int = 10000,
         vehicle_count: int = 1,
         population_size: int = 10,
+        weight_type: str = "eta",
+        cost_type: str | None = "priority",
     ) -> OptimizationResult:
         print("Initializing graph and route nodes...")
         context = self._graph_generator.initialize(origin, destinations)
@@ -53,7 +72,14 @@ class RouteOptimizationService:
             plotter = self._plotter_factory(context)
 
         print("Creating optimizer with route calculator...")
-        optimizer = self._optimizer_factory(route_calculator, plotter, population_size)
+        optimizer = self._optimizer_factory(
+            route_calculator,
+            context.route_nodes,
+            weight_type,
+            cost_type,
+            plotter,
+            population_size,
+        )
 
         print("Creating coordinate converter...")
         coordinate_converter = self._graph_generator.build_coordinate_converter(context)

@@ -1,5 +1,5 @@
 from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
-from src.infrastructure.route_calculator import RouteCalculator
+from src.infrastructure.route_calculator import RouteCalculator, build_adjacency_matrix
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
 from src.infrastructure.matplotlib_plotter import MatplotlibPlotter
 from src.application.route_optimization_service import RouteOptimizationService
@@ -9,8 +9,13 @@ def run_console_example():
     service = RouteOptimizationService(
         graph_generator=OSMnxGraphGenerator(),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=lambda calc, plotter, population_size: TSPGeneticAlgorithm(
-            route_calculator=calc,
+        optimizer_factory=lambda calc, route_nodes, weight_type, cost_type, plotter, population_size: TSPGeneticAlgorithm(
+            adjacency_matrix=build_adjacency_matrix(
+                route_calculator=calc,
+                route_nodes=route_nodes,
+                weight_type=weight_type,
+                cost_type=cost_type,
+            ),
             plotter=plotter,
             population_size=population_size,
         ),
@@ -31,6 +36,8 @@ def run_console_example():
 
     max_generation = 50
     max_processing_time = 30000
+    weight_type = "eta"
+    cost_type = "priority"
 
     result = service.optimize(
         origin=origin,
@@ -39,6 +46,8 @@ def run_console_example():
         max_processing_time=max_processing_time,
         vehicle_count=2,  # example value
         population_size=10,
+        weight_type=weight_type,
+        cost_type=cost_type,
     )
     # resultado formatado para exibição no console
     print("\nResumo da otimização:")
@@ -51,7 +60,8 @@ def run_console_example():
         print(f"  ETA: {vehicle_route.total_eta/60:.1f} min")
         print(f"  Custo: {(vehicle_route.total_cost or 0.0):.2f}")
     print(f"Distância total: {result.best_route.total_length:.1f} m")
-    print(f"Tempo total estimado: {result.best_route.total_eta/60:.1f} min")
+    print(f"Tempo mínimo entre veículos: {result.best_route.min_vehicle_eta/60:.1f} min")
+    print(f"Tempo máximo entre veículos: {result.best_route.max_vehicle_eta/60:.1f} min")
     print(f"Custo total: {(result.best_route.total_cost or 0.0):.2f}")
     input("\nPressione Enter para sair...")
 

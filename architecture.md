@@ -154,8 +154,8 @@ classDiagram
         <<interface>>
         +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
         +compute_route_segments_info(segments) RouteSegmentsInfo
-        +get_weight_function() Callable
-        +get_cost_function(cost_type) Callable
+        +get_weight_function(weight_type) Callable
+        +get_cost_function(cost_type) Callable|None
     }
 
     class IRouteOptimizer {
@@ -209,6 +209,8 @@ classDiagram
 
     class FleetRouteInfo {
         +routes_by_vehicle list[VehicleRouteInfo]
+        +min_vehicle_eta float
+        +max_vehicle_eta float
     }
 
     class OptimizationResult {
@@ -427,9 +429,9 @@ class IRouteCalculator(Protocol):
         segments: list[RouteSegment],
     ) -> RouteSegmentsInfo: ...
 
-    def get_weight_function(self) -> Callable: ...
+    def get_weight_function(self, weight_type: str) -> Callable: ...
 
-    def get_cost_function(self, cost_type: str) -> Callable: ...
+    def get_cost_function(self, cost_type: str | None) -> Callable | None: ...
 
 
 @runtime_checkable
@@ -453,7 +455,7 @@ class IPlotter(Protocol):
 | Interface | Consumer | Responsibility |
 |---|---|---|
 | `IGraphGenerator` | `RouteOptimizationService` | Initializes a projected street graph and resolves geographic locations to graph nodes |
-| `IRouteCalculator` | `TSPGeneticAlgorithm`, `RouteOptimizationService` | Computes segment-level route metrics (ETA, length, cost) for an ordered list of nodes |
+| `IRouteCalculator` | `RouteOptimizationService` and infrastructure composition | Computes segment-level route metrics (ETA, length, cost) for an ordered list of nodes |
 | `IRouteOptimizer` | `RouteOptimizationService` | Executes the optimization algorithm and returns the best route found |
 | `IPlotter` | `RouteOptimizationService` | Renders route information visually; optional dependency |
 
@@ -576,7 +578,8 @@ The class exposes two public methods with distinct responsibilities:
 
 - `compute_segment(start_node_id, end_node, weight_function, cost_function)` — runs Dijkstra between a single pair of nodes and returns a typed `RouteSegment` dataclass containing ETA, length, path details, and optional cost. The cost function is passed in already resolved, so the same callable is reused across all segments in a route.
 - `compute_route_segments_info(segments)` — the consolidating entry point. It receives a pre-built `list[RouteSegment]`, sums ETA, length, and cost totals, and packages the result into `RouteSegmentsInfo`. Callers are responsible for building the segment list (e.g., via `compute_segment` for each consecutive node pair) before invoking this method.
-- `get_cost_function(cost_type)` — resolves and returns the cost callable by name, allowing callers to pre-resolve it once before iterating over route pairs.
+- `get_weight_function(weight_type)` — resolves and returns the graph-edge weight callable by name. The current implementation supports `eta`.
+- `get_cost_function(cost_type)` — resolves and returns the cost callable by name, allowing callers to pre-resolve it once before iterating over route pairs. The current implementation supports `priority` and also accepts `None` to disable aggregated segment cost.
 
 Because the graph is only available after `IGraphGenerator.initialize()` is called, this class is not injected as a singleton but rather instantiated on demand via a factory callable in `RouteOptimizationService`.
 
@@ -585,9 +588,9 @@ Because the graph is only available after `IGraphGenerator.initialize()` is call
 **Location:** `src/infrastructure/tsp_genetic_algorithm.py`
 **Implements:** `IRouteOptimizer`
 
-Receives an `IRouteCalculator` at construction time. The genetic operators (crossover, mutation, population generation) are implemented as private methods within the class. An optional `IPlotter` may also be injected to visualize progress after each generation.
+Receives a precomputed adjacency matrix at construction time instead of an `IRouteCalculator`. The genetic operators (crossover, mutation, population generation) are implemented as private methods within the class. An optional `IPlotter` may also be injected to visualize progress after each generation.
 
-The `solve()` method returns an `OptimizationResult` whose `best_route` is a `FleetRouteInfo`, containing one `VehicleRouteInfo` per vehicle plus fleet-level totals. Population generation now allows empty vehicles, crossover chooses between parent1 distribution, parent2 distribution, or a positional mean distribution, and mutation can both reorder stops within a vehicle and move stops across vehicles.
+The `solve()` method returns an `OptimizationResult` whose `best_route` is a `FleetRouteInfo`, containing one `VehicleRouteInfo` per vehicle plus fleet-level totals. At fleet level, temporal aggregation is expressed as `min_vehicle_eta` and `max_vehicle_eta` instead of summing ETAs across vehicles. Population generation now allows empty vehicles, crossover chooses between parent1 distribution, parent2 distribution, or a positional mean distribution, and mutation can both reorder stops within a vehicle and move stops across vehicles.
 
 The initial population bootstrap is now hybrid instead of purely random:
 
@@ -625,7 +628,7 @@ Because the interface is defined in the domain layer and the concrete implementa
 
 **Location:** `src/application/route_optimization_service.py`
 
-`RouteOptimizationService` is the single orchestrator. It depends exclusively on interfaces and on factory callables that produce interface-typed instances. Its `optimize` method accepts both `vehicle_count` and `population_size`, obtains a coordinate-conversion delegate from the graph generator, forwards optimization parameters to the GA, and then applies the coordinate delegate over the multi-vehicle aggregate before returning. The service contains no routing heuristics of its own beyond sequencing the workflow and mapping coordinate conversion over the result structure.
+`RouteOptimizationService` is the single orchestrator. It depends exclusively on interfaces and on factory callables that produce interface-typed instances. Its `optimize` method now accepts `vehicle_count`, `population_size`, `weight_type`, and `cost_type`, obtains a coordinate-conversion delegate from the graph generator, forwards optimization parameters to the infrastructure composition, and then applies the coordinate delegate over the multi-vehicle aggregate before returning. The service contains no routing heuristics of its own beyond sequencing the workflow and mapping coordinate conversion over the result structure.
 
 ```python
 # src/application/route_optimization_service.py
@@ -640,7 +643,7 @@ class RouteOptimizationService:
         self,
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
-        optimizer_factory: Callable[[IRouteCalculator, IPlotter | None, int], IRouteOptimizer],
+        optimizer_factory: Callable[[IRouteCalculator, list[RouteNode], str, str | None, IPlotter | None, int], IRouteOptimizer],
     ):
         self._graph_generator = graph_generator
         self._route_calculator_factory = route_calculator_factory
@@ -658,7 +661,14 @@ class RouteOptimizationService:
         context = self._graph_generator.initialize(origin, destinations)
 
         route_calculator = self._route_calculator_factory(context.graph)
-        optimizer = self._optimizer_factory(route_calculator, None, population_size)
+        optimizer = self._optimizer_factory(
+            route_calculator,
+            context.route_nodes,
+            "eta",
+            "priority",
+            None,
+            population_size,
+        )
         coordinate_converter = self._graph_generator.build_coordinate_converter(context)
 
         result = optimizer.solve(
@@ -677,7 +687,7 @@ class RouteOptimizationService:
         )
 ```
 
-Note that `route_calculator_factory` and `optimizer_factory` are used per-call rather than per-service-instance. This is necessary because `RouteCalculator` depends on a graph that is only known at request time. The factories act as lightweight constructors bound to the DI container at startup.
+Note that `route_calculator_factory` and `optimizer_factory` are used per-call rather than per-service-instance. This is necessary because `RouteCalculator` depends on a graph that is only known at request time, and because the adjacency matrix is now precomputed in the infrastructure composition using the current `route_nodes`, `weight_type`, and `cost_type` before the optimizer is instantiated.
 
 ---
 

@@ -224,13 +224,13 @@ class MatplotlibPlotter(IPlotter):
         # update route cache only after successful draw/update of artists
         self._last_route_signature = route_signature
 
-        # update fitness chart: prefer total_cost, fall back to total_eta
+        # update fitness chart: prefer total_cost, fall back to fleet makespan
         if route_info.total_cost is not None:
             fitness_value = route_info.total_cost
             fitness_ylabel = "Total Cost"
         else:
-            fitness_value = route_info.total_eta
-            fitness_ylabel = "Total ETA (s)"
+            fitness_value = route_info.max_vehicle_eta
+            fitness_ylabel = "Max Vehicle ETA (s)"
 
         if not self._fitness_label_set:
             self.fitness_ax.set_ylabel(fitness_ylabel)

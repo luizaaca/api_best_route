@@ -22,6 +22,13 @@ class RouteTotals(BaseModel):
     total_cost: Optional[float] = None
 
 
+class FleetTotals(BaseModel):
+    total_length: float
+    min_vehicle_eta: float
+    max_vehicle_eta: float
+    total_cost: Optional[float] = None
+
+
 class OptimizeRouteRequest(BaseModel):
     origin: Union[str, list[float]]
     destinations: list[Destination]
@@ -29,6 +36,8 @@ class OptimizeRouteRequest(BaseModel):
     max_processing_time: int = 10000
     population_size: int = 10
     vehicle_count: int = 1  # number of vehicles available for routing
+    weight_type: str = "eta"
+    cost_type: Optional[str] = "priority"
 
 
 class VehicleRouteResponse(BaseModel):
@@ -39,7 +48,7 @@ class VehicleRouteResponse(BaseModel):
 
 class OptimizeRouteResponse(BaseModel):
     routes_by_vehicle: list[VehicleRouteResponse]
-    totals: RouteTotals
+    totals: FleetTotals
     best_fitness: float
     population_size: int
     generations_run: int

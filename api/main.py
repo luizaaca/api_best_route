@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.schemas import (
+    FleetTotals,
     RouteItem,
     RouteTotals,
     OptimizeRouteRequest,
@@ -58,6 +59,8 @@ async def optimize_route(
             max_processing_time=request.max_processing_time,
             vehicle_count=request.vehicle_count,
             population_size=request.population_size,
+            weight_type=request.weight_type,
+            cost_type=request.cost_type,
         )
 
         routes_by_vehicle = []
@@ -86,9 +89,10 @@ async def optimize_route(
                 )
             )
 
-        totals = RouteTotals(
+        totals = FleetTotals(
             total_length=result.best_route.total_length,
-            total_eta=result.best_route.total_eta,
+            min_vehicle_eta=result.best_route.min_vehicle_eta,
+            max_vehicle_eta=result.best_route.max_vehicle_eta,
             total_cost=result.best_route.total_cost,
         )
 

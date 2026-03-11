@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
+from src.infrastructure.route_calculator import build_adjacency_matrix
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
 
 
@@ -42,10 +43,14 @@ class FakeRouteCalculator:
             total_cost=total_cost,
         )
 
-    def get_weight_function(self):
+    def get_weight_function(self, weight_type="eta"):
+        if weight_type != "eta":
+            raise ValueError(f"Unknown weight type: {weight_type}")
         return lambda *_args, **_kwargs: 1.0
 
     def get_cost_function(self, cost_type):
+        if cost_type in (None, "", "none"):
+            return None
         return lambda node_id, eta: float(node_id + eta)
 
 
@@ -126,7 +131,7 @@ def test_build_clustered_individual_preserves_origin_and_uniqueness():
 
 def test_generate_initial_population_returns_hybrid_diverse_population():
     random.seed(7)
-    optimizer = TSPGeneticAlgorithm(FakeRouteCalculator(), population_size=5)
+    optimizer = TSPGeneticAlgorithm({}, population_size=5)
     nodes = [
         RouteNode("Origin", 1, (0.0, 0.0)),
         RouteNode("Node 2", 2, (0.0, 1.0)),
@@ -152,7 +157,7 @@ def test_generate_initial_population_returns_hybrid_diverse_population():
 
 def test_evaluate_individual_returns_fleet_aggregate_with_empty_vehicle():
     calculator = FakeRouteCalculator()
-    optimizer = TSPGeneticAlgorithm(calculator)
+    optimizer = TSPGeneticAlgorithm({})
     origin, destination = make_nodes(1)
     cost_function = calculator.get_cost_function("priority")
 
@@ -179,11 +184,13 @@ def test_evaluate_individual_returns_fleet_aggregate_with_empty_vehicle():
     assert fleet_route.routes_by_vehicle[1].segments[0].start == origin.node_id
     assert fleet_route.routes_by_vehicle[1].segments[0].end == origin.node_id
     assert fleet_route.total_cost == fleet_route.routes_by_vehicle[0].total_cost
+    assert fleet_route.min_vehicle_eta == 0
+    assert fleet_route.max_vehicle_eta == fleet_route.routes_by_vehicle[0].total_eta
 
 
 def test_order_crossover_preserves_all_destinations_and_origins():
     random.seed(1)
-    optimizer = TSPGeneticAlgorithm(FakeRouteCalculator())
+    optimizer = TSPGeneticAlgorithm({})
     origin, n2, n3, n4, n5 = make_nodes(4)
     parent1 = [[origin, n2, n3], [origin, n4, n5]]
     parent2 = [[origin, n5], [origin, n3, n2, n4]]
@@ -197,7 +204,7 @@ def test_order_crossover_preserves_all_destinations_and_origins():
 
 def test_mutate_preserves_all_destinations_and_origins():
     random.seed(2)
-    optimizer = TSPGeneticAlgorithm(FakeRouteCalculator())
+    optimizer = TSPGeneticAlgorithm({})
     origin, n2, n3, n4, n5 = make_nodes(4)
     individual = [[origin, n2, n3], [origin], [origin, n4, n5]]
 
@@ -210,8 +217,10 @@ def test_mutate_preserves_all_destinations_and_origins():
 
 def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
     random.seed(3)
-    optimizer = TSPGeneticAlgorithm(FakeRouteCalculator(), population_size=4)
+    calculator = FakeRouteCalculator()
     nodes = make_nodes(2)
+    adjacency_matrix = build_adjacency_matrix(calculator, nodes)
+    optimizer = TSPGeneticAlgorithm(adjacency_matrix, population_size=4)
 
     result = optimizer.solve(
         route_nodes=nodes,
@@ -232,3 +241,5 @@ def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
     ) == [2, 3]
     assert all(route.segments[0].start == 1 for route in result.best_route.routes_by_vehicle)
     assert all(route.segments[0].end == 1 for route in result.best_route.routes_by_vehicle)
+    assert result.best_route.min_vehicle_eta == 0
+    assert result.best_route.max_vehicle_eta >= 0

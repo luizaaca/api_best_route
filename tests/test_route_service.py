@@ -33,16 +33,28 @@ class DummyRouteCalculator:
     def __init__(self, graph):
         pass
 
-    def get_weight_function(self):
+    def get_weight_function(self, weight_type="eta"):
         return lambda u, v, d: 1
+
+    def get_cost_function(self, cost_type="priority"):
+        return None
 
     def compute_route_segments_info(self, route, weight_function, cost_type=None):
         return RouteSegmentsInfo(segments=[], total_eta=0, total_length=0, total_cost=0)
 
 
 class DummyOptimizer:
-    def __init__(self, calc, plotter=None, population_size=10):
-        self.calc = calc
+    def __init__(
+        self,
+        route_nodes,
+        weight_type,
+        cost_type,
+        plotter=None,
+        population_size=10,
+    ):
+        self.route_nodes = route_nodes
+        self.weight_type = weight_type
+        self.cost_type = cost_type
         self.plotter = plotter
         self.last_vehicle_count = None
         self.last_population_size = population_size
@@ -105,9 +117,15 @@ def test_service_uses_generators():
     # capture optimizer instance so we can inspect arguments later
     last_optimizer = None
 
-    def optimizer_factory(calc, plotter, population_size):
+    def optimizer_factory(calc, route_nodes, weight_type, cost_type, plotter, population_size):
         nonlocal last_optimizer
-        last_optimizer = DummyOptimizer(calc, plotter, population_size)
+        last_optimizer = DummyOptimizer(
+            route_nodes,
+            weight_type,
+            cost_type,
+            plotter,
+            population_size,
+        )
         return last_optimizer
 
     service = RouteOptimizationService(
@@ -122,14 +140,21 @@ def test_service_uses_generators():
         [("dest", 1)],
         vehicle_count=3,
         population_size=17,
+        weight_type="eta",
+        cost_type="priority",
     )
     assert plotter.called
     assert generator.converter_built
     assert last_optimizer is not None
     assert last_optimizer.last_vehicle_count == 3
     assert last_optimizer.last_population_size == 17
+    assert last_optimizer.weight_type == "eta"
+    assert last_optimizer.cost_type == "priority"
+    assert len(last_optimizer.route_nodes) == 1
     assert result.best_route.routes_by_vehicle[0].vehicle_id == 1
     assert result.best_route.routes_by_vehicle[0].total_length == 10
+    assert result.best_route.min_vehicle_eta == 5
+    assert result.best_route.max_vehicle_eta == 5
     origin_segment = result.best_route.routes_by_vehicle[0].segments[0]
     destination_segment = result.best_route.routes_by_vehicle[0].segments[1]
     assert origin_segment.start == 1

@@ -4,6 +4,9 @@ import networkx as nx
 from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
 
 
+AdjacencyMatrix = dict[tuple[int, int], RouteSegment]
+
+
 class RouteCalculator:
     """Class responsible for calculating route segments info based on a given graph and route."""
 
@@ -59,7 +62,10 @@ class RouteCalculator:
             total_cost=total_cost,
         )
 
-    def get_weight_function(self):
+    def get_weight_function(self, weight_type: str = "eta"):
+        if weight_type != "eta":
+            raise ValueError(f"Unknown weight type: {weight_type}")
+
         def calculate_weight(u: Any, v: Any, d: dict) -> float:
             length = d.get("length")
             maxspeed = d.get("maxspeed", 50)
@@ -136,8 +142,11 @@ class RouteCalculator:
                 deduped_route.append(item)
         return deduped_route
 
-    def get_cost_function(self, cost_type: str) -> Any:
+    def get_cost_function(self, cost_type: str | None) -> Any:
         """Resolve and return the cost callable for the given cost_type."""
+
+        if cost_type in (None, "", "none"):
+            return None
 
         def priority(node_id, eta: float) -> float:
             node = self.graph.nodes[node_id]
@@ -149,3 +158,26 @@ class RouteCalculator:
             return priority
         else:
             raise ValueError(f"Unknown cost type: {cost_type}")
+
+
+def build_adjacency_matrix(
+    route_calculator: RouteCalculator,
+    route_nodes: list[RouteNode],
+    weight_type: str = "eta",
+    cost_type: str | None = "priority",
+) -> AdjacencyMatrix:
+    weight_function = route_calculator.get_weight_function(weight_type)
+    cost_function = route_calculator.get_cost_function(cost_type)
+    matrix: AdjacencyMatrix = {}
+    for i, from_node in enumerate(route_nodes):
+        for j, to_node in enumerate(route_nodes):
+            if i == j:
+                continue
+            seg = route_calculator.compute_segment(
+                start_node=from_node,
+                end_node=to_node,
+                weight_function=weight_function,
+                cost_function=cost_function,
+            )
+            matrix[(from_node.node_id, to_node.node_id)] = seg
+    return matrix

@@ -6,7 +6,7 @@ from math import dist, floor
 from typing import Tuple
 from shapely.geometry import MultiPoint, Polygon
 from sklearn.cluster import KMeans
-from src.domain.interfaces import IRouteCalculator, IPlotter
+from src.domain.interfaces import IPlotter
 from src.domain.models import (
     FleetRouteInfo,
     OptimizationResult,
@@ -15,6 +15,7 @@ from src.domain.models import (
     RouteSegment,
     VehicleRouteInfo,
 )
+from src.infrastructure.route_calculator import AdjacencyMatrix
 
 # type aliases to clarify multi-vehicle data structures
 VehicleRoute = list[RouteNode]  # single vehicle sequence
@@ -531,35 +532,7 @@ class TSPGeneticAlgorithm:
     def _fitness(route_info: FleetRouteInfo) -> float:
         if route_info.total_cost is not None:
             return route_info.total_cost
-        return route_info.total_eta
-
-    def _generate_adjacency_matrix(
-        self, route_nodes: list[RouteNode], weight_function, cost_function
-    ) -> dict[tuple[int, int], RouteSegment]:
-        """
-        Generate an adjacency mapping of travel calculations between every pair of nodes.
-
-        Parameters:
-        - route_nodes (list[RouteNode]): Resolved graph nodes.
-        - weight_function: Callable to compute the weight (e.g., distance) of a segment.
-        - cost_function: Callable to compute the cost of a segment based on its eta and node priority.
-
-        Returns:
-        dict[tuple[int, int], RouteSegment]: Mapping of (start_node_id, end_node_id) -> RouteSegment.
-        """
-        matrix: dict[tuple[int, int], RouteSegment] = {}
-        for i, from_node in enumerate(route_nodes):
-            for j, to_node in enumerate(route_nodes):
-                if i == j:
-                    continue
-                seg = self.route_calculator.compute_segment(
-                    start_node=from_node,
-                    end_node=to_node,
-                    weight_function=weight_function,
-                    cost_function=cost_function,
-                )
-                matrix[(from_node.node_id, to_node.node_id)] = seg
-        return matrix
+        return route_info.max_vehicle_eta
 
     # helper for evaluating an individual comprised of multiple vehicle routes
     def _evaluate_individual(
@@ -591,12 +564,12 @@ class TSPGeneticAlgorithm:
 
     def __init__(
         self,
-        route_calculator: IRouteCalculator,
+        adjacency_matrix: AdjacencyMatrix,
         population_size=10,
         mutation_probability=0.5,
         plotter: IPlotter | None = None,
     ):
-        self.route_calculator = route_calculator
+        self._adjacency_matrix = adjacency_matrix
         self.population_size = population_size
         self.mutation_probability = mutation_probability
         self._plotter = plotter
@@ -634,11 +607,6 @@ class TSPGeneticAlgorithm:
                 number of generations actually executed.
         """
         print(f"Running optimizer with vehicle_count={vehicle_count}")
-        weight_function = self.route_calculator.get_weight_function()
-        cost_function = self.route_calculator.get_cost_function("priority")
-        adjacency_matrix: dict[tuple[int, int], RouteSegment] = (
-            self._generate_adjacency_matrix(route_nodes, weight_function, cost_function)
-        )
         population = self._generate_initial_population(
             route_nodes, self.population_size, vehicle_count
         )
@@ -668,7 +636,7 @@ class TSPGeneticAlgorithm:
             print(f"Processing generation {generation}...")
             generation += 1
             population_calculated: list[FleetRouteInfo] = [
-                self._evaluate_individual(individual, adjacency_matrix)
+                self._evaluate_individual(individual, self._adjacency_matrix)
                 for individual in population
             ]
 
