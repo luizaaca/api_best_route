@@ -1,16 +1,31 @@
 import os
 import random
 import sys
+import copy
 
 # ensure src directory is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
+from src.domain.interfaces import (
+    ICrossoverStrategy,
+    IMutationStrategy,
+    IPopulationGenerator,
+    IRouteCalculator,
+    ISelectionStrategy,
+)
+from src.infrastructure.genetic_algorithm import (
+    HybridPopulationGenerator,
+    OrderCrossoverStrategy,
+    RandomPopulationGenerator,
+    RoulleteSelectionStrategy,
+    SwapAndRedistributeMutationStrategy,
+)
 from src.infrastructure.route_calculator import build_adjacency_matrix
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
 
 
-class FakeRouteCalculator:
+class FakeRouteCalculator(IRouteCalculator):
     def compute_segment(
         self,
         start_node,
@@ -54,6 +69,48 @@ class FakeRouteCalculator:
         return lambda node_id, eta: float(node_id + eta)
 
 
+class StubSelectionStrategy(ISelectionStrategy):
+    def __init__(self):
+        self.called = False
+
+    def select_parents(self, population, evaluated_population, fitness_function):
+        self.called = True
+        return population[0], population[-1]
+
+
+class StubCrossoverStrategy(ICrossoverStrategy):
+    def __init__(self):
+        self.called = False
+
+    def crossover(self, parent1, parent2):
+        self.called = True
+        return copy.deepcopy(parent1)
+
+
+class StubMutationStrategy(IMutationStrategy):
+    def __init__(self):
+        self.called = False
+
+    def mutate(self, solution, mutation_probability):
+        self.called = True
+        return copy.deepcopy(solution)
+
+
+class StubPopulationGenerator(IPopulationGenerator):
+    def __init__(self):
+        self.called = False
+
+    def generate(self, location_list, population_size, vehicle_count):
+        self.called = True
+        origin = location_list[0]
+        destinations = location_list[1:]
+        vehicle_slots = max(1, vehicle_count)
+        base_routes = [[origin] for _ in range(vehicle_slots)]
+        for index, destination in enumerate(destinations):
+            base_routes[index % vehicle_slots].append(destination)
+        return [copy.deepcopy(base_routes) for _ in range(population_size)]
+
+
 def make_nodes(destination_count):
     nodes = [RouteNode("Origin", 1, (0.0, 0.0))]
     for index in range(destination_count):
@@ -70,11 +127,22 @@ def route_signature(individual):
     return tuple(tuple(node.node_id for node in route) for route in individual)
 
 
+def build_default_optimizer(adjacency_matrix, population_size=10):
+    return TSPGeneticAlgorithm(
+        adjacency_matrix,
+        population_size=population_size,
+        selection_strategy=RoulleteSelectionStrategy(),
+        crossover_strategy=OrderCrossoverStrategy(),
+        mutation_strategy=SwapAndRedistributeMutationStrategy(),
+        population_generator=HybridPopulationGenerator(RandomPopulationGenerator()),
+    )
+
+
 def test_generate_random_population_allows_empty_vehicles():
     random.seed(0)
     nodes = make_nodes(2)
 
-    population = TSPGeneticAlgorithm._generate_random_population(
+    population = RandomPopulationGenerator().generate(
         nodes,
         population_size=1,
         vehicle_count=5,
@@ -92,7 +160,7 @@ def test_cluster_destinations_groups_spatially_close_nodes():
     n4 = RouteNode("Node 4", 4, (100.0, 100.0))
     n5 = RouteNode("Node 5", 5, (101.0, 100.0))
 
-    clusters = TSPGeneticAlgorithm._cluster_destinations(
+    clusters = HybridPopulationGenerator.cluster_destinations(
         [n2, n3, n4, n5],
         vehicle_count=2,
         random_state=0,
@@ -105,7 +173,7 @@ def test_cluster_destinations_groups_spatially_close_nodes():
 def test_cluster_destinations_handles_more_vehicles_than_destinations():
     nodes = make_nodes(2)[1:]
 
-    clusters = TSPGeneticAlgorithm._cluster_destinations(
+    clusters = HybridPopulationGenerator.cluster_destinations(
         nodes,
         vehicle_count=5,
         random_state=0,
@@ -119,7 +187,7 @@ def test_cluster_destinations_handles_more_vehicles_than_destinations():
 def test_build_clustered_individual_preserves_origin_and_uniqueness():
     origin, n2, n3, n4, n5 = make_nodes(4)
 
-    individual = TSPGeneticAlgorithm._build_clustered_individual(
+    individual = HybridPopulationGenerator.build_clustered_individual(
         origin,
         [[n2, n3], [n4, n5], []],
     )
@@ -131,7 +199,6 @@ def test_build_clustered_individual_preserves_origin_and_uniqueness():
 
 def test_generate_initial_population_returns_hybrid_diverse_population():
     random.seed(7)
-    optimizer = TSPGeneticAlgorithm({}, population_size=5)
     nodes = [
         RouteNode("Origin", 1, (0.0, 0.0)),
         RouteNode("Node 2", 2, (0.0, 1.0)),
@@ -140,7 +207,7 @@ def test_generate_initial_population_returns_hybrid_diverse_population():
         RouteNode("Node 5", 5, (101.0, 100.0)),
     ]
 
-    population = optimizer._generate_initial_population(
+    population = HybridPopulationGenerator(RandomPopulationGenerator()).generate(
         nodes,
         population_size=5,
         vehicle_count=2,
@@ -157,7 +224,7 @@ def test_generate_initial_population_returns_hybrid_diverse_population():
 
 def test_evaluate_individual_returns_fleet_aggregate_with_empty_vehicle():
     calculator = FakeRouteCalculator()
-    optimizer = TSPGeneticAlgorithm({})
+    optimizer = build_default_optimizer({})
     origin, destination = make_nodes(1)
     cost_function = calculator.get_cost_function("priority")
 
@@ -190,12 +257,11 @@ def test_evaluate_individual_returns_fleet_aggregate_with_empty_vehicle():
 
 def test_order_crossover_preserves_all_destinations_and_origins():
     random.seed(1)
-    optimizer = TSPGeneticAlgorithm({})
     origin, n2, n3, n4, n5 = make_nodes(4)
     parent1 = [[origin, n2, n3], [origin, n4, n5]]
     parent2 = [[origin, n5], [origin, n3, n2, n4]]
 
-    child = optimizer._order_crossover(parent1, parent2)
+    child = OrderCrossoverStrategy().crossover(parent1, parent2)
 
     assert len(child) == 2
     assert all(route[0].node_id == origin.node_id for route in child)
@@ -204,11 +270,13 @@ def test_order_crossover_preserves_all_destinations_and_origins():
 
 def test_mutate_preserves_all_destinations_and_origins():
     random.seed(2)
-    optimizer = TSPGeneticAlgorithm({})
     origin, n2, n3, n4, n5 = make_nodes(4)
     individual = [[origin, n2, n3], [origin], [origin, n4, n5]]
 
-    mutated = optimizer._mutate(individual, mutation_probability=1.0)
+    mutated = SwapAndRedistributeMutationStrategy().mutate(
+        individual,
+        mutation_probability=1.0,
+    )
 
     assert len(mutated) == 3
     assert all(route[0].node_id == origin.node_id for route in mutated)
@@ -220,7 +288,7 @@ def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
     calculator = FakeRouteCalculator()
     nodes = make_nodes(2)
     adjacency_matrix = build_adjacency_matrix(calculator, nodes)
-    optimizer = TSPGeneticAlgorithm(adjacency_matrix, population_size=4)
+    optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
 
     result = optimizer.solve(
         route_nodes=nodes,
@@ -243,3 +311,35 @@ def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
     assert all(route.segments[0].end == 1 for route in result.best_route.routes_by_vehicle)
     assert result.best_route.min_vehicle_eta == 0
     assert result.best_route.max_vehicle_eta >= 0
+
+
+def test_solve_uses_injected_ga_components():
+    random.seed(5)
+    calculator = FakeRouteCalculator()
+    nodes = make_nodes(2)
+    adjacency_matrix = build_adjacency_matrix(calculator, nodes)
+    selection_strategy = StubSelectionStrategy()
+    crossover_strategy = StubCrossoverStrategy()
+    mutation_strategy = StubMutationStrategy()
+    population_generator = StubPopulationGenerator()
+    optimizer = TSPGeneticAlgorithm(
+        adjacency_matrix,
+        population_size=2,
+        selection_strategy=selection_strategy,
+        crossover_strategy=crossover_strategy,
+        mutation_strategy=mutation_strategy,
+        population_generator=population_generator,
+    )
+
+    result = optimizer.solve(
+        route_nodes=nodes,
+        max_generation=1,
+        max_processing_time=1000,
+        vehicle_count=2,
+    )
+
+    assert population_generator.called is True
+    assert selection_strategy.called is True
+    assert crossover_strategy.called is True
+    assert mutation_strategy.called is True
+    assert len(result.best_route.routes_by_vehicle) == 2

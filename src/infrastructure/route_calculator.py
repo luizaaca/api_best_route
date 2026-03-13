@@ -1,13 +1,14 @@
 from typing import Any, cast
 import networkx as nx
 
+from src.domain.interfaces import IRouteCalculator
 from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
 
 
 AdjacencyMatrix = dict[tuple[int, int], RouteSegment]
 
 
-class RouteCalculator:
+class RouteCalculator(IRouteCalculator):
     """Class responsible for calculating route segments info based on a given graph and route."""
 
     def __init__(self, graph: nx.MultiDiGraph):
@@ -161,7 +162,7 @@ class RouteCalculator:
 
 
 def build_adjacency_matrix(
-    route_calculator: RouteCalculator,
+    route_calculator: IRouteCalculator,
     route_nodes: list[RouteNode],
     weight_type: str = "eta",
     cost_type: str | None = "priority",

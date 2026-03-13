@@ -6,10 +6,11 @@ import networkx as nx
 from geopy.geocoders import Photon
 import os
 
+from src.domain.interfaces import IGraphGenerator
 from src.domain.models import GraphContext, RouteNode
 
 
-class OSMnxGraphGenerator:
+class OSMnxGraphGenerator(IGraphGenerator):
     """Generate and initialize OSMnx graphs for route optimization."""
 
     def __init__(

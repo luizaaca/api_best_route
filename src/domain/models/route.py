@@ -1,40 +1,9 @@
 from dataclasses import dataclass, field
-import networkx as nx
-
-
-@dataclass
-class RouteNode:
-    """
-    Represents a named, projected graph node resolved from a geographic location.
-    """
-
-    name: str
-    node_id: int
-    coords: tuple[float, float]
-
-
-@dataclass
-class GraphContext:
-    """
-    The output of IGraphGenerator.initialize().
-    Bundles the projected street graph with the resolved route nodes,
-    eliminating the raw tuple return from the graph initialization step.
-    """
-
-    graph: nx.MultiDiGraph
-    route_nodes: list[RouteNode]
-    crs: str = field(init=False)
-
-    def __post_init__(self):
-        self.crs = self.graph.graph["crs"]
 
 
 @dataclass
 class RouteSegment:
-    """
-    Typed representation of a single computed route segment between two graph nodes.
-    Replaces the raw dict previously returned by RouteCalculator.compute_segment.
-    """
+    """Typed representation of a single computed route segment between two graph nodes."""
 
     start: int
     end: int
@@ -49,9 +18,7 @@ class RouteSegment:
 
 @dataclass
 class RouteMetrics:
-    """
-    Shared aggregate totals for route-level and fleet-level results.
-    """
+    """Shared aggregate totals for route-level and fleet-level results."""
 
     total_eta: float = 0.0
     total_length: float = 0.0
@@ -60,15 +27,13 @@ class RouteMetrics:
 
 @dataclass
 class RouteSegmentsInfo(RouteMetrics):
-    """
-    Stores computed metrics for an ordered sequence of route segments.
-    Each segment maps to one destination in the optimized route.
-    """
+    """Stores computed metrics for an ordered sequence of route segments."""
 
     segments: list[RouteSegment] = field(default_factory=list)
 
     @classmethod
     def from_segments(cls, segments: list[RouteSegment]) -> "RouteSegmentsInfo":
+        """Build aggregate metrics from an ordered list of route segments."""
         total_eta = 0.0
         total_length = 0.0
         total_cost = 0.0
@@ -91,9 +56,7 @@ class RouteSegmentsInfo(RouteMetrics):
 
 @dataclass
 class VehicleRouteInfo(RouteSegmentsInfo):
-    """
-    Route result assigned to a specific vehicle.
-    """
+    """Route result assigned to a specific vehicle."""
 
     vehicle_id: int = 0
 
@@ -103,6 +66,7 @@ class VehicleRouteInfo(RouteSegmentsInfo):
         vehicle_id: int,
         route_info: RouteSegmentsInfo,
     ) -> "VehicleRouteInfo":
+        """Promote generic route metrics to a vehicle-specific route result."""
         return cls(
             vehicle_id=vehicle_id,
             segments=route_info.segments,
@@ -114,9 +78,7 @@ class VehicleRouteInfo(RouteSegmentsInfo):
 
 @dataclass
 class FleetRouteInfo(RouteMetrics):
-    """
-    Aggregated optimization result across all vehicles.
-    """
+    """Aggregated optimization result across all vehicles."""
 
     routes_by_vehicle: list[VehicleRouteInfo] = field(default_factory=list)
     min_vehicle_eta: float = 0.0
@@ -127,6 +89,7 @@ class FleetRouteInfo(RouteMetrics):
         cls,
         routes_by_vehicle: list[VehicleRouteInfo],
     ) -> "FleetRouteInfo":
+        """Aggregate metrics across all vehicle routes in the fleet result."""
         total_length = sum(route.total_length for route in routes_by_vehicle)
         vehicle_etas = [route.total_eta for route in routes_by_vehicle]
         total_cost_values = [
@@ -142,16 +105,3 @@ class FleetRouteInfo(RouteMetrics):
             min_vehicle_eta=min(vehicle_etas, default=0.0),
             max_vehicle_eta=max(vehicle_etas, default=0.0),
         )
-
-
-@dataclass
-class OptimizationResult:
-    """
-    The output of a single optimization run.
-    Replaces the raw dict previously returned by TSPGeneticAlgorithm.solve().
-    """
-
-    best_route: FleetRouteInfo
-    best_fitness: float
-    population_size: int
-    generations_run: int
