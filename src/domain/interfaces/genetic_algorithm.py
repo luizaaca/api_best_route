@@ -1,6 +1,7 @@
 from typing import Callable, Protocol, runtime_checkable
 
 from src.domain.models import FleetRouteInfo, Individual, Population, VehicleRoute
+from .heuristic_distance import IHeuristicDistanceStrategy
 
 
 @runtime_checkable
@@ -39,3 +40,12 @@ class IPopulationGenerator(Protocol):
         population_size: int,
         vehicle_count: int,
     ) -> Population: ...
+
+
+__all__ = [
+    "ICrossoverStrategy",
+    "IHeuristicDistanceStrategy",
+    "IMutationStrategy",
+    "IPopulationGenerator",
+    "ISelectionStrategy",
+]

@@ -1,4 +1,17 @@
+from src.application.route_optimization_service import RouteOptimizationService
+from src.infrastructure.cache import (
+    CachedAdjacencyMatrixBuilder,
+    CachedGeocodingResolver,
+    PhotonGeocodingResolver,
+    SQLiteAdjacencySegmentCache,
+    SQLiteGeocodingCache,
+)
 from src.infrastructure.genetic_algorithm import (
+    AdjacencyCostPopulationDistanceStrategy,
+    AdjacencyEtaPopulationDistanceStrategy,
+    AdjacencyLengthPopulationDistanceStrategy,
+    EuclideanPopulationDistanceStrategy,
+    HeuristicPopulationGenerator,
     HybridPopulationGenerator,
     OrderCrossoverStrategy,
     RandomPopulationGenerator,
@@ -6,10 +19,20 @@ from src.infrastructure.genetic_algorithm import (
     SwapAndRedistributeMutationStrategy,
 )
 from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
-from src.infrastructure.route_calculator import RouteCalculator, build_adjacency_matrix
+from src.infrastructure.route_calculator import RouteCalculator
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
 from src.infrastructure.matplotlib_plotter import MatplotlibPlotter
-from src.application.route_optimization_service import RouteOptimizationService
+
+
+def _build_population_distance_strategy(adjacency_matrix, weight_type, cost_type):
+    """Select the default heuristic distance strategy for population seeding."""
+    if cost_type not in (None, "", "none"):
+        return AdjacencyCostPopulationDistanceStrategy(adjacency_matrix)
+    if weight_type == "length":
+        return AdjacencyLengthPopulationDistanceStrategy(adjacency_matrix)
+    if weight_type == "eta":
+        return AdjacencyEtaPopulationDistanceStrategy(adjacency_matrix)
+    return EuclideanPopulationDistanceStrategy()
 
 
 def _build_default_optimizer(
@@ -21,25 +44,39 @@ def _build_default_optimizer(
     population_size,
 ) -> TSPGeneticAlgorithm:
     """Create a GA optimizer with the default console collaborators."""
+    adjacency_matrix = CachedAdjacencyMatrixBuilder(
+        SQLiteAdjacencySegmentCache("cache/adjacency_segments.db")
+    ).build(
+        route_calculator=calc,
+        route_nodes=route_nodes,
+        weight_type=weight_type,
+        cost_type=cost_type,
+    )
+    heuristic_generator = HeuristicPopulationGenerator(
+        _build_population_distance_strategy(adjacency_matrix, weight_type, cost_type)
+    )
     return TSPGeneticAlgorithm(
-        adjacency_matrix=build_adjacency_matrix(
-            route_calculator=calc,
-            route_nodes=route_nodes,
-            weight_type=weight_type,
-            cost_type=cost_type,
-        ),
+        adjacency_matrix=adjacency_matrix,
         plotter=plotter,
         population_size=population_size,
         selection_strategy=RoulleteSelectionStrategy(),
         crossover_strategy=OrderCrossoverStrategy(),
         mutation_strategy=SwapAndRedistributeMutationStrategy(),
-        population_generator=HybridPopulationGenerator(RandomPopulationGenerator()),
+        population_generator=HybridPopulationGenerator(
+            RandomPopulationGenerator(),
+            heuristic_generator,
+        ),
     )
 
 
 def run_console_example():
     service = RouteOptimizationService(
-        graph_generator=OSMnxGraphGenerator(),
+        graph_generator=OSMnxGraphGenerator(
+            geocoder=CachedGeocodingResolver(
+                cache=SQLiteGeocodingCache("cache/geocoding.db"),
+                fallback_resolver=PhotonGeocodingResolver(),
+            )
+        ),
         route_calculator_factory=RouteCalculator,
         optimizer_factory=_build_default_optimizer,
         plotter_factory=MatplotlibPlotter,

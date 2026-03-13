@@ -3,10 +3,9 @@ from pyproj import Transformer
 from shapely.geometry import MultiPoint
 import osmnx as ox
 import networkx as nx
-from geopy.geocoders import Photon
 import os
 
-from src.domain.interfaces import IGraphGenerator
+from src.domain.interfaces import IGeocodingResolver, IGraphGenerator
 from src.domain.models import GraphContext, RouteNode
 
 
@@ -15,14 +14,14 @@ class OSMnxGraphGenerator(IGraphGenerator):
 
     def __init__(
         self,
+        geocoder: IGeocodingResolver,
         network_type: str = "drive",
         custom_filter: str | None = None,
         cache_folder: str | None = None,
     ):
         self.network_type = network_type
         self.custom_filter = custom_filter
-
-        self.geolocator = Photon(user_agent="geo_app")
+        self._geocoder = geocoder
 
         print("Configuring OSMnx settings...")
         ox.settings.use_cache = True
@@ -70,14 +69,11 @@ class OSMnxGraphGenerator(IGraphGenerator):
         for loc in locations:
             if isinstance(loc, str):
                 print(f"Geocoding location: {loc}")
-                geoloc = self.geolocator.geocode(loc)
-                lat_lon = (geoloc.latitude, geoloc.longitude)  # type: ignore
-                name = geoloc.address  # type: ignore
+                lat_lon, name = self._geocoder.geocode(loc)
             else:
                 print(f"Processing coordinates: {loc}")
                 try:
-                    geoloc = self.geolocator.reverse(loc)
-                    name = geoloc.address  # type: ignore
+                    name = self._geocoder.reverse_geocode(loc)
                 except Exception:
                     name = f"Coords: ({loc[0]:.4f}, {loc[1]:.4f})"
                 lat_lon = loc

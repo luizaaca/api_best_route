@@ -15,6 +15,8 @@ from src.domain.interfaces import (
     ISelectionStrategy,
 )
 from src.infrastructure.genetic_algorithm import (
+    AdjacencyEtaPopulationDistanceStrategy,
+    HeuristicPopulationGenerator,
     HybridPopulationGenerator,
     OrderCrossoverStrategy,
     RandomPopulationGenerator,
@@ -128,13 +130,19 @@ def route_signature(individual):
 
 
 def build_default_optimizer(adjacency_matrix, population_size=10):
+    heuristic_generator = HeuristicPopulationGenerator(
+        AdjacencyEtaPopulationDistanceStrategy(adjacency_matrix)
+    )
     return TSPGeneticAlgorithm(
         adjacency_matrix,
         population_size=population_size,
         selection_strategy=RoulleteSelectionStrategy(),
         crossover_strategy=OrderCrossoverStrategy(),
         mutation_strategy=SwapAndRedistributeMutationStrategy(),
-        population_generator=HybridPopulationGenerator(RandomPopulationGenerator()),
+        population_generator=HybridPopulationGenerator(
+            RandomPopulationGenerator(),
+            heuristic_generator,
+        ),
     )
 
 
@@ -154,49 +162,6 @@ def test_generate_random_population_allows_empty_vehicles():
     assert sorted(flatten_destination_ids(population[0])) == [2, 3]
 
 
-def test_cluster_destinations_groups_spatially_close_nodes():
-    n2 = RouteNode("Node 2", 2, (0.0, 1.0))
-    n3 = RouteNode("Node 3", 3, (0.0, 2.0))
-    n4 = RouteNode("Node 4", 4, (100.0, 100.0))
-    n5 = RouteNode("Node 5", 5, (101.0, 100.0))
-
-    clusters = HybridPopulationGenerator.cluster_destinations(
-        [n2, n3, n4, n5],
-        vehicle_count=2,
-        random_state=0,
-    )
-
-    cluster_sets = {frozenset(node.node_id for node in cluster) for cluster in clusters}
-    assert cluster_sets == {frozenset({2, 3}), frozenset({4, 5})}
-
-
-def test_cluster_destinations_handles_more_vehicles_than_destinations():
-    nodes = make_nodes(2)[1:]
-
-    clusters = HybridPopulationGenerator.cluster_destinations(
-        nodes,
-        vehicle_count=5,
-        random_state=0,
-    )
-
-    assert len(clusters) == 5
-    assert sum(1 for cluster in clusters if not cluster) == 3
-    assert sorted(node.node_id for cluster in clusters for node in cluster) == [2, 3]
-
-
-def test_build_clustered_individual_preserves_origin_and_uniqueness():
-    origin, n2, n3, n4, n5 = make_nodes(4)
-
-    individual = HybridPopulationGenerator.build_clustered_individual(
-        origin,
-        [[n2, n3], [n4, n5], []],
-    )
-
-    assert len(individual) == 3
-    assert all(route[0].node_id == origin.node_id for route in individual)
-    assert sorted(flatten_destination_ids(individual)) == [2, 3, 4, 5]
-
-
 def test_generate_initial_population_returns_hybrid_diverse_population():
     random.seed(7)
     nodes = [
@@ -207,7 +172,14 @@ def test_generate_initial_population_returns_hybrid_diverse_population():
         RouteNode("Node 5", 5, (101.0, 100.0)),
     ]
 
-    population = HybridPopulationGenerator(RandomPopulationGenerator()).generate(
+    adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
+    heuristic_generator = HeuristicPopulationGenerator(
+        AdjacencyEtaPopulationDistanceStrategy(adjacency_matrix)
+    )
+    population = HybridPopulationGenerator(
+        RandomPopulationGenerator(),
+        heuristic_generator,
+    ).generate(
         nodes,
         population_size=5,
         vehicle_count=2,
