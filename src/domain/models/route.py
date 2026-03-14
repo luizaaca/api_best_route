@@ -1,9 +1,28 @@
+"""Domain models representing computed route segments and aggregated route metrics.
+
+This module defines the data transfer objects (DTOs) used by the optimization service
+and the genetic algorithm to capture route distances, timings, costs, and the
+structure of multi-vehicle fleet routes.
+"""
+
 from dataclasses import dataclass, field
 
 
 @dataclass
 class RouteSegment:
-    """Typed representation of a single computed route segment between two graph nodes."""
+    """Represents a single computed segment between two graph nodes.
+
+    Attributes:
+        start: The starting graph node identifier.
+        end: The ending graph node identifier.
+        eta: Estimated time of arrival in seconds.
+        length: The segment length in meters.
+        path: A list of (latitude, longitude) points representing the route.
+        segment: The sequence of graph node IDs traversed.
+        name: A human-readable name for the end node (typically the destination label).
+        coords: The projected graph coordinates (x, y) for the end node.
+        cost: Optional computed cost (e.g., priority-adjusted ETA).
+    """
 
     start: int
     end: int
@@ -33,7 +52,18 @@ class RouteSegmentsInfo(RouteMetrics):
 
     @classmethod
     def from_segments(cls, segments: list[RouteSegment]) -> "RouteSegmentsInfo":
-        """Build aggregate metrics from an ordered list of route segments."""
+        """Create a RouteSegmentsInfo instance from a list of segments.
+
+        This helper computes aggregate metrics (total ETA, total length, and
+        optionally total cost) across all segments.
+
+        Args:
+            segments: An ordered list of RouteSegment instances.
+
+        Returns:
+            A RouteSegmentsInfo containing the original segments and computed
+            aggregate totals.
+        """
         total_eta = 0.0
         total_length = 0.0
         total_cost = 0.0
@@ -66,7 +96,17 @@ class VehicleRouteInfo(RouteSegmentsInfo):
         vehicle_id: int,
         route_info: RouteSegmentsInfo,
     ) -> "VehicleRouteInfo":
-        """Promote generic route metrics to a vehicle-specific route result."""
+        """Create a vehicle-specific route result from generic route metrics.
+
+        Args:
+            vehicle_id: The identifier of the vehicle assigned to the route.
+            route_info: A RouteSegmentsInfo instance containing segment-level
+                metrics for the vehicle’s route.
+
+        Returns:
+            A VehicleRouteInfo containing the same segment data and aggregated
+            totals, annotated with the vehicle identifier.
+        """
         return cls(
             vehicle_id=vehicle_id,
             segments=route_info.segments,
@@ -89,7 +129,15 @@ class FleetRouteInfo(RouteMetrics):
         cls,
         routes_by_vehicle: list[VehicleRouteInfo],
     ) -> "FleetRouteInfo":
-        """Aggregate metrics across all vehicle routes in the fleet result."""
+        """Create a FleetRouteInfo by aggregating metrics across all vehicles.
+
+        Args:
+            routes_by_vehicle: A list of VehicleRouteInfo objects, one per vehicle.
+
+        Returns:
+            A FleetRouteInfo containing the combined totals, including min/max
+            per-vehicle ETA and optional aggregated cost.
+        """
         total_length = sum(route.total_length for route in routes_by_vehicle)
         vehicle_etas = [route.total_eta for route in routes_by_vehicle]
         total_cost_values = [

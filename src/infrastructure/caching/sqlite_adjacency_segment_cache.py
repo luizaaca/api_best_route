@@ -1,3 +1,9 @@
+"""SQLite-backed cache for adjacency segments.
+
+This module provides a persistent store for caching computed RouteSegment
+objects, keyed by graph identity and segment parameters.
+"""
+
 import json
 import sqlite3
 from pathlib import Path

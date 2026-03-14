@@ -1,3 +1,5 @@
+"""Mutation strategy that swaps and redistributes stops across vehicle routes."""
+
 import copy
 import random
 
@@ -10,7 +12,11 @@ class SwapAndRedistributeMutationStrategy(IMutationStrategy):
 
     @staticmethod
     def _mutate_distribution(solution: Individual) -> None:
-        """Move one destination from a source route into a different target route."""
+        """Move one destination from one vehicle route to another.
+
+        This mutation promotes diversity by changing the distribution of visited
+        nodes across vehicles while keeping the origin fixed at index 0.
+        """
         source_indexes = [
             index for index, route in enumerate(solution) if len(route) > 1
         ]
@@ -32,7 +38,7 @@ class SwapAndRedistributeMutationStrategy(IMutationStrategy):
 
     @staticmethod
     def _mutate_vehicle_order(solution: Individual) -> None:
-        """Swap two destinations inside the same vehicle route."""
+        """Swap two destinations within the same vehicle route."""
         candidate_routes = [route for route in solution if len(route) > 2]
         if not candidate_routes:
             return
@@ -51,7 +57,16 @@ class SwapAndRedistributeMutationStrategy(IMutationStrategy):
         solution: Individual,
         mutation_probability: float,
     ) -> Individual:
-        """Return a mutated copy of the provided solution when the mutation triggers."""
+        """Return a potentially mutated copy of the provided solution.
+
+        Args:
+            solution: The individual to mutate.
+            mutation_probability: A value between 0 and 1 indicating the chance
+                that mutation is applied.
+
+        Returns:
+            A new Individual, mutated if the random chance triggered.
+        """
         mutated_solution = copy.deepcopy(solution)
         if random.random() < mutation_probability:
             mutation_actions = [self._mutate_distribution, self._mutate_vehicle_order]

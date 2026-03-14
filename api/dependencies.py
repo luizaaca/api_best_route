@@ -1,3 +1,9 @@
+"""FastAPI dependency definitions for creating optimizer components.
+
+This module provides cached factory functions used by the API to wire up the
+route optimization service with default infrastructure implementations.
+"""
+
 from functools import lru_cache
 from src.application.route_optimization_service import RouteOptimizationService
 from src.infrastructure.caching import (
@@ -53,7 +59,16 @@ def get_graph_generator() -> OSMnxGraphGenerator:
 
 
 def _build_population_distance_strategy(adjacency_matrix, weight_type, cost_type):
-    """Select the default heuristic distance strategy for population seeding."""
+    """Select the default heuristic distance strategy for population seeding.
+
+    Args:
+        adjacency_matrix: The adjacency matrix used for distance lookups.
+        weight_type: The weight strategy (e.g., "eta", "length").
+        cost_type: Optional cost strategy name.
+
+    Returns:
+        An IHeuristicDistanceStrategy implementation.
+    """
     if cost_type not in (None, "", "none"):
         return AdjacencyCostPopulationDistanceStrategy(adjacency_matrix)
     if weight_type == "length":
@@ -71,7 +86,22 @@ def _build_default_optimizer(
     plotter,
     population_size,
 ) -> TSPGeneticAlgorithm:
-    """Create a GA optimizer with the default concrete collaborators."""
+    """Create a GA optimizer with default concrete collaborators.
+
+    This function constructs the optimizer with a cached adjacency matrix
+    builder, heuristic population generator, and default genetic operators.
+
+    Args:
+        calc: The route calculator to use for segment computation.
+        route_nodes: The list of route nodes to optimize.
+        weight_type: Weighting strategy for segment computation.
+        cost_type: Optional cost strategy for segment computation.
+        plotter: Optional plotter for visualization.
+        population_size: The number of individuals in the genetic population.
+
+    Returns:
+        A configured TSPGeneticAlgorithm instance.
+    """
     adjacency_matrix = get_adjacency_matrix_builder().build(
         route_calculator=calc,
         route_nodes=route_nodes,
@@ -96,6 +126,7 @@ def _build_default_optimizer(
 
 
 def get_route_optimization_service() -> RouteOptimizationService:
+    """Return the RouteOptimizationService configured with default dependencies."""
     return RouteOptimizationService(
         graph_generator=get_graph_generator(),
         route_calculator_factory=RouteCalculator,

@@ -1,3 +1,9 @@
+"""SQLite-backed implementation of IGeocodingCache.
+
+This module provides a lightweight persistent cache for forward and reverse
+geocoding lookups to reduce repeated external API calls.
+"""
+
 import sqlite3
 from pathlib import Path
 
@@ -47,7 +53,14 @@ class SQLiteGeocodingCache(IGeocodingCache):
 
     @staticmethod
     def _coords_key(coords: tuple[float, float]) -> str:
-        """Normalize coordinates into a stable SQLite key."""
+        """Normalize coordinates into a stable SQLite key.
+
+        Args:
+            coords: A (latitude, longitude) tuple.
+
+        Returns:
+            A stable string key formatted with fixed precision.
+        """
         return f"{coords[0]:.8f},{coords[1]:.8f}"
 
     def get_geocode(self, location: str) -> tuple[tuple[float, float], str] | None:

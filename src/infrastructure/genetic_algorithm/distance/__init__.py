@@ -1,3 +1,5 @@
+"""Distance strategy implementations for population seeding heuristics."""
+
 from .adjacency_cost_population_distance_strategy import (
     AdjacencyCostPopulationDistanceStrategy,
 )

@@ -1,3 +1,9 @@
+"""Convenience exports for all domain interface types.
+
+This package exposes the protocol definitions used throughout the application so
+that implementations can import them from a single location.
+"""
+
 from .adjacency_cache import IAdjacencyMatrixBuilder, IAdjacencySegmentCache
 from .geocoding import IGeocodingCache, IGeocodingResolver
 from .genetic_algorithm import (

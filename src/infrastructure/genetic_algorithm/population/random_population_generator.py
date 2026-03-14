@@ -1,3 +1,5 @@
+"""Population generators for the genetic algorithm."""
+
 import random
 
 from src.domain.interfaces import IPopulationGenerator
@@ -13,7 +15,16 @@ class RandomPopulationGenerator(IPopulationGenerator):
         population_size: int,
         vehicle_count: int,
     ) -> Population:
-        """Create a random population while allowing empty vehicle routes."""
+        """Create a random population while allowing empty vehicle routes.
+
+        Args:
+            location_list: A list of route nodes where the first node is the origin.
+            population_size: Number of individuals to generate.
+            vehicle_count: Number of vehicles to distribute destinations across.
+
+        Returns:
+            A population consisting of individuals (lists of vehicle routes).
+        """
         if not location_list:
             return []
         origin = location_list[0]

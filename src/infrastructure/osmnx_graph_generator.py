@@ -1,3 +1,11 @@
+"""Infrastructure component that generates projected OSMnx graphs.
+
+This module encapsulates building a bounded OSMnx graph around an origin and
+set of destinations, choosing the appropriate bounding box, caching graph
+selection specs, and locating the nearest graph nodes for each requested
+location.
+"""
+
 import os
 import hashlib
 from typing import Callable, Union
@@ -12,7 +20,7 @@ from src.domain.models import GraphContext, RouteNode
 
 
 class OSMnxGraphGenerator(IGraphGenerator):
-    """Generate and initialize OSMnx graphs for route optimization."""
+    """Graph generator using OSMnx to build and project a street network."""
 
     def __init__(
         self,
@@ -21,6 +29,16 @@ class OSMnxGraphGenerator(IGraphGenerator):
         custom_filter: str | list[str] | None = None,
         cache_folder: str | None = None,
     ):
+        """Initialize the graph generator with geocoding and OSMnx settings.
+
+        Args:
+            geocoder: A geocoding resolver used to translate addresses into
+                coordinates.
+            network_type: The OSMnx network type (e.g., "drive" or "walk").
+            custom_filter: Optional Overpass API filter(s) to apply to the
+                graph extraction.
+            cache_folder: Optional folder path to store OSMnx cache files.
+        """
         self.network_type = network_type
         self.custom_filter = custom_filter
         self._geocoder = geocoder
@@ -94,7 +112,19 @@ class OSMnxGraphGenerator(IGraphGenerator):
         origin: Union[str, tuple[float, float]],
         destinations: list[tuple[Union[str, tuple[float, float]], int]],
     ) -> GraphContext:
-        """Builds and returns the projected graph along with resolved nodes."""
+        """Build the projected route graph and resolve route nodes.
+
+        This method geocodes the origin and destinations, computes an appropriate
+        graph bounding box, downloads / loads the OSMnx graph, projects it to a
+        metric CRS, and resolves the nearest graph node for each location.
+
+        Args:
+            origin: Starting point, either an address string or (lat, lon).
+            destinations: A list of (location, priority) tuples.
+
+        Returns:
+            A GraphContext containing the projected graph and resolved route nodes.
+        """
         all_locations = [origin] + [dest[0] for dest in destinations]
         all_locations_info = self._set_coords_and_names(all_locations)
         center, radius = self._get_center_and_dist(
@@ -122,6 +152,15 @@ class OSMnxGraphGenerator(IGraphGenerator):
     def _set_coords_and_names(
         self, locations: list[Union[str, tuple[float, float]]]
     ) -> list[tuple[tuple[float, float], str]]:
+        """Resolve coordinates and human-readable names for each location.
+
+        Args:
+            locations: A list of locations which may be address strings or
+                (lat, lon) tuples.
+
+        Returns:
+            A list of tuples containing ((lat, lon), name) for each location.
+        """
         result = []
         for loc in locations:
             if isinstance(loc, str):
@@ -140,6 +179,20 @@ class OSMnxGraphGenerator(IGraphGenerator):
     def _get_center_and_dist(
         self, coords: list[tuple[float, float]]
     ) -> tuple[tuple[float, float], float]:
+        """Compute a graph center point and required bounding distance.
+
+        The method computes the centroid of all given points and then determines
+        the maximum great-circle distance from the centroid to any point. A
+        small buffer is added to ensure all points fall within the resulting
+        graph.
+
+        Args:
+            coords: A list of (latitude, longitude) pairs.
+
+        Returns:
+            A tuple (centroid, dist) where centroid is (lat, lon) and dist is
+            the required bounding radius in meters.
+        """
         points = MultiPoint([(lon, lat) for lat, lon in coords])
         centroid = (points.centroid.y, points.centroid.x)
         distances = [
@@ -154,6 +207,15 @@ class OSMnxGraphGenerator(IGraphGenerator):
     def _create_projected_graph(
         self, center: tuple[float, float], dist: float
     ) -> nx.MultiDiGraph:
+        """Create a projected OSMnx graph around the given center.
+
+        Args:
+            center: Center point as (latitude, longitude).
+            dist: Maximum distance in meters to include around the center.
+
+        Returns:
+            A projected MultiDiGraph in a metric CRS.
+        """
         g = ox.graph_from_point(
             center_point=center,
             dist=dist,
@@ -171,6 +233,15 @@ class OSMnxGraphGenerator(IGraphGenerator):
         g_proj: nx.MultiDiGraph,
         locations: list[tuple[tuple[float, float], str]],
     ) -> list[tuple[str, int, tuple[float, float]]]:
+        """Map each location to the nearest node in the projected graph.
+
+        Args:
+            g_proj: The projected graph.
+            locations: A list of ((lat, lon), name) tuples.
+
+        Returns:
+            A list of tuples containing (name, node_id, (x, y)) for each location.
+        """
         transformer = Transformer.from_crs(
             "EPSG:4326", g_proj.graph["crs"], always_xy=True
         )
@@ -193,6 +264,13 @@ class OSMnxGraphGenerator(IGraphGenerator):
         route_nodes: list[tuple[str, int, tuple[float, float]]],
         priorities: list[int],
     ):
+        """Attach priority metadata to route nodes in the graph.
+
+        Args:
+            g_proj: The projected graph in which nodes should be annotated.
+            route_nodes: A list of tuples (name, node_id, coords) for each route node.
+            priorities: A list of integer priorities corresponding to each node.
+        """
         for (nome, node_id, (x, y)), priority in zip(route_nodes, priorities):
             g_proj.nodes[node_id]["name"] = nome
             g_proj.nodes[node_id]["priority"] = priority
@@ -214,4 +292,13 @@ class OSMnxGraphGenerator(IGraphGenerator):
         self,
         context: GraphContext,
     ) -> Callable[[float, float], tuple[float, float]]:
+        """Return a converter from projected graph coordinates to lat/lon.
+
+        Args:
+            context: The GraphContext produced during initialization.
+
+        Returns:
+            A callable that accepts (x, y) coordinates in the graph CRS and
+            returns (latitude, longitude).
+        """
         return self._build_utm_to_lat_lon_converter(context.crs)

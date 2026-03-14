@@ -1,3 +1,9 @@
+"""Adjacency matrix builder that caches computed route segments.
+
+This implementation checks a persistent segment cache before computing a
+segment and stores newly computed segments for future reuse.
+"""
+
 from src.domain.interfaces import (
     IAdjacencyMatrixBuilder,
     IAdjacencySegmentCache,
@@ -20,7 +26,20 @@ class CachedAdjacencyMatrixBuilder(IAdjacencyMatrixBuilder):
         weight_type: str = "eta",
         cost_type: str | None = "priority",
     ) -> dict[tuple[int, int], RouteSegment]:
-        """Build an adjacency matrix while filling and reading the segment cache."""
+        """Build an adjacency matrix while filling and reading the segment cache.
+
+        Each computed segment is cached so subsequent runs can reuse previously
+        computed results for the same graph and parameters.
+
+        Args:
+            route_calculator: The route calculator used to compute missing segments.
+            route_nodes: The nodes to include in the adjacency matrix.
+            weight_type: Weighting strategy for path computation.
+            cost_type: Optional cost strategy for segment cost adjustments.
+
+        Returns:
+            A mapping from (start_node_id, end_node_id) to RouteSegment.
+        """
         weight_function = route_calculator.get_weight_function(weight_type)
         cost_function = route_calculator.get_cost_function(cost_type)
         graph_key = route_calculator.graph_id

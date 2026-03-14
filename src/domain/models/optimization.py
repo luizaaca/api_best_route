@@ -1,3 +1,5 @@
+"""Domain model representing the result of a route optimization run."""
+
 from dataclasses import dataclass
 
 from .route import FleetRouteInfo
@@ -5,7 +7,7 @@ from .route import FleetRouteInfo
 
 @dataclass
 class OptimizationResult:
-    """The output of a single optimization run."""
+    """Encapsulates the results and metrics from a genetic algorithm run."""
 
     best_route: FleetRouteInfo
     best_fitness: float

@@ -1,3 +1,11 @@
+"""Infrastructure implementation of route calculations using NetworkX.
+
+This module provides a concrete RouteCalculator that computes shortest-paths
+and segment metrics (ETA, distances, paths) using an OSMnx graph. It also
+includes helpers for building adjacency matrices that can be used by
+optimization algorithms.
+"""
+
 from typing import Any, cast
 import networkx as nx
 
@@ -9,7 +17,7 @@ AdjacencyMatrix = dict[tuple[int, int], RouteSegment]
 
 
 class RouteCalculator(IRouteCalculator):
-    """Class responsible for calculating route segments info based on a given graph and route."""
+    """Calculator for computing route segments and aggregating their metrics."""
 
     def __init__(self, graph: nx.MultiDiGraph):
         self.graph = graph
@@ -26,7 +34,25 @@ class RouteCalculator(IRouteCalculator):
         weight_function: Any = "length",
         cost_function: Any | None = None,
     ) -> RouteSegment:
-        """Compute route metrics for a single segment between two graph nodes."""
+        """Compute metrics and routing details for a segment between two nodes.
+
+        This method uses NetworkX's Dijkstra shortest path implementation to
+        compute the fastest route between the two nodes according to the
+        provided weight function. It then enriches the result with total length,
+        detailed geometry, and optional cost calculations.
+
+        Args:
+            start_node: The graph node to start from.
+            end_node: The graph node to end at.
+            weight_function: A callable or key to determine edge weights for
+                pathfinding.
+            cost_function: Optional callable that can compute a cost value based
+                on the end node and computed ETA.
+
+        Returns:
+            A RouteSegment containing ETA, length, detailed path points, and
+            any computed cost.
+        """
         eta, segment = nx.single_source_dijkstra(
             self.graph, start_node.node_id, end_node.node_id, weight=weight_function
         )
@@ -51,7 +77,15 @@ class RouteCalculator(IRouteCalculator):
         self,
         segments: list[RouteSegment],
     ) -> RouteSegmentsInfo:
-        """Consolidate a list of computed segments into a RouteSegmentsInfo aggregate."""
+        """Aggregate multiple route segments into overall route metrics.
+
+        Args:
+            segments: The list of RouteSegment instances for a route.
+
+        Returns:
+            A RouteSegmentsInfo object containing the summed ETA, length, and
+            optional cost totals.
+        """
         total_eta = 0
         total_length = 0.0
         has_cost = any(seg.cost is not None for seg in segments)
@@ -69,6 +103,22 @@ class RouteCalculator(IRouteCalculator):
         )
 
     def get_weight_function(self, weight_type: str = "eta"):
+        """Build a callable weight function for NetworkX pathfinding.
+
+        Currently the only supported weight_type is "eta". The returned
+        function computes an estimated travel time based on edge length,
+        maximum speed, and traffic signal penalties.
+
+        Args:
+            weight_type: The type of weight to compute (currently only "eta").
+
+        Returns:
+            A callable suitable for passing as the `weight` parameter to
+            networkx shortest-path algorithms.
+
+        Raises:
+            ValueError: If an unsupported weight_type is provided.
+        """
         if weight_type != "eta":
             raise ValueError(f"Unknown weight type: {weight_type}")
 
@@ -112,6 +162,15 @@ class RouteCalculator(IRouteCalculator):
         return weight_function
 
     def _path_length_sum(self, path: list[int], weight: str = "length") -> float:
+        """Sum the edge weights along a graph path.
+
+        Args:
+            path: A sequence of graph node identifiers.
+            weight: The edge attribute key to sum (e.g., "length").
+
+        Returns:
+            The total weight of the path.
+        """
         total = 0
         for u, v in zip(path[:-1], path[1:]):
             edge_data = self.graph.get_edge_data(u, v)
@@ -123,6 +182,17 @@ class RouteCalculator(IRouteCalculator):
         return total
 
     def _get_path_details(self, path: list[int]) -> list[tuple[float, float]]:
+        """Build a list of coordinate points representing the full segment path.
+
+        This includes the projected coordinates for each graph node and any
+        intermediate geometry points (e.g., from the 'geometry' edge attribute).
+
+        Args:
+            path: A sequence of graph node identifiers.
+
+        Returns:
+            A list of (x, y) coordinate pairs representing the detailed route.
+        """
         detailed_route = []
         for i in range(1, len(path) - 1):
             u, v = path[i - 1], path[i]
@@ -149,7 +219,19 @@ class RouteCalculator(IRouteCalculator):
         return deduped_route
 
     def get_cost_function(self, cost_type: str | None) -> Any:
-        """Resolve and return the cost callable for the given cost_type."""
+        """Return a cost adjustment callable based on the requested strategy.
+
+        Args:
+            cost_type: The name of the cost strategy (e.g., "priority"). If
+                None or "none", no cost adjustment is applied.
+
+        Returns:
+            A callable accepting (node_id, eta) and returning an adjusted cost,
+            or None if no cost should be applied.
+
+        Raises:
+            ValueError: If an unknown cost_type is provided.
+        """
 
         if cost_type in (None, "", "none"):
             return None
@@ -172,6 +254,21 @@ def build_adjacency_matrix(
     weight_type: str = "eta",
     cost_type: str | None = "priority",
 ) -> AdjacencyMatrix:
+    """Build a full adjacency matrix of computed route segments.
+
+    The adjacency matrix maps every ordered pair of route nodes to a
+    RouteSegment containing the computed travel metrics between them.
+
+    Args:
+        route_calculator: The calculator used to compute individual segments.
+        route_nodes: The list of nodes to include in the adjacency matrix.
+        weight_type: The metric used to compute path weights (e.g., "eta").
+        cost_type: Optional cost strategy to apply to each segment.
+
+    Returns:
+        A mapping from (start_node_id, end_node_id) tuples to RouteSegment
+        instances.
+    """
     weight_function = route_calculator.get_weight_function(weight_type)
     cost_function = route_calculator.get_cost_function(cost_type)
     matrix: AdjacencyMatrix = {}

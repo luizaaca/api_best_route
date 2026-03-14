@@ -1,3 +1,5 @@
+"""Caching-related infrastructure components."""
+
 from .cached_adjacency_matrix_builder import CachedAdjacencyMatrixBuilder
 from .cached_geocoding_resolver import CachedGeocodingResolver
 from .direct_adjacency_matrix_builder import DirectAdjacencyMatrixBuilder

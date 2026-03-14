@@ -1,3 +1,5 @@
+"""Cached geocoding resolver that uses a backing cache with a fallback provider."""
+
 from src.domain.interfaces import IGeocodingCache, IGeocodingResolver
 
 

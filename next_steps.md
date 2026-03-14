@@ -9,7 +9,7 @@
 # 3. Aplicar heurísticas de inicialização [X]
 - implementar heurísticas como Nearest Neighbor, K-means e Convex Hull para gerar soluções iniciais mais próximas do ótimo, melhorando a eficiência do algoritmo genético e a qualidade das soluções geradas, em comparação com a geração aleatória de soluções iniciais.
 
-# 3.1 Permitir uso de distância/custo da rede em vez de distância Euclidiana
+# 3.1 Permitir uso de distância/custo da rede em vez de distância Euclidiana [X]
 - permitir que a ordenação intra-cluster das heurísticas use o custo real da rede (por exemplo, tempo estimado de viagem) em vez da distância Euclidiana projetada, para gerar rotas mais realistas e eficientes desde a fase de inicialização.
 - parametrizar a função de custo usada na ordenação intra-cluster, permitindo escolher entre distância Euclidiana e custo de rede, para avaliar o impacto dessa escolha na qualidade das soluções geradas.
 
@@ -39,10 +39,10 @@
 # 8. Verificar aquisição de nomes de locais [X]
 - a função de busca de locais é bidirecional e deve encontrar coordenadas para nomes e nomes para coordenadas, usando a API do Nominatim. Verificar se a função está funcionando corretamente.
 
-# 8.1 Cache persistente de geocoding
+# 8.1 Cache persistente de geocoding [X]
 - cachear persistentemente a recuperação de nomes e coordenadas de ruas (geocoding direto e reverso), evitando recomputação e chamadas externas repetidas entre execuções.
 
-# 8.2 Cache de matriz de adjacência
+# 8.2 Cache de matriz de adjacência [X]
 - implementar cache específico para a matriz de adjacência, evitando reconstrução completa a cada requisição e melhorando a performance do serviço, especialmente para rotas com destinos recorrentes.
 
 # 9. Melhorar testes unitários

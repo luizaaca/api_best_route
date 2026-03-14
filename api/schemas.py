@@ -1,13 +1,19 @@
+"""Pydantic request and response schemas for the route optimization API."""
+
 from typing import Union, Optional
 from pydantic import BaseModel
 
 
 class Destination(BaseModel):
+    """Represents a destination waypoint in the optimization request."""
+
     location: Union[str, list[float]]
     priority: int
 
 
 class RouteItem(BaseModel):
+    """Represents a single route segment in the API response."""
+
     location: Union[str, list[float]]
     coords: list[float]
     length: float
@@ -17,12 +23,16 @@ class RouteItem(BaseModel):
 
 
 class RouteTotals(BaseModel):
+    """Aggregate metrics for a single vehicle route."""
+
     total_length: float
     total_eta: float
     total_cost: Optional[float] = None
 
 
 class FleetTotals(BaseModel):
+    """Aggregate metrics across all vehicles in the optimized fleet."""
+
     total_length: float
     min_vehicle_eta: float
     max_vehicle_eta: float
@@ -30,6 +40,8 @@ class FleetTotals(BaseModel):
 
 
 class OptimizeRouteRequest(BaseModel):
+    """Request payload for route optimization."""
+
     origin: Union[str, list[float]]
     destinations: list[Destination]
     max_generation: int = 50
@@ -41,12 +53,16 @@ class OptimizeRouteRequest(BaseModel):
 
 
 class VehicleRouteResponse(BaseModel):
+    """Response payload for a single vehicle's route."""
+
     vehicle_id: int
     route: list[RouteItem]
     totals: RouteTotals
 
 
 class OptimizeRouteResponse(BaseModel):
+    """Response payload returned from the optimize_route endpoint."""
+
     routes_by_vehicle: list[VehicleRouteResponse]
     totals: FleetTotals
     best_fitness: float

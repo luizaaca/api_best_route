@@ -1,3 +1,11 @@
+"""Genetic algorithm implementation for multi-vehicle route optimization.
+
+This module implements a simple genetic algorithm where each individual is a
+set of vehicle routes. It relies on a precomputed adjacency matrix of
+RouteSegment objects to evaluate fitness and determine the cost of traveling
+between waypoints.
+"""
+
 import copy
 import time
 from typing import Tuple
@@ -24,10 +32,21 @@ from src.infrastructure.route_calculator import AdjacencyMatrix
 
 
 class TSPGeneticAlgorithm(IRouteOptimizer):
-    """Genetic Algorithm for multi-vehicle TSP optimization over a fixed adjacency matrix."""
+    """Genetic algorithm for multi-vehicle TSP optimization over a fixed adjacency matrix."""
 
     @staticmethod
     def _build_origin_route_segment(origin: RouteNode) -> RouteSegment:
+        """Create a zero-length RouteSegment representing the route origin.
+
+        The optimizer prepends this segment to each vehicle route so that the
+        first segment always represents the starting point.
+
+        Args:
+            origin: The origin RouteNode.
+
+        Returns:
+            A RouteSegment with zero distance and ETA rooted at the origin.
+        """
         return RouteSegment(
             start=origin.node_id,
             end=origin.node_id,
@@ -46,6 +65,15 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         origin: RouteNode,
         route_info: RouteSegmentsInfo,
     ) -> RouteSegmentsInfo:
+        """Ensure the origin segment appears at the beginning of a route.
+
+        Args:
+            origin: The origin RouteNode.
+            route_info: The computed RouteSegmentsInfo for a vehicle route.
+
+        Returns:
+            A new RouteSegmentsInfo with the origin segment prepended.
+        """
         return RouteSegmentsInfo(
             segments=[cls._build_origin_route_segment(origin), *route_info.segments],
             total_eta=route_info.total_eta,
@@ -59,6 +87,18 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         route: VehicleRoute,
         vehicle_id: int,
     ) -> VehicleRouteInfo:
+        """Produce a VehicleRouteInfo for an empty route (no destinations).
+
+        This ensures that vehicles with no assigned destinations still have a
+        valid RouteSegmentsInfo structure containing the origin segment.
+
+        Args:
+            route: The vehicle's route list of RouteNode objects (at least origin).
+            vehicle_id: The vehicle identifier.
+
+        Returns:
+            A VehicleRouteInfo representing an empty route with only an origin.
+        """
         origin = route[0]
         route_info = cls._prepend_origin_segment(
             origin,
@@ -72,6 +112,17 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
 
     @staticmethod
     def _fitness(route_info: FleetRouteInfo) -> float:
+        """Compute the fitness score for a fleet route.
+
+        If a total cost is available it is used as the fitness metric. Otherwise,
+        the maximum vehicle ETA (makespan) is used.
+
+        Args:
+            route_info: The fleet route information to evaluate.
+
+        Returns:
+            A scalar fitness value to minimize.
+        """
         if route_info.total_cost is not None:
             return route_info.total_cost
         return route_info.max_vehicle_eta
@@ -82,7 +133,15 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         individual: Individual,
         adjacency_matrix: dict[tuple[int, int], RouteSegment],
     ) -> FleetRouteInfo:
-        """Return a fleet aggregate containing one route result per vehicle."""
+        """Evaluate an individual by converting it into route metrics.
+
+        Args:
+            individual: A candidate solution comprising several vehicle routes.
+            adjacency_matrix: A precomputed map of route segments between nodes.
+
+        Returns:
+            A FleetRouteInfo representing the evaluated fitness and route details.
+        """
         infos: list[VehicleRouteInfo] = []
         for vehicle_id, route in enumerate(individual, start=1):
             origin = route[0]
@@ -115,7 +174,21 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         mutation_strategy: IMutationStrategy | None = None,
         population_generator: IPopulationGenerator | None = None,
     ):
-        """Create an optimizer that delegates GA operations to injected collaborators."""
+        """Create an optimizer that delegates GA operations to injected collaborators.
+
+        Args:
+            adjacency_matrix: A precomputed adjacency matrix mapping node pairs to segments.
+            population_size: Number of candidate solutions maintained per generation.
+            mutation_probability: Probability of applying mutation to offspring.
+            plotter: Optional plotter used to visualize optimization progress.
+            selection_strategy: Strategy for selecting parents in each generation.
+            crossover_strategy: Strategy for combining parents to create offspring.
+            mutation_strategy: Strategy for mutating offspring solutions.
+            population_generator: Generator for the initial population.
+
+        Raises:
+            ValueError: If any required strategy dependency is not provided.
+        """
         if selection_strategy is None:
             raise ValueError("selection_strategy is required")
         if crossover_strategy is None:

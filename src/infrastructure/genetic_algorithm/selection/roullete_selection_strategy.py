@@ -1,3 +1,9 @@
+"""Roulette selection strategy for choosing parent solutions.
+
+This implementation performs inverse-fitness sampling, meaning lower fitness values
+are considered more desirable (since the problem is a minimization task).
+"""
+
 import random
 from collections.abc import Callable
 
@@ -8,7 +14,7 @@ from src.domain.models import FleetRouteInfo, Individual, Population
 
 
 class RoulleteSelectionStrategy(ISelectionStrategy):
-    """Select parents with inverse-fitness roulette sampling."""
+    """Select parents using a roulette-wheel approach based on fitness."""
 
     def select_parents(
         self,
@@ -16,7 +22,16 @@ class RoulleteSelectionStrategy(ISelectionStrategy):
         evaluated_population: list[FleetRouteInfo],
         fitness_function: Callable[[FleetRouteInfo], float],
     ) -> tuple[Individual, Individual]:
-        """Return two sampled parents from the current population."""
+        """Sample two parents from the population based on fitness.
+
+        Args:
+            population: The current population of candidate solutions.
+            evaluated_population: The population evaluated with fitness values.
+            fitness_function: Callable returning a fitness score for each individual.
+
+        Returns:
+            A pair of selected individuals to be used as parents.
+        """
         if not population:
             return [], []
         fitness_values = [fitness_function(info) for info in evaluated_population]

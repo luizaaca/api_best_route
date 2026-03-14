@@ -1,3 +1,5 @@
+"""Population generator that mixes random and heuristic seeds."""
+
 from src.domain.interfaces import IPopulationGenerator
 from src.domain.models import Population, VehicleRoute
 

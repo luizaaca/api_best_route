@@ -1,3 +1,10 @@
+"""Order crossover operator for multi-vehicle routing individuals.
+
+This strategy flattens the destination sequences from both parents, performs an
+order crossover to mix their ordering, and then rebuilds a multi-vehicle
+solution respecting a chosen destination distribution between vehicles.
+"""
+
 import random
 from math import floor
 
@@ -6,14 +13,26 @@ from src.domain.models import Individual, RouteNode
 
 
 class OrderCrossoverStrategy(ICrossoverStrategy):
-    """Create a child by combining order-based genetic material from two parents."""
+    """Crossover strategy that preserves ordering of destinations from parents."""
 
     @staticmethod
     def _order_crossover_sequence(
         parent1: list[RouteNode],
         parent2: list[RouteNode],
     ) -> list[RouteNode]:
-        """Apply classic order crossover over flattened destination sequences."""
+        """Apply classic order crossover on two destination sequences.
+
+        This method selects a random slice from the first parent and fills the
+        remaining positions with destinations from the second parent in order,
+        skipping duplicates.
+
+        Args:
+            parent1: The first destination sequence.
+            parent2: The second destination sequence.
+
+        Returns:
+            A new list of destinations representing the crossover child.
+        """
         length = len(parent1)
         if length < 2:
             return parent1[:]
@@ -32,7 +51,16 @@ class OrderCrossoverStrategy(ICrossoverStrategy):
 
     @staticmethod
     def _extract_distribution(individual: Individual) -> list[int]:
-        """Return the per-vehicle destination counts for an individual."""
+        """Return the per-vehicle destination counts for an individual.
+
+        The origin node is excluded from the count as it is fixed for every vehicle.
+
+        Args:
+            individual: A list of vehicle routes.
+
+        Returns:
+            A list of destination counts (excluding the origin) for each vehicle.
+        """
         return [max(0, len(route) - 1) for route in individual]
 
     @staticmethod
@@ -41,7 +69,20 @@ class OrderCrossoverStrategy(ICrossoverStrategy):
         distribution2: list[int],
         total_destinations: int,
     ) -> list[int]:
-        """Blend two route distributions while preserving the total destination count."""
+        """Blend two route distributions while preserving the total destination count.
+
+        The returned distribution is based on the average of the parents' distributions.
+        If rounding causes the total to deviate, the remainder is distributed to the
+        routes with the largest fractional remainders.
+
+        Args:
+            distribution1: The destination counts from the first parent.
+            distribution2: The destination counts from the second parent.
+            total_destinations: The total number of destinations that must be allocated.
+
+        Returns:
+            A destination count list for each vehicle that sums to total_destinations.
+        """
         raw_distribution = [
             (left + right) / 2 for left, right in zip(distribution1, distribution2)
         ]
@@ -59,7 +100,17 @@ class OrderCrossoverStrategy(ICrossoverStrategy):
 
     @staticmethod
     def _flatten_destinations(individual: Individual) -> list[RouteNode]:
-        """Flatten all destinations while skipping the repeated route origins."""
+        """Flatten all destination nodes across vehicle routes.
+
+        This ignores the route origin (first node) for each vehicle to avoid
+        duplicating the starting point in the flattened sequence.
+
+        Args:
+            individual: A list of vehicle routes.
+
+        Returns:
+            A flattened list of all destination nodes.
+        """
         return [node for route in individual for node in route[1:]]
 
     @staticmethod
@@ -68,7 +119,16 @@ class OrderCrossoverStrategy(ICrossoverStrategy):
         destinations: list[RouteNode],
         distribution: list[int],
     ) -> Individual:
-        """Rebuild a multi-vehicle individual from a flat destination sequence."""
+        """Rebuild a multi-vehicle individual from a flat destination sequence.
+
+        Args:
+            origin: The common origin node for all vehicle routes.
+            destinations: A flat list of destination nodes.
+            distribution: A list describing how many destinations each vehicle should take.
+
+        Returns:
+            A multi-vehicle individual where each route begins with the origin.
+        """
         routes: Individual = []
         offset = 0
         for route_size in distribution:
@@ -83,7 +143,18 @@ class OrderCrossoverStrategy(ICrossoverStrategy):
         parent2: Individual,
         total_destinations: int,
     ) -> list[int]:
-        """Choose how many destinations each child vehicle route should receive."""
+        """Choose how many destinations each child vehicle route should receive.
+
+        The distribution can be copied from one of the parents or averaged between both.
+
+        Args:
+            parent1: The first parent individual.
+            parent2: The second parent individual.
+            total_destinations: Total number of destination nodes to distribute.
+
+        Returns:
+            A list of destination counts per vehicle route for the child.
+        """
         distribution1 = self._extract_distribution(parent1)
         distribution2 = self._extract_distribution(parent2)
         strategy = random.choice(("parent1", "parent2", "average"))

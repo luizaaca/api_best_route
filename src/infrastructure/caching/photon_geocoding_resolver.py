@@ -1,3 +1,5 @@
+"""Geocoding resolver implementation backed by Photon (via geopy)."""
+
 from typing import Protocol, cast
 
 from geopy.geocoders import Photon

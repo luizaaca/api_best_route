@@ -1,3 +1,10 @@
+"""Genetic algorithm component exports.
+
+This package exposes the default implementations of distance metrics, population
+generation strategies, selection, crossover, and mutation operators used in the
+route optimization genetic algorithm.
+"""
+
 from .crossover import OrderCrossoverStrategy
 from .distance import (
     AdjacencyCostPopulationDistanceStrategy,

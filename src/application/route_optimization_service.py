@@ -1,3 +1,5 @@
+"""Application service that orchestrates route optimization workflows."""
+
 from typing import Callable
 from src.domain.interfaces import (
     IGraphGenerator,
@@ -15,6 +17,8 @@ from src.domain.models import (
 
 
 class RouteOptimizationService:
+    """High-level service coordinating graph generation, optimization, and post-processing."""
+
     def __init__(
         self,
         graph_generator: IGraphGenerator,
@@ -32,6 +36,14 @@ class RouteOptimizationService:
         ],
         plotter_factory: Callable[..., IPlotter] | None = None,
     ):
+        """Initialize the service with its dependencies.
+
+        Args:
+            graph_generator: Responsible for building the graph and route nodes.
+            route_calculator_factory: Factory callable for route calculators.
+            optimizer_factory: Factory callable for route optimizers.
+            plotter_factory: Optional factory for creating a plotter.
+        """
         self._graph_generator: IGraphGenerator = graph_generator
         self._route_calculator_factory: Callable[..., IRouteCalculator] = (
             route_calculator_factory
@@ -60,6 +72,24 @@ class RouteOptimizationService:
         weight_type: str = "eta",
         cost_type: str | None = "priority",
     ) -> OptimizationResult:
+        """Optimize routes for the given origin and destinations.
+
+        This method orchestrates graph generation, route calculation, genetic
+        optimization, and coordinate conversion back to latitude/longitude.
+
+        Args:
+            origin: Starting location, either as an address string or (lat, lon).
+            destinations: List of (location, priority) tuples.
+            max_generation: Maximum number of GA generations to run.
+            max_processing_time: Maximum time in milliseconds to spend optimizing.
+            vehicle_count: Number of vehicles to route.
+            population_size: Size of the genetic algorithm population.
+            weight_type: Weighting strategy for route calculation (e.g., "eta").
+            cost_type: Optional cost adjustment strategy.
+
+        Returns:
+            An OptimizationResult containing the best found routes and metrics.
+        """
         print("Initializing graph and route nodes...")
         context = self._graph_generator.initialize(origin, destinations)
 
@@ -111,6 +141,15 @@ class RouteOptimizationService:
         fleet_route: FleetRouteInfo,
         coordinate_converter: Callable[[float, float], tuple[float, float]],
     ) -> FleetRouteInfo:
+        """Convert all route coordinates from projected CRS back to lat/lon.
+
+        Args:
+            fleet_route: The computed fleet route in projected coordinate space.
+            coordinate_converter: Callable that converts (x, y) to (lat, lon).
+
+        Returns:
+            A FleetRouteInfo instance with converted coordinates.
+        """
         converted_routes = [
             self._convert_vehicle_route_coordinates(route, coordinate_converter)
             for route in fleet_route.routes_by_vehicle
@@ -122,6 +161,15 @@ class RouteOptimizationService:
         route: VehicleRouteInfo,
         coordinate_converter: Callable[[float, float], tuple[float, float]],
     ) -> VehicleRouteInfo:
+        """Convert a single vehicle route's segment coordinates.
+
+        Args:
+            route: The vehicle route to convert.
+            coordinate_converter: Callable that converts (x, y) to (lat, lon).
+
+        Returns:
+            A VehicleRouteInfo with converted segment and path coordinates.
+        """
         converted_segments = [
             self._convert_segment_coordinates(segment, coordinate_converter)
             for segment in route.segments
@@ -139,6 +187,15 @@ class RouteOptimizationService:
         segment: RouteSegment,
         coordinate_converter: Callable[[float, float], tuple[float, float]],
     ) -> RouteSegment:
+        """Convert the coordinates for a single route segment.
+
+        Args:
+            segment: The segment whose coordinates are in projected CRS.
+            coordinate_converter: Callable that converts (x, y) to (lat, lon).
+
+        Returns:
+            A new RouteSegment with converted coords and path.
+        """
         coords = coordinate_converter(*segment.coords)
         path = [coordinate_converter(*point) for point in segment.path]
         return RouteSegment(

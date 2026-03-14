@@ -1,3 +1,5 @@
+"""Domain model exports used across the application."""
+
 from .genetic_algorithm import Individual, Population, VehicleRoute
 from .graph import AdjacencyMatrixMap, GraphContext, RouteNode
 from .optimization import OptimizationResult

@@ -1,9 +1,11 @@
+"""Population generator implementations for the genetic algorithm."""
+
 from .heuristic_population_generator import HeuristicPopulationGenerator
 from .hybrid_population_generator import HybridPopulationGenerator
 from .random_population_generator import RandomPopulationGenerator
 
 __all__ = [
-	"HeuristicPopulationGenerator",
-	"HybridPopulationGenerator",
-	"RandomPopulationGenerator",
+    "HeuristicPopulationGenerator",
+    "HybridPopulationGenerator",
+    "RandomPopulationGenerator",
 ]

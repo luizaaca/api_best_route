@@ -1,3 +1,9 @@
+"""FastAPI application exposing a route optimization endpoint.
+
+This application serves a single endpoint that accepts origins and
+destinations and returns an optimized route plan using a genetic algorithm.
+"""
+
 from typing import cast
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,6 +39,18 @@ async def optimize_route(
     request: OptimizeRouteRequest,
     service: RouteOptimizationService = Depends(get_route_optimization_service),
 ):
+    """Handle route optimization requests.
+
+    The endpoint accepts an origin plus a list of destinations and returns a
+    recommended set of routes per vehicle along with aggregated metrics.
+
+    Args:
+        request: The optimized route request payload.
+        service: The injected route optimization service.
+
+    Returns:
+        An OptimizeRouteResponse containing routes per vehicle and totals.
+    """
     try:
         destinations_formatted: list[tuple[str | tuple[float, float], int]] = [
             (

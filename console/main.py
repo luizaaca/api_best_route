@@ -1,3 +1,10 @@
+"""Console entrypoint for the route optimization example.
+
+This module is intended for local experimentation and demonstrates how to
+construct the application services and run the genetic algorithm from a
+standalone script.
+"""
+
 from src.application.route_optimization_service import RouteOptimizationService
 from src.infrastructure.caching import (
     CachedAdjacencyMatrixBuilder,
@@ -43,7 +50,19 @@ def _build_default_optimizer(
     plotter,
     population_size,
 ) -> TSPGeneticAlgorithm:
-    """Create a GA optimizer with the default console collaborators."""
+    """Create a GA optimizer configured with console defaults.
+
+    Args:
+        calc: The route calculator to use.
+        route_nodes: The list of route nodes for optimization.
+        weight_type: Weighting strategy for segment evaluation.
+        cost_type: Optional cost strategy.
+        plotter: Plotter used to visualize progress.
+        population_size: Number of individuals in the population.
+
+    Returns:
+        A configured TSPGeneticAlgorithm instance.
+    """
     adjacency_matrix = CachedAdjacencyMatrixBuilder(
         SQLiteAdjacencySegmentCache("cache/adjacency_segments.db")
     ).build(
@@ -70,6 +89,11 @@ def _build_default_optimizer(
 
 
 def run_console_example():
+    """Run a console example optimization and print the results.
+
+    This function is intended as a quick demo for running the optimizer from the
+    command line, using hard-coded locations and parameters.
+    """
     service = RouteOptimizationService(
         graph_generator=OSMnxGraphGenerator(
             geocoder=CachedGeocodingResolver(

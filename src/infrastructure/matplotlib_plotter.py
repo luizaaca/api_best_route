@@ -1,3 +1,9 @@
+"""Plotter implementation using Matplotlib and OSMnx for visualization.
+
+This module provides a real-time visualization of route optimization progress,
+rendering the graph, static POIs, and dynamic route segments with fitness tracking.
+"""
+
 from src.domain.interfaces import IPlotter
 from matplotlib.collections import LineCollection
 from src.domain.models import FleetRouteInfo, GraphContext
@@ -10,6 +16,11 @@ class MatplotlibPlotter(IPlotter):
     _MAX_FIXED_LABEL_LENGTH = 20
 
     def __init__(self, context: GraphContext):
+        """Initialize the plotter with the graph context and setup the UI.
+
+        Args:
+            context: The GraphContext containing the projected graph and route nodes.
+        """
         self._context = context
         self.graph = context.graph
         self._fitness_history: list[float] = []
@@ -78,11 +89,13 @@ class MatplotlibPlotter(IPlotter):
 
     @classmethod
     def _truncate_fixed_label(cls, label: str) -> str:
+        """Shorten a label to a fixed maximum length, adding ellipsis if needed."""
         if len(label) <= cls._MAX_FIXED_LABEL_LENGTH:
             return label
         return f"{label[: cls._MAX_FIXED_LABEL_LENGTH - 3]}..."
 
     def _restore_map_limits(self) -> None:
+        """Reset the map axes limits to the initial view extents."""
         xlim, ylim = self._map_limits
         self.map_ax.set_xlim(xlim)
         self.map_ax.set_ylim(ylim)
@@ -95,6 +108,18 @@ class MatplotlibPlotter(IPlotter):
         eta: float,
         cost: float | None,
     ) -> str:
+        """Format a short information label for a route segment.
+
+        Args:
+            vehicle_id: The identifier of the vehicle.
+            segment_index: The index of the segment within the vehicle route.
+            length: The segment length in meters.
+            eta: The estimated time in seconds.
+            cost: Optional cost value associated with the segment.
+
+        Returns:
+            A multi-line string summarizing the segment metrics.
+        """
         info_text = (
             f"v{vehicle_id}.{segment_index}\nL {length:.0f}m | E {eta/60:.1f}min"
         )
@@ -121,7 +146,15 @@ class MatplotlibPlotter(IPlotter):
         )
 
     def plot(self, route_info: FleetRouteInfo) -> None:
-        """Redraw route lines for the current generation without touching static layers."""
+        """Render the optimized fleet route and update the fitness plot.
+
+        The method redraws route segments only when the route changes, leaving the
+        underlying static map and POI markers intact. It also updates a small
+        chart showing fitness progression per generation.
+
+        Args:
+            route_info: The fleet route information for the current generation.
+        """
 
         # redraw route segments only if the displayed route information changed
         route_signature = self._build_route_signature(route_info)
