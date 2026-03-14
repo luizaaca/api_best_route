@@ -7,5 +7,6 @@ population during optimization.
 from .swap_and_redistribute_mutation_strategy import (
     SwapAndRedistributeMutationStrategy,
 )
+from .two_opt_mutation_strategy import TwoOptMutationStrategy
 
-__all__ = ["SwapAndRedistributeMutationStrategy"]
+__all__ = ["SwapAndRedistributeMutationStrategy", "TwoOptMutationStrategy"]

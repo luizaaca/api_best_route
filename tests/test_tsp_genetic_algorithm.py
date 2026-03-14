@@ -20,9 +20,12 @@ from src.infrastructure.genetic_algorithm import (
     HeuristicPopulationGenerator,
     HybridPopulationGenerator,
     OrderCrossoverStrategy,
+    PartiallyMappedCrossoverStrategy,
     RandomPopulationGenerator,
     RoulleteSelectionStrategy,
     SwapAndRedistributeMutationStrategy,
+    TournamentSelectionStrategy,
+    TwoOptMutationStrategy,
 )
 from src.infrastructure.route_calculator import build_adjacency_matrix
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
@@ -249,6 +252,21 @@ def test_order_crossover_preserves_all_destinations_and_origins():
     assert sorted(flatten_destination_ids(child)) == sorted([n2.node_id, n3.node_id, n4.node_id, n5.node_id])
 
 
+def test_partially_mapped_crossover_preserves_all_destinations_and_origins():
+    random.seed(11)
+    origin, n2, n3, n4, n5, n6 = make_nodes(5)
+    parent1 = [[origin, n2, n3, n4], [origin, n5, n6]]
+    parent2 = [[origin, n6, n4], [origin, n5, n2, n3]]
+
+    child = PartiallyMappedCrossoverStrategy().crossover(parent1, parent2)
+
+    assert len(child) == 2
+    assert all(route[0].node_id == origin.node_id for route in child)
+    assert sorted(flatten_destination_ids(child)) == sorted(
+        [n2.node_id, n3.node_id, n4.node_id, n5.node_id, n6.node_id]
+    )
+
+
 def test_mutate_preserves_all_destinations_and_origins():
     random.seed(2)
     origin, n2, n3, n4, n5 = make_nodes(4)
@@ -262,6 +280,48 @@ def test_mutate_preserves_all_destinations_and_origins():
     assert len(mutated) == 3
     assert all(route[0].node_id == origin.node_id for route in mutated)
     assert sorted(flatten_destination_ids(mutated)) == sorted([n2.node_id, n3.node_id, n4.node_id, n5.node_id])
+
+
+def test_two_opt_mutation_preserves_all_destinations_and_origins():
+    random.seed(17)
+    origin, n2, n3, n4, n5 = make_nodes(4)
+    individual = [[origin, n2, n3, n4, n5], [origin]]
+
+    mutated = TwoOptMutationStrategy().mutate(
+        individual,
+        mutation_probability=1.0,
+    )
+
+    assert len(mutated) == 2
+    assert all(route[0].node_id == origin.node_id for route in mutated)
+    assert sorted(flatten_destination_ids(mutated)) == sorted(
+        [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
+    )
+
+
+def test_tournament_selection_returns_population_members():
+    random.seed(19)
+    nodes = make_nodes(4)
+    adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
+    optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
+    population = optimizer._population_generator.generate(
+        nodes,
+        population_size=4,
+        vehicle_count=2,
+    )
+    evaluated_population = [
+        optimizer._evaluate_individual(individual, adjacency_matrix)
+        for individual in population
+    ]
+
+    parent1, parent2 = TournamentSelectionStrategy(tournament_size=2).select_parents(
+        population,
+        evaluated_population,
+        optimizer._fitness,
+    )
+
+    assert parent1 in population
+    assert parent2 in population
 
 
 def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():

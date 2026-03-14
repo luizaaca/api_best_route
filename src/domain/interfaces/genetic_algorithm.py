@@ -20,18 +20,19 @@ class ISelectionStrategy(Protocol):
         population: Population,
         evaluated_population: list[FleetRouteInfo],
         fitness_function: Callable[[FleetRouteInfo], float],
-    ) -> tuple[Individual, Individual]:
-        """Choose two individuals from the current population to act as parents.
+    ) -> tuple[Individual, Individual]: ...
 
-        Args:
-            population: The current population of candidate solutions.
-            evaluated_population: The population evaluated with fitness scores.
-            fitness_function: A callable that returns a fitness score for a given
-                FleetRouteInfo.
+    """Choose two individuals from the current population to act as parents.
 
-        Returns:
-            A pair of Individuals selected to be parents for the next generation.
-        """
+    Args:
+        population: The current population of candidate solutions.
+        evaluated_population: The population evaluated with fitness scores.
+        fitness_function: A callable that returns a fitness score for a given
+            FleetRouteInfo.
+
+    Returns:
+        A pair of Individuals selected to be parents for the next generation.
+    """
 
 
 @runtime_checkable
@@ -42,16 +43,17 @@ class ICrossoverStrategy(Protocol):
         self,
         parent1: Individual,
         parent2: Individual,
-    ) -> Individual:
-        """Combine two parent individuals into a new offspring.
+    ) -> Individual: ...
 
-        Args:
-            parent1: The first parent individual.
-            parent2: The second parent individual.
+    """Combine two parent individuals into a new offspring.
 
-        Returns:
-            A new Individual representing the crossover result.
-        """
+    Args:
+        parent1: The first parent individual.
+        parent2: The second parent individual.
+
+    Returns:
+        A new Individual representing the crossover result.
+    """
 
 
 @runtime_checkable
@@ -62,16 +64,17 @@ class IMutationStrategy(Protocol):
         self,
         solution: Individual,
         mutation_probability: float,
-    ) -> Individual:
-        """Mutate a candidate solution based on a given probability.
+    ) -> Individual: ...
 
-        Args:
-            solution: The individual to mutate.
-            mutation_probability: The probability of applying a mutation.
+    """Mutate a candidate solution based on a given probability.
 
-        Returns:
-            A potentially modified Individual.
-        """
+    Args:
+        solution: The individual to mutate.
+        mutation_probability: The probability of applying a mutation.
+
+    Returns:
+        A potentially modified Individual.
+    """
 
 
 @runtime_checkable
