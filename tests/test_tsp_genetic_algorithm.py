@@ -2,6 +2,7 @@ import os
 import random
 import sys
 import copy
+import networkx as nx
 
 # ensure src directory is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -28,6 +29,14 @@ from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
 
 
 class FakeRouteCalculator(IRouteCalculator):
+    def __init__(self):
+        self.graph = nx.MultiDiGraph()
+        self.graph.graph["graph_id"] = "fake-graph"
+
+    @property
+    def graph_id(self) -> str:
+        return str(self.graph.graph.get("graph_id", "fake-graph"))
+
     def compute_segment(
         self,
         start_node,
@@ -36,7 +45,7 @@ class FakeRouteCalculator(IRouteCalculator):
         cost_function=None,
     ):
         eta = abs(end_node.node_id - start_node.node_id) + 1
-        cost = cost_function(end_node.node_id, eta) if cost_function else float(eta)
+        cost = cost_function(end_node.node_id, eta) if cost_function else None
         return RouteSegment(
             start=start_node.node_id,
             end=end_node.node_id,
@@ -46,7 +55,7 @@ class FakeRouteCalculator(IRouteCalculator):
             segment=[start_node.node_id, end_node.node_id],
             name=end_node.name,
             coords=end_node.coords,
-            cost=float(cost),
+            cost=float(cost) if cost is not None else None,
         )
 
     def compute_route_segments_info(self, segments):

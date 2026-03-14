@@ -1,5 +1,5 @@
 from src.application.route_optimization_service import RouteOptimizationService
-from src.infrastructure.cache import (
+from src.infrastructure.caching import (
     CachedAdjacencyMatrixBuilder,
     CachedGeocodingResolver,
     PhotonGeocodingResolver,

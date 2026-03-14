@@ -1,10 +1,7 @@
 from typing import Protocol, runtime_checkable
 
 from .route_calculator import IRouteCalculator
-from src.domain.models import RouteNode, RouteSegment
-
-
-AdjacencyMatrixMap = dict[tuple[int, int], RouteSegment]
+from src.domain.models import AdjacencyMatrixMap, RouteNode, RouteSegment
 
 
 @runtime_checkable

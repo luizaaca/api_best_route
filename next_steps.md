@@ -52,5 +52,15 @@
 - adicionar um modo de benchmark que execute duas rodadas comparativas, uma sem heurísticas e outra com heurísticas, com resultado exibido apenas no console.
 - esse modo deve ser habilitado por algum parâmetro explícito de laboratório, por exemplo `lab_mode`, para não interferir no fluxo normal da API/console.
 
-# 10. Verificar possibilidade de capacidade de veículos e lista de entregas
+# 10. Usar abstract factory para criar classes de acordo com tipo de busca
+- implementar uma fabrica abstrata que crie as instancias de otimizadores, plotters e outras dependências de acordo com o modo de operação:
+    - `multi_vehicle`: otimização para múltiplos veículos, com plotter específico para visualização de rotas múltiplas (implementação atual);
+    - `multi_vehicle_capacity`: otimização para múltiplos veículos considerando capacidade e lista de entregas, com plotter específico para visualização de rotas múltiplas e carga (a ser implementado);
+    - `multi_vehicle_category`: versão que semelhante as anteriores, mas aplicando calculos mais precisos de tempo de viagem com base em categorias de ruas e veículos, gasto de combustível, pedagios, usando a API do OSRM para obter tempos reais de viagem entre os pontos, e plotter específico para visualização de rotas múltiplas com tempos estimados.
+
+# 10.1 Verificar possibilidade de capacidade de veículos e lista de entregas
 - implementar lógica para considerar a capacidade dos veículos e a lista de entregas, garantindo que as rotas geradas sejam viáveis em termos de carga e demanda, e que os veículos não sejam sobrecarregados.
+
+# 11. Evoluir para produto semelhante ao Qualp (caculador de rotas)
+- integração com serviço de mapas para obter tempos reais de viagem, considerando categorias de ruas e veículos, e gasto de combustível;
+- capacidade de iniciar navegação com Waze ou Google Maps a partir das rotas geradas, para facilitar a execução prática das rotas otimizadas;

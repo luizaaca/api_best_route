@@ -2,6 +2,11 @@ from dataclasses import dataclass, field
 
 import networkx as nx
 
+from .route import RouteSegment
+
+
+AdjacencyMatrixMap = dict[tuple[int, int], RouteSegment]
+
 
 @dataclass
 class RouteNode:
@@ -19,7 +24,9 @@ class GraphContext:
     graph: nx.MultiDiGraph
     route_nodes: list[RouteNode]
     crs: str = field(init=False)
+    graph_id: str = field(init=False)
 
     def __post_init__(self) -> None:
-        """Capture the graph CRS after dataclass initialization."""
+        """Capture graph metadata after dataclass initialization."""
         self.crs = self.graph.graph["crs"]
+        self.graph_id = str(self.graph.graph.get("graph_id", "unknown-graph"))

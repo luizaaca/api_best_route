@@ -1,5 +1,5 @@
 from .genetic_algorithm import Individual, Population, VehicleRoute
-from .graph import GraphContext, RouteNode
+from .graph import AdjacencyMatrixMap, GraphContext, RouteNode
 from .optimization import OptimizationResult
 from .route import (
     FleetRouteInfo,
@@ -11,6 +11,7 @@ from .route import (
 
 __all__ = [
     "FleetRouteInfo",
+    "AdjacencyMatrixMap",
     "GraphContext",
     "Individual",
     "OptimizationResult",

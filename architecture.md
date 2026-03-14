@@ -1,920 +1,294 @@
 # Architecture Specification — API Best Route
 
-## Table of Contents
-
-1. [Overview](#1-overview)
-2. [Architectural Principles](#2-architectural-principles)
-3. [Proposed Directory Structure](#3-proposed-directory-structure)
-4. [Layer Architecture](#4-layer-architecture)
-5. [Class Diagrams](#5-class-diagrams)
-6. [Interfaces](#6-interfaces)
-7. [Domain Models](#7-domain-models)
-8. [Concrete Implementations](#8-concrete-implementations)
-9. [Application Service](#9-application-service)
-10. [Entry Points and Dependency Injection](#10-entry-points-and-dependency-injection)
-11. [Library Reference](#11-library-reference)
-
----
-
 ## 1. Overview
 
-This document specifies the target architecture for the **API Best Route** system — a route optimization engine based on a Genetic Algorithm (TSP variant) using real street network data from OpenStreetMap.
+`API Best Route` is a layered route-optimization system built around a multi-vehicle Genetic Algorithm over OpenStreetMap street-network data. The current architecture separates contracts, data models, orchestration, and infrastructure implementations, with dependency injection handled at the API and console entry points.
 
----
+The architecture now includes:
+
+- modular GA operators and population generators;
+- adjacency-aware heuristic distance strategies;
+- persistent geocoding and adjacency caching;
+- deterministic graph identity for cache-safe reuse.
 
 ## 2. Architectural Principles
 
-### 2.1 SOLID
+### 2.1 Layered separation
 
-| Principle | Application in this system |
-|---|---|
-| **Single Responsibility** | Each class has one clearly defined job: `OSMnxGraphGenerator` builds graphs; `RouteCalculator` computes route metrics; `TSPGeneticAlgorithm` optimizes; `RouteOptimizationService` orchestrates. |
-| **Open/Closed** | The system is open for extension (new `IPlotter`, new `IRouteOptimizer` implementations) without modifying existing classes. |
-| **Liskov Substitution** | Any concrete class implementing an interface can replace another without altering program correctness. A mock `IGraphGenerator` can replace `OSMnxGraphGenerator` in tests. |
-| **Interface Segregation** | Each interface exposes only the methods required by its consumers. `IPlotter` is a single-method interface. `IGraphGenerator` and `IRouteOptimizer` are narrow contracts. |
-| **Dependency Inversion** | High-level modules (`RouteOptimizationService`, entry points) depend on abstractions (`IGraphGenerator`, `IRouteCalculator`, `IRouteOptimizer`, `IPlotter`), not on concrete classes. |
+- **Domain** defines interfaces and models only.
+- **Application** orchestrates the workflow.
+- **Infrastructure** implements graph generation, route calculation, GA execution, plotting, and caching.
+- **Entry points** wire dependencies and translate transport concerns.
 
-### 2.2 Dependency Injection
+### 2.2 Dependency inversion
 
-Dependencies that vary (graph generation strategy, optimization algorithm, visualization backend) are injected from outside at composition time. The `RouteOptimizationService` is constructed at the entry point (FastAPI `Depends`, console script, or test fixture) with concrete implementations wired in. No high-level class imports a concrete infrastructure class directly.
+High-level services depend on contracts from `src/domain/interfaces`. Concrete implementations live in `src/infrastructure` and are assembled only in composition roots such as `api/dependencies.py` and `console/main.py`.
 
----
+### 2.3 Explicit contracts
 
-## 3. Proposed Directory Structure
+Concrete infrastructure classes explicitly inherit the domain interfaces they implement. This keeps the architecture readable during code review and prevents accidental structural conformance from becoming a hidden coupling mechanism.
 
-```
+## 3. Current Directory Structure
+
+```text
 api_best_route/
-├── src/
-│   ├── domain/
-│   │   ├── __init__.py
-│   │   ├── models.py              # RouteMetrics, RouteSegmentsInfo,
-│   │   │                          # VehicleRouteInfo, FleetRouteInfo,
-│   │   │                          # OptimizationResult
-│   │   └── interfaces.py          # IGraphGenerator, IRouteCalculator,
-│   │                              # IRouteOptimizer, IPlotter
-│   ├── application/
-│   │   ├── __init__.py
-│   │   └── route_optimization_service.py
-│   └── infrastructure/
-│       ├── __init__.py
-│       ├── osmnx_graph_generator.py   # was: osmnx_graph_utils.py
-│       ├── route_calculator.py        # was: route_calculator_utils.py
-│       ├── tsp_genetic_algorithm.py   # genetic operators and algorithm (helpers incorporated)
-│       └── matplotlib_plotter.py      # implementation of IPlotter
 ├── api/
-│   ├── __init__.py
-│   ├── main.py                    # FastAPI application
-│   ├── schemas.py                 # Pydantic request/response models
-│   └── dependencies.py            # DI wiring via FastAPI Depends
-└── console/
-    └── main.py                    # future console entry point
+│   ├── dependencies.py
+│   ├── main.py
+│   └── schemas.py
+├── changelog/
+├── console/
+│   └── main.py
+├── src/
+│   ├── application/
+│   │   └── route_optimization_service.py
+│   ├── domain/
+│   │   ├── interfaces/
+│   │   │   ├── adjacency_cache.py
+│   │   │   ├── geocoding.py
+│   │   │   ├── genetic_algorithm.py
+│   │   │   ├── graph_generator.py
+│   │   │   ├── heuristic_distance.py
+│   │   │   ├── plotter.py
+│   │   │   ├── route_calculator.py
+│   │   │   └── route_optimizer.py
+│   │   └── models/
+│   │       ├── genetic_algorithm.py
+│   │       ├── graph.py
+│   │       ├── optimization.py
+│   │       └── route.py
+│   └── infrastructure/
+│       ├── caching/
+│       ├── genetic_algorithm/
+│       │   ├── crossover/
+│       │   ├── distance/
+│       │   ├── mutation/
+│       │   ├── population/
+│       │   └── selection/
+│       ├── matplotlib_plotter.py
+│       ├── osmnx_graph_generator.py
+│       ├── route_calculator.py
+│       └── tsp_genetic_algorithm.py
+└── tests/
 ```
 
----
-
-## 4. Layer Architecture
-
-```
-+---------------------------------------------------------------+
-|                        Entry Points                           |
-|         FastAPI (api/main.py)   |   Console (console/main.py) |
-+---------------------------------------------------------------+
-                          |
-                          v  (injects)
-+---------------------------------------------------------------+
-|                    Application Layer                          |
-|              RouteOptimizationService                         |
-+---------------------------------------------------------------+
-        |                   |                   |
-        v                   v                   v  (optional)
-+----------------+  +----------------+  +----------------+
-| IGraphGenerator|  |IRouteOptimizer |  |   IPlotter     |
-+----------------+  +----------------+  +----------------+
-        |                   |
-        | (context +        |  (factory)
-        | coord delegate)   |
-        v                   v
-+----------------+  +----------------+
-|OSMnxGraph      |  |TSPGenetic      |    IRouteCalculator
-|Generator       |  |Algorithm       |  <-- injected into optimizer
-+----------------+  +----------------+
-+---------------------------------------------------------------+
-|                    Domain Layer                               |
-| RouteMetrics / VehicleRouteInfo / FleetRouteInfo /            |
-| OptimizationResult                                             |
-+---------------------------------------------------------------+
-```
-
-Entry points are responsible solely for wiring concrete implementations and translating transport-level data (HTTP request/response, CLI arguments) to and from domain objects. No business logic lives in entry points.
-
-### 4.1 High-Level Genetic Algorithm Flow
-
-The diagram below summarizes the high-level execution flow of the genetic algorithm after the introduction of hybrid clustered seeding.
+## 4. System Composition
 
 ```mermaid
 flowchart TD
-    A[Receive route nodes and optimization parameters] --> B[Build adjacency matrix for all ordered node pairs]
-    B --> C[Generate initial population]
-    C --> C1[Hybrid seeding]
-    C1 --> C2[Heuristic seeds via KMeans clustering on projected coords]
-    C1 --> C3[Random seeds for diversity]
-    C2 --> C4[Order each cluster with nearest-neighbor or hull-guided heuristic]
-    C4 --> D[Evaluate each individual as FleetRouteInfo]
-    C3 --> D
-    D --> E[Sort population by fitness]
-    E --> F{Stop condition reached?}
-    F -- yes --> G[Return best fleet route found]
-    F -- no --> H[Keep elite individual]
-    H --> I[Select parents by roulette weights]
-    I --> J[Apply order crossover]
-    J --> K[Apply mutation]
-    K --> L[Build next generation]
-    L --> D
+    A[FastAPI / Console] --> B[RouteOptimizationService]
+    B --> C[IGraphGenerator]
+    B --> D[IRouteCalculator factory]
+    B --> E[IRouteOptimizer factory]
+    B --> F[IPlotter factory optional]
+
+    C --> G[OSMnxGraphGenerator]
+    D --> H[RouteCalculator]
+    E --> I[TSPGeneticAlgorithm]
+    F --> J[MatplotlibPlotter]
+
+    G --> K[CachedGeocodingResolver]
+    K --> L[SQLiteGeocodingCache]
+    K --> M[PhotonGeocodingResolver]
+
+    H --> N[CachedAdjacencyMatrixBuilder]
+    N --> O[SQLiteAdjacencySegmentCache]
 ```
 
----
+## 5. Domain Contracts and Models
 
-## 5. Class Diagrams
+### 5.1 Key interfaces
 
-### 5.1 Domain: Contracts
+| Interface | Responsibility |
+|---|---|
+| `IGraphGenerator` | Resolve locations, build the projected graph, and expose coordinate conversion |
+| `IRouteCalculator` | Compute route segments, resolve weight/cost callables, and expose `graph_id` |
+| `IRouteOptimizer` | Solve the route optimization problem |
+| `ISelectionStrategy` | Select parents for the GA |
+| `ICrossoverStrategy` | Combine two individuals into a child |
+| `IMutationStrategy` | Mutate an individual |
+| `IPopulationGenerator` | Generate initial GA populations |
+| `IHeuristicDistanceStrategy` | Resolve heuristic distances for seeding |
+| `IGeocodingCache` | Persist forward and reverse geocoding results |
+| `IAdjacencySegmentCache` | Persist adjacency segments keyed by graph identity and metric parameters |
+| `IAdjacencyMatrixBuilder` | Assemble an adjacency matrix, optionally using persistent cache |
+| `IPlotter` | Render optimization progress or results |
 
-Interfaces and models only. Communicates what the system requires, independent of how it is built.
+### 5.2 Key models
+
+| Model | Purpose |
+|---|---|
+| `RouteNode` | Resolved location mapped to a graph node |
+| `GraphContext` | Projected graph, resolved route nodes, CRS, and deterministic `graph_id` |
+| `RouteSegment` | A computed segment between two route nodes |
+| `RouteSegmentsInfo` | Aggregated metrics for an ordered sequence of segments |
+| `VehicleRouteInfo` | One vehicle route plus totals |
+| `FleetRouteInfo` | Fleet-wide aggregate over all vehicles |
+| `OptimizationResult` | Result of one optimization run |
+| `AdjacencyMatrixMap` | In-memory mapping from `(start_node_id, end_node_id)` to `RouteSegment` |
+
+## 6. Genetic Algorithm Architecture
 
 ```mermaid
 classDiagram
     direction LR
-
-    class IGraphGenerator {
-        <<interface>>
-        +initialize(origin, destinations) GraphContext
-        +build_coordinate_converter(context) Callable[(x, y) -> (lat, lon)]
-    }
-
-    class IRouteCalculator {
-        <<interface>>
-        +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
-        +compute_route_segments_info(segments) RouteSegmentsInfo
-        +get_weight_function(weight_type) Callable
-        +get_cost_function(cost_type) Callable|None
-    }
-
-    class IRouteOptimizer {
-        <<interface>>
-        +solve(route_nodes, max_generation, max_processing_time, vehicle_count) OptimizationResult
-    }
-
-    class IPlotter {
-        <<interface>>
-        +plot(route_info FleetRouteInfo) None
-    }
-
-    class RouteNode {
-        +name str
-        +node_id int
-        +coords tuple[float, float]
-    }
-
-    class GraphContext {
-        +graph MultiDiGraph
-        +route_nodes list[RouteNode]
-        +crs str
-    }
-
-    class RouteSegment {
-        +start int
-        +end int
-        +eta float
-        +length float
-        +path list[tuple[float, float]]
-        +segment list[int]
-        +name str
-        +coords tuple[float, float]
-        +cost float or None
-    }
-
-    class RouteMetrics {
-        +total_eta float
-        +total_length float
-        +total_cost float or None
-    }
-
-    class RouteSegmentsInfo {
-        +segments list[RouteSegment]
-    }
-
-    class VehicleRouteInfo {
-        +vehicle_id int
-        +segments list[RouteSegment]
-    }
-
-    class FleetRouteInfo {
-        +routes_by_vehicle list[VehicleRouteInfo]
-        +min_vehicle_eta float
-        +max_vehicle_eta float
-    }
-
-    class OptimizationResult {
-        +best_route FleetRouteInfo
-        +best_fitness float
-        +population_size int
-        +generations_run int
-    }
-
-    IGraphGenerator ..> GraphContext : returns
-    IRouteCalculator ..> RouteSegment : returns
-    IRouteCalculator ..> RouteSegmentsInfo : returns
-    IRouteOptimizer ..> OptimizationResult : returns
-    GraphContext *-- RouteNode : contains
-    RouteMetrics <|-- RouteSegmentsInfo
-    RouteSegmentsInfo <|-- VehicleRouteInfo
-    RouteMetrics <|-- FleetRouteInfo
-    RouteSegmentsInfo *-- RouteSegment : contains
-    FleetRouteInfo *-- VehicleRouteInfo : contains
-    OptimizationResult *-- FleetRouteInfo : contains
-```
-
----
-
-### 5.2 Infrastructure: Concrete Implementations
-
-Each concrete class, its internal structure, and the contract it satisfies.
-
-```mermaid
-classDiagram
-    direction LR
-
-    class IGraphGenerator {
-        <<interface>>
-        +initialize(origin, destinations) GraphContext
-        +build_coordinate_converter(context) Callable[(x, y) -> (lat, lon)]
-    }
-
-    class IRouteCalculator {
-        <<interface>>
-        +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
-        +compute_route_segments_info(segments) RouteSegmentsInfo
-        +get_weight_function() Callable
-        +get_cost_function(cost_type) Callable
-    }
-
-    class IRouteOptimizer {
-        <<interface>>
-        +solve(route_nodes, max_generation, max_processing_time) OptimizationResult
-    }
-
-    class IPlotter {
-        <<interface>>
-        +plot(route_info FleetRouteInfo) None
-    }
-
-    class OSMnxGraphGenerator {
-        -network_type str
-        -custom_filter str or None
-        +initialize(origin, destinations) GraphContext
-        +build_coordinate_converter(context) Callable[(x, y) -> (lat, lon)]
-        -_build_utm_to_lat_lon_converter(crs) Callable
-        -_set_coords_and_names(locations) list
-        -_get_center_and_dist(coords) tuple
-        -_create_projected_graph(center, dist) MultiDiGraph
-        -_find_route_nodes(graph, locations) list
-        -_set_node_priorities(graph, nodes, priorities) None
-    }
-
-    class RouteCalculator {
-        -graph MultiDiGraph
-        +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
-        +compute_route_segments_info(segments) RouteSegmentsInfo
-        +get_weight_function() Callable
-        +get_cost_function(cost_type) Callable
-        -_path_length_sum(path, weight) float
-        -_get_path_details(path) list[tuple[float, float]]
-    }
 
     class TSPGeneticAlgorithm {
-        -route_calculator IRouteCalculator
-        -plotter IPlotter           
-        -population_size int
-        -mutation_probability float
-        -_generate_initial_population(locations, size, vehicle_count) Population
-        -_generate_random_population(locations, size) list
-        -_cluster_destinations(destinations, vehicle_count, random_state) list
-        -_build_clustered_individual(origin, clustered_destinations, strategy) Individual
-        -_order_cluster_destinations(origin, cluster_nodes, strategy) list
-        -_generate_adjacency_matrix(route_nodes, weight_function, cost_function) dict
-        -_order_crossover(p1, p2) Individual
-        -_mutate(solution, probability) Individual
-        +solve(route_nodes, max_generation, max_processing_time, vehicle_count) OptimizationResult
+        +solve(...)
     }
+    class ISelectionStrategy
+    class ICrossoverStrategy
+    class IMutationStrategy
+    class IPopulationGenerator
+    class RoulleteSelectionStrategy
+    class OrderCrossoverStrategy
+    class SwapAndRedistributeMutationStrategy
+    class HybridPopulationGenerator
+    class RandomPopulationGenerator
+    class HeuristicPopulationGenerator
+    class IHeuristicDistanceStrategy
+    class EuclideanPopulationDistanceStrategy
+    class AdjacencyLengthPopulationDistanceStrategy
+    class AdjacencyEtaPopulationDistanceStrategy
+    class AdjacencyCostPopulationDistanceStrategy
 
-    class MatplotlibPlotter {
-        -_context GraphContext
-        -graph MultiDiGraph
-        +plot(route_info FleetRouteInfo) None
-    }
+    TSPGeneticAlgorithm --> ISelectionStrategy
+    TSPGeneticAlgorithm --> ICrossoverStrategy
+    TSPGeneticAlgorithm --> IMutationStrategy
+    TSPGeneticAlgorithm --> IPopulationGenerator
 
-    OSMnxGraphGenerator ..|> IGraphGenerator : implements
-    RouteCalculator ..|> IRouteCalculator : implements
-    TSPGeneticAlgorithm ..|> IRouteOptimizer : implements
-    MatplotlibPlotter ..|> IPlotter : implements
+    RoulleteSelectionStrategy ..|> ISelectionStrategy
+    OrderCrossoverStrategy ..|> ICrossoverStrategy
+    SwapAndRedistributeMutationStrategy ..|> IMutationStrategy
 
-    TSPGeneticAlgorithm --> IRouteCalculator : depends on
-    TSPGeneticAlgorithm --> IPlotter : depends on
-    MatplotlibPlotter --> GraphContext : constructed with
+    HybridPopulationGenerator ..|> IPopulationGenerator
+    RandomPopulationGenerator ..|> IPopulationGenerator
+    HeuristicPopulationGenerator ..|> IPopulationGenerator
+
+    HybridPopulationGenerator --> RandomPopulationGenerator
+    HybridPopulationGenerator --> HeuristicPopulationGenerator
+    HeuristicPopulationGenerator --> IHeuristicDistanceStrategy
+
+    EuclideanPopulationDistanceStrategy ..|> IHeuristicDistanceStrategy
+    AdjacencyLengthPopulationDistanceStrategy ..|> IHeuristicDistanceStrategy
+    AdjacencyEtaPopulationDistanceStrategy ..|> IHeuristicDistanceStrategy
+    AdjacencyCostPopulationDistanceStrategy ..|> IHeuristicDistanceStrategy
 ```
 
----
+### 6.1 Heuristic seeding flow
 
-### 5.3 Composition: Service and Entry Points
+The heuristic population generator is responsible for:
 
-How the service depends on interfaces and how each entry point wires the full dependency graph. Concrete classes appear as collapsed nodes to indicate which implementation is injected.
+- clustering destinations with `KMeans`;
+- ordering each cluster with nearest-neighbor or convex-hull-guided heuristics;
+- applying controlled diversification in `mixed` mode;
+- raising a clear error if the chosen heuristic metric is unavailable, rather than silently falling back.
+
+## 7. Caching Architecture
 
 ```mermaid
-classDiagram
-    direction LR
-
-    class IGraphGenerator {
-        <<interface>>
-        +initialize(origin, destinations) GraphContext
-        +build_coordinate_converter(context) Callable[(x, y) -> (lat, lon)]
-    }
-
-    class IRouteCalculator {
-        <<interface>>
-        +compute_segment(start_node, end_node, weight_function, cost_function) RouteSegment
-        +compute_route_segments_info(segments) RouteSegmentsInfo
-        +get_weight_function() Callable
-        +get_cost_function(cost_type) Callable
-    }
-
-    class IRouteOptimizer {
-        <<interface>>
-        +solve(route_nodes, max_generation, max_processing_time) OptimizationResult
-    }
-
-    class IPlotter {
-        <<interface>>
-        +plot(route_info FleetRouteInfo) None
-    }
-
-    class OSMnxGraphGenerator { <<infrastructure>> }
-    class RouteCalculator { <<infrastructure>> }
-    class TSPGeneticAlgorithm { <<infrastructure>> }
-    class MatplotlibPlotter { <<infrastructure>> }
-
-    class RouteOptimizationService {
-        -graph_generator IGraphGenerator
-        -route_calculator_factory Callable
-        -optimizer_factory Callable[IRouteCalculator, IPlotter, int -> IRouteOptimizer]
-        +optimize(origin, destinations, max_generation, max_processing_time, vehicle_count, population_size) OptimizationResult
-    }
-
-    class FastAPIApp {
-        +optimize_route(request) OptimizeRouteResponse
-    }
-
-    class ConsoleApp {
-        +run(origin, destinations) None
-    }
-
-    RouteOptimizationService --> IGraphGenerator
-    RouteOptimizationService --> IRouteCalculator : factory
-    RouteOptimizationService --> IRouteOptimizer : factory
-    TSPGeneticAlgorithm --> IPlotter : optional
-
-    OSMnxGraphGenerator ..|> IGraphGenerator
-    RouteCalculator ..|> IRouteCalculator
-    TSPGeneticAlgorithm ..|> IRouteOptimizer
-    MatplotlibPlotter ..|> IPlotter
-
-    FastAPIApp --> RouteOptimizationService : injects
-    ConsoleApp --> RouteOptimizationService : injects
+flowchart TD
+    A[OSMnxGraphGenerator] --> B[Build normalized bbox]
+    B --> C[Build effective graph-selection spec]
+    C --> D[Generate graph_id]
+    D --> E[GraphContext.graph_id]
+    E --> F[RouteCalculator.graph_id]
+    F --> G[CachedAdjacencyMatrixBuilder]
+    G --> H[Compose segment cache key]
+    H --> I[SQLiteAdjacencySegmentCache]
 ```
 
----
+### 7.1 Graph identity
 
-## 6. Interfaces
+`OSMnxGraphGenerator` creates a deterministic `graph_id` from:
 
-All interfaces are defined as Python `Protocol` classes (PEP 544, `typing.Protocol`) enabling structural subtyping. Concrete classes are not required to explicitly inherit from the Protocol; they only need to satisfy the structural contract. This keeps infrastructure classes free of framework coupling.
+- normalized bbox coordinates;
+- the effective graph-selection spec:
+  - canonicalized `custom_filter` when present;
+  - otherwise `network_type`.
 
-```python
-# src/domain/interfaces.py
+This identity is stored on the graph and exposed through `GraphContext` and `RouteCalculator`.
 
-from typing import Protocol, Callable, Any, runtime_checkable
-from .models import RouteSegment, RouteSegmentsInfo, FleetRouteInfo, OptimizationResult, GraphContext, RouteNode
+### 7.2 Cache keys
 
+Adjacency segment cache keys are composed from:
 
-@runtime_checkable
-class IGraphGenerator(Protocol):
-    def initialize(
-        self,
-        origin: str | tuple[float, float],
-        destinations: list[tuple[str | tuple[float, float], int]],
-    ) -> GraphContext: ...
+- `graph_id`
+- `start_node_id`
+- `end_node_id`
+- `weight_type`
+- `cost_type`
 
-    def build_coordinate_converter(self, context: GraphContext) -> Callable[[float, float], tuple[float, float]]: ...
+This guarantees that different graph downloads or metric configurations do not collide in the cache.
 
+### 7.3 Cache implementations
 
-@runtime_checkable
-class IRouteCalculator(Protocol):
-    def compute_segment(
-        self,
-        start_node: RouteNode,
-        end_node: RouteNode,
-        weight_function: Any = ...,
-        cost_function: Any | None = ...,
-    ) -> RouteSegment: ...
+The `src/infrastructure/caching` package currently contains:
 
-    def compute_route_segments_info(
-        self,
-        segments: list[RouteSegment],
-    ) -> RouteSegmentsInfo: ...
+- `SQLiteGeocodingCache`
+- `SQLiteAdjacencySegmentCache`
+- `CachedGeocodingResolver`
+- `PhotonGeocodingResolver`
+- `DirectAdjacencyMatrixBuilder`
+- `CachedAdjacencyMatrixBuilder`
 
-    def get_weight_function(self, weight_type: str) -> Callable: ...
+SQLite connections are explicitly closed after each operation to avoid file-lock issues, especially on Windows.
 
-    def get_cost_function(self, cost_type: str | None) -> Callable | None: ...
+## 8. Application Service
 
+`RouteOptimizationService` is the single workflow orchestrator. It:
 
-@runtime_checkable
-class IRouteOptimizer(Protocol):
-    def solve(
-        self,
-        route_nodes: list,
-        max_generation: int = ...,
-        max_processing_time: int = ...,
-        vehicle_count: int = ...,
-    ) -> OptimizationResult: ...
+1. initializes the graph and route nodes;
+2. creates a route calculator for the current graph;
+3. optionally creates a plotter;
+4. creates the optimizer through the injected factory;
+5. runs optimization;
+6. converts projected coordinates back to lat/lon for the result.
 
+The service does not know how graph caching, adjacency caching, or GA operator composition are implemented.
 
-@runtime_checkable
-class IPlotter(Protocol):
-    def plot(self, route_info: FleetRouteInfo) -> None: ...
-```
+## 9. Entry Points and Dependency Injection
 
-### Interface Responsibilities
+### 9.1 API wiring
 
-| Interface | Consumer | Responsibility |
+`api/dependencies.py` is the main composition root. It wires:
+
+- cached geocoding;
+- cached adjacency building;
+- heuristic distance strategy selection;
+- hybrid population generation;
+- concrete GA strategies.
+
+### 9.2 Console wiring
+
+`console/main.py` mirrors the API composition while optionally injecting `MatplotlibPlotter`.
+
+## 10. Technology Notes
+
+| Library | Role |
+|---|---|
+| `OSMnx` | Graph download, projection, and nearest-node resolution |
+| `NetworkX` | Shortest-path computation and graph model |
+| `geopy` | Photon geocoding resolver |
+| `Shapely` | Spatial centroid and convex-hull operations |
+| `PyProj` | Coordinate transformation |
+| `NumPy` | Selection weights and heuristic helpers |
+| `scikit-learn` | `KMeans` clustering for heuristic seeding |
+| `FastAPI` | HTTP entry point |
+| `Pydantic` | API schemas |
+| `Matplotlib` | Optional plotter implementation |
+
+## 11. Responsibility Summary
+
+| Component | Layer | Responsibility |
 |---|---|---|
-| `IGraphGenerator` | `RouteOptimizationService` | Initializes a projected street graph and resolves geographic locations to graph nodes |
-| `IRouteCalculator` | `RouteOptimizationService` and infrastructure composition | Computes segment-level route metrics (ETA, length, cost) for an ordered list of nodes |
-| `IRouteOptimizer` | `RouteOptimizationService` | Executes the optimization algorithm and returns the best route found |
-| `IPlotter` | `RouteOptimizationService` | Renders route information visually; optional dependency |
-
----
-
-## 7. Domain Models
-
-Domain models are pure data containers with no external dependencies. They reside in `src/domain/models.py` and are shared across all layers.
-
-```python
-# src/domain/models.py
-
-from dataclasses import dataclass, field
-from typing import List
-import networkx as nx
-
-
-@dataclass
-class RouteNode:
-    """
-    Represents a named, projected graph node resolved from a geographic location.
-    """
-    name: str
-    node_id: int
-    coords: tuple[float, float]
-
-
-@dataclass
-class GraphContext:
-    """
-    The output of IGraphGenerator.initialize().
-    Bundles the projected street graph with the resolved route nodes,
-    eliminating the raw tuple return from the graph initialization step.
-    """
-    graph: nx.MultiDiGraph
-    route_nodes: list[RouteNode]
-    crs: str = field(init=False)
-
-    def __post_init__(self):
-        self.crs = self.graph.graph["crs"]
-
-
-@dataclass
-class RouteSegment:
-    """
-    Typed representation of a single computed route segment between two graph nodes.
-    """
-    start: int
-    end: int
-    eta: float
-    length: float
-    path: list[tuple[float, float]]
-    segment: list[int]
-    name: str
-    coords: tuple[float, float]
-    cost: float | None = None
-
-
-@dataclass
-class RouteSegmentsInfo:
-    """
-    Stores computed metrics for an ordered sequence of route segments.
-    Each segment maps to one destination in the optimized route.
-    """
-    segments: list[RouteSegment] = field(default_factory=list)
-
-
-@dataclass
-class VehicleRouteInfo(RouteSegmentsInfo):
-    vehicle_id: int = 0
-
-
-@dataclass
-class FleetRouteInfo(RouteMetrics):
-    routes_by_vehicle: list[VehicleRouteInfo] = field(default_factory=list)
-
-
-@dataclass
-class OptimizationResult:
-    """
-    The output of a single optimization run.
-    Replaces the raw dict previously returned by TSPGeneticAlgorithm.solve().
-    """
-    best_route: FleetRouteInfo
-    best_fitness: float
-    population_size: int
-    generations_run: int
-```
-
----
-
-## 8. Concrete Implementations
-
-### 8.1 OSMnxGraphGenerator
-
-**Location:** `src/infrastructure/osmnx_graph_generator.py`
-**Implements:** `IGraphGenerator`
-
-Encapsulates all OSMnx operations. Migrates the module-level functions from `osmnx_graph_utils.py` into a single cohesive class. Responsible for:
-
-- Geocoding addresses and reverse-geocoding coordinates via OSMnx
-- Computing a bounding area using Shapely (`MultiPoint.centroid`)
-- Downloading and projecting a street network via OSMnx
-- Snapping geographic points to the nearest graph node
-- Annotating nodes with priority metadata
-- Providing a coordinate-conversion delegate `(x, y) -> (lat, lon)` for the application service
-
-Configuration (network type, custom filter) is injected at construction time, allowing different instances for different road network scenarios without code changes. The generator remains cohesive by not depending on route aggregate models; only coordinate conversion primitives are exposed to higher layers.
-
-### 8.2 RouteCalculator
-
-**Location:** `src/infrastructure/route_calculator.py`
-**Implements:** `IRouteCalculator`
-
-Wraps a `networkx.MultiDiGraph` and computes route-level metrics using Dijkstra's algorithm. The graph is injected via the constructor — this class has no knowledge of how the graph was built, satisfying the Dependency Inversion Principle.
-
-Additionally, it removes duplicate coordinates from path details to ensure clean route representations.
-
-The class exposes two public methods with distinct responsibilities:
-
-- `compute_segment(start_node_id, end_node, weight_function, cost_function)` — runs Dijkstra between a single pair of nodes and returns a typed `RouteSegment` dataclass containing ETA, length, path details, and optional cost. The cost function is passed in already resolved, so the same callable is reused across all segments in a route.
-- `compute_route_segments_info(segments)` — the consolidating entry point. It receives a pre-built `list[RouteSegment]`, sums ETA, length, and cost totals, and packages the result into `RouteSegmentsInfo`. Callers are responsible for building the segment list (e.g., via `compute_segment` for each consecutive node pair) before invoking this method.
-- `get_weight_function(weight_type)` — resolves and returns the graph-edge weight callable by name. The current implementation supports `eta`.
-- `get_cost_function(cost_type)` — resolves and returns the cost callable by name, allowing callers to pre-resolve it once before iterating over route pairs. The current implementation supports `priority` and also accepts `None` to disable aggregated segment cost.
-
-Because the graph is only available after `IGraphGenerator.initialize()` is called, this class is not injected as a singleton but rather instantiated on demand via a factory callable in `RouteOptimizationService`.
-
-### 8.3 TSPGeneticAlgorithm
-
-**Location:** `src/infrastructure/tsp_genetic_algorithm.py`
-**Implements:** `IRouteOptimizer`
-
-Receives a precomputed adjacency matrix at construction time instead of an `IRouteCalculator`. The genetic operators (crossover, mutation, population generation) are implemented as private methods within the class. An optional `IPlotter` may also be injected to visualize progress after each generation.
-
-The `solve()` method returns an `OptimizationResult` whose `best_route` is a `FleetRouteInfo`, containing one `VehicleRouteInfo` per vehicle plus fleet-level totals. At fleet level, temporal aggregation is expressed as `min_vehicle_eta` and `max_vehicle_eta` instead of summing ETAs across vehicles. Population generation now allows empty vehicles, crossover chooses between parent1 distribution, parent2 distribution, or a positional mean distribution, and mutation can both reorder stops within a vehicle and move stops across vehicles.
-
-The initial population bootstrap is now hybrid instead of purely random:
-
-- `_generate_initial_population(...)` orchestrates the seed generation;
-- `_cluster_destinations(...)` applies `KMeans` over `RouteNode.coords`, which are already stored in the graph projected CRS;
-- `_build_clustered_individual(...)` materializes one valid multi-vehicle individual from the resulting clusters;
-- `_order_cluster_destinations(...)` uses nearest-neighbor by default and may switch to a convex-hull-guided ordering for larger, more spatially dispersed clusters;
-- `_perturb_clustered_individual(...)` introduces small local variations so heuristic seeds do not collapse into a single repeated solution.
-
-This design preserves compatibility with the existing evaluation, selection, crossover, and mutation stages while improving the quality of the starting population.
-
-### 8.4 MatplotlibPlotter
-
-**Location:** `src/infrastructure/matplotlib_plotter.py`
-**Implements:** `IPlotter`
-
-Receives a `GraphContext` in its constructor, giving it access to both the projected street graph and the full list of `RouteNode` objects. At construction time it:
-
-- Opens a two-panel interactive figure (`plt.ion()`): left panel is the street-map, right panel is a distance-per-generation line chart.
-- Draws the base street graph once (static layer, never cleared).
-- Places crimson `X` markers for **all** `route_nodes` — including the origin — as a static POI layer.
-- Initialises a persistent summary text box (bottom-left of the map) that is updated each generation.
-
-Each call to `plot(route_info)` removes only the route-line artists from the previous generation (tracked in `_route_artists`), draws the new fleet solution with colours grouped by vehicle, updates the summary block, and appends the total fleet fitness to the right-panel chart. Static layers (base graph and POI markers) are never redrawn, keeping updates fast.
-
-```python
-def plot(self, route_info: FleetRouteInfo) -> None: ...
-```
-
-Because the interface is defined in the domain layer and the concrete implementation in the infrastructure layer, the application service has no dependency on Matplotlib. Any renderer (web-based, PNG file, interactive Folium map) can be swapped in by providing a different `IPlotter` implementation.
-
----
-
-## 9. Application Service
-
-**Location:** `src/application/route_optimization_service.py`
-
-`RouteOptimizationService` is the single orchestrator. It depends exclusively on interfaces and on factory callables that produce interface-typed instances. Its `optimize` method now accepts `vehicle_count`, `population_size`, `weight_type`, and `cost_type`, obtains a coordinate-conversion delegate from the graph generator, forwards optimization parameters to the infrastructure composition, and then applies the coordinate delegate over the multi-vehicle aggregate before returning. The service contains no routing heuristics of its own beyond sequencing the workflow and mapping coordinate conversion over the result structure.
-
-```python
-# src/application/route_optimization_service.py
-
-from typing import Callable
-from src.domain.interfaces import IGraphGenerator, IRouteCalculator, IRouteOptimizer, IPlotter
-from src.domain.models import OptimizationResult
-
-
-class RouteOptimizationService:
-    def __init__(
-        self,
-        graph_generator: IGraphGenerator,
-        route_calculator_factory: Callable[..., IRouteCalculator],
-        optimizer_factory: Callable[[IRouteCalculator, list[RouteNode], str, str | None, IPlotter | None, int], IRouteOptimizer],
-    ):
-        self._graph_generator = graph_generator
-        self._route_calculator_factory = route_calculator_factory
-        self._optimizer_factory = optimizer_factory
-
-    def optimize(
-        self,
-        origin: str | tuple[float, float],
-        destinations: list[tuple[str | tuple[float, float], int]],
-        max_generation: int = 50,
-        max_processing_time: int = 10000,
-        vehicle_count: int = 1,
-        population_size: int = 10,
-    ) -> OptimizationResult:
-        context = self._graph_generator.initialize(origin, destinations)
-
-        route_calculator = self._route_calculator_factory(context.graph)
-        optimizer = self._optimizer_factory(
-            route_calculator,
-            context.route_nodes,
-            "eta",
-            "priority",
-            None,
-            population_size,
-        )
-        coordinate_converter = self._graph_generator.build_coordinate_converter(context)
-
-        result = optimizer.solve(
-            route_nodes=context.route_nodes,
-            max_generation=max_generation,
-            max_processing_time=max_processing_time,
-            vehicle_count=vehicle_count,
-        )
-
-        converted_route = self._convert_fleet_route_coordinates(result.best_route, coordinate_converter)
-        return OptimizationResult(
-            best_route=converted_route,
-            best_fitness=result.best_fitness,
-            population_size=result.population_size,
-            generations_run=result.generations_run,
-        )
-```
-
-Note that `route_calculator_factory` and `optimizer_factory` are used per-call rather than per-service-instance. This is necessary because `RouteCalculator` depends on a graph that is only known at request time, and because the adjacency matrix is now precomputed in the infrastructure composition using the current `route_nodes`, `weight_type`, and `cost_type` before the optimizer is instantiated.
-
----
-
-## 10. Entry Points and Dependency Injection
-
-### 10.1 FastAPI Entry Point
-
-Dependency wiring is handled via FastAPI's `Depends` mechanism in `api/dependencies.py`. This file is the only place where concrete implementation classes are imported.
-
-```python
-# api/dependencies.py
-
-from functools import lru_cache
-from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
-from src.infrastructure.route_calculator import RouteCalculator
-from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
-from src.application.route_optimization_service import RouteOptimizationService
-
-
-@lru_cache
-def get_graph_generator() -> OSMnxGraphGenerator:
-    return OSMnxGraphGenerator()
-
-
-def get_route_optimization_service() -> RouteOptimizationService:
-    return RouteOptimizationService(
-        graph_generator=get_graph_generator(),
-        route_calculator_factory=RouteCalculator,
-        optimizer_factory=lambda calc, plotter, population_size: TSPGeneticAlgorithm(
-            route_calculator=calc,
-            plotter=plotter,
-            population_size=population_size,
-        ),
-    )
-```
-
-```python
-# api/main.py
-
-from fastapi import FastAPI, Depends
-from api.dependencies import get_route_optimization_service
-from src.application.route_optimization_service import RouteOptimizationService
-
-app = FastAPI()
-
-@app.post("/optimize_route")
-async def optimize_route(
-    request: OptimizeRouteRequest,
-    service: RouteOptimizationService = Depends(get_route_optimization_service),
-):
-    result = service.optimize(
-        origin=request.origin,
-        destinations=[(d.location, d.priority) for d in request.destinations],
-        max_generation=request.max_generation,
-        max_processing_time=request.max_processing_time,
-        vehicle_count=request.vehicle_count,
-        population_size=request.population_size,
-    )
-    # map result to response schema
-    ...
-```
-
-### 10.2 Console Entry Point
-
-```python
-# console/main.py
-
-from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
-from src.infrastructure.route_calculator import RouteCalculator
-from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
-from src.infrastructure.matplotlib_plotter import MatplotlibPlotter
-from src.application.route_optimization_service import RouteOptimizationService
-
-service = RouteOptimizationService(
-    graph_generator=OSMnxGraphGenerator(),
-    route_calculator_factory=RouteCalculator,
-    optimizer_factory=lambda calc, plotter, population_size: TSPGeneticAlgorithm(
-        route_calculator=calc,
-        plotter=plotter,
-        population_size=population_size,
-    ),
-)
-
-result = service.optimize(origin="...", destinations=[...], vehicle_count=2, population_size=20)
-```
-
-The application service and all infrastructure classes are identical in both entry points. Only the wiring and data translation (HTTP vs. stdin/stdout) differ.
-
-### 10.3 Test Entry Point
-
-Dependency injection enables substitution of any component with a test double:
-
-```python
-# tests/test_route_optimization_service.py
-
-class MockGraphGenerator:
-    def initialize(self, origin, destinations):
-        return mock_graph, mock_route_nodes
-
-class MockOptimizer:
-    def solve(self, route_nodes, max_generation, max_processing_time, vehicle_count=1):
-        return OptimizationResult(...)
-
-service = RouteOptimizationService(
-    graph_generator=MockGraphGenerator(),
-    route_calculator_factory=lambda g: MockRouteCalculator(),
-    optimizer_factory=lambda calc: MockOptimizer(),
-)
-```
-
-No real network calls, no OSMnx, no genetic algorithm execution required by unit tests.
-
----
-
-## 11. Library Reference
-
-### 11.1 OSMnx
-
-> "OSMnx is a Python package to download, model, analyze, and visualize street networks and other geospatial features from OpenStreetMap."
-> — [Boeing, G. (2017). OSMnx: New Methods for Acquiring, Constructing, Analyzing, and Visualizing Complex Street Networks. Computers, Environment and Urban Systems.](https://osmnx.readthedocs.io)
-
-**Role in this system:** Used exclusively inside `OSMnxGraphGenerator`. Responsible for geocoding addresses, downloading the street network graph from OpenStreetMap, projecting the graph to a metric CRS (via `ox.project_graph`), and snapping coordinates to the nearest graph node (`ox.distance.nearest_nodes`).
-
-**Key APIs used:**
-- `ox.graph_from_point` — constructs a `networkx.MultiDiGraph` from a geographic bounding box
-- `ox.project_graph` — reprojects the graph from WGS84 to a local UTM CRS
-- `ox.geocoder.geocode` — resolves an address string to `(lat, lon)`
-- `ox.distance.nearest_nodes` — finds the nearest graph node to a projected coordinate
-- `ox.settings.use_cache` — enables local disk caching of OSM API responses
-
-### 11.2 NetworkX
-
-> "NetworkX is a Python package for the creation, manipulation, and study of the structure, dynamics, and functions of complex networks."
-> — [NetworkX Documentation](https://networkx.org/documentation/stable/)
-
-**Role in this system:** Provides the `MultiDiGraph` data structure used throughout the system, and the shortest-path algorithm used by `RouteCalculator`. The graph built by OSMnx is a `networkx.MultiDiGraph` with street-level attributes (`length`, `maxspeed`, `geometry`, etc.) stored on edges.
-
-**Key APIs used:**
-- `nx.MultiDiGraph` — directed multigraph where nodes are intersections and edges are street segments
-- `nx.single_source_dijkstra` — returns both the shortest-path cost and the node sequence; used in `RouteCalculator.compute_route_segments_info` with a custom weight function
-
-### 11.3 PyProj
-
-> "Cartographic projections and coordinate transformations library."
-> — [PyProj Documentation](https://pyproj4.github.io/pyproj/stable/)
-
-**Role in this system:** Used inside `OSMnxGraphGenerator` to convert geographic coordinates between reference systems. Since OSMnx stores node positions in the projected CRS of the graph (typically UTM), and all external inputs are in WGS84 (EPSG:4326), `pyproj.Transformer` is used bidirectionally.
-
-**Key APIs used:**
-- `Transformer.from_crs(source_crs, target_crs, always_xy=True)` — creates a reusable transformer object
-- `Transformer.transform(x, y)` — applies the coordinate transformation
-
-### 11.4 geopy
-
-> "Geopy makes it easy for Python developers to locate the coordinates of addresses, cities, countries, and landmarks across the globe using third-party geocoders and other data sources."
-> — [geopy Documentation](https://geopy.readthedocs.io/)
-
-**Role in this system:** Used in `OSMnxGraphGenerator._get_short_name_from_coord` to reverse‑geocode latitude/longitude pairs into human‑readable place names when the origin or destination is provided as coordinates. A single `geopy.geocoders.Photon` instance is created in the constructor and reused for all lookups.
-
-**Key APIs used:**
-- `Photon(user_agent=...)` — instantiates the Photon geocoder
-- `geolocator.reverse((lat, lon))` — performs reverse geocoding to obtain a location object or string
-
-### 11.5 Shapely
-
-> "Shapely is a BSD-licensed Python package for manipulation and analysis of planar geometric objects."
-> — [Shapely Documentation](https://shapely.readthedocs.io/en/stable/)
-
-**Role in this system:** Used inside `OSMnxGraphGenerator` to calculate the geographic centroid of a set of points (the center of the bounding area to pass to OSMnx) and to extract detailed path geometry from edges that carry a `LineString` geometry attribute. It is also used inside `TSPGeneticAlgorithm` to compute convex hulls for larger clusters during heuristic ordering of the initial population.
-
-**Key APIs used:**
-- `MultiPoint(coords).centroid` — computes the centroid of a collection of geographic points
-- `LineString.coords` — iterates over the coordinate sequence of a curved road segment
-
-### 11.5 FastAPI
-
-> "FastAPI is a modern, fast (high-performance), web framework for building APIs with Python based on standard Python type hints."
-> — [FastAPI Documentation](https://fastapi.tiangolo.com)
-
-**Role in this system:** Serves as one delivery mechanism (entry point) for the application. The API layer is a thin adapter: it translates HTTP request/response payloads to and from domain objects and delegates all logic to `RouteOptimizationService`. FastAPI's `Depends` system is used to wire the dependency graph at startup.
-
-### 11.6 Pydantic
-
-> "Data validation using Python type annotations."
-> — [Pydantic Documentation](https://docs.pydantic.dev/latest/)
-
-**Role in this system:** Defines HTTP-level request and response schemas in `api/schemas.py`. Pydantic models are strictly confined to the API layer and are never passed into the application or infrastructure layers. Domain models (`RouteSegmentsInfo`, `OptimizationResult`) are plain Python dataclasses.
-
-### 11.7 NumPy
-
-> "The fundamental package for scientific computing with Python."
-> — [NumPy Documentation](https://numpy.org/doc/stable/)
-
-**Role in this system:** Used inside `TSPGeneticAlgorithm` to compute selection probabilities for the roulette-wheel parent selection mechanism (`1 / np.array(fitness_values)`). NumPy's vectorized operations replace an explicit Python loop for this weighted random selection step.
-
-### 11.8 scikit-learn
-
-> "Simple and efficient tools for predictive data analysis."
-> — [scikit-learn Documentation](https://scikit-learn.org/stable/)
-
-**Role in this system:** Used inside `TSPGeneticAlgorithm` to run `KMeans` over projected node coordinates and generate clustered seeds for the initial population. This allows the optimizer to assign geographically close destinations to the same vehicle before the evolutionary loop begins.
-
-**Key APIs used:**
-- `sklearn.cluster.KMeans` — partitions destination coordinates into `vehicle_count` spatial clusters
-- `KMeans.fit_predict(...)` — returns the cluster label for each destination node
-
-### 11.9 Matplotlib
-
-> "Matplotlib is a comprehensive library for creating static, animated, and interactive visualizations in Python."
-> — [Matplotlib Documentation](https://matplotlib.org/stable/)
-
-**Role in this system:** Will be used by the future `MatplotlibPlotter` implementation of `IPlotter`. Since `IPlotter` is defined in the domain layer and `MatplotlibPlotter` in the infrastructure layer, Matplotlib is an optional runtime dependency; the system functions completely without it when no plotter is injected.
-
----
-
-## Summary of Responsibilities
-
-| Class / Module | Layer | Responsibility |
-|---|---|---|
-| `interfaces.py` | Domain | Defines contracts (`IGraphGenerator`, `IRouteCalculator`, `IRouteOptimizer`, `IPlotter`) |
-| `models.py` | Domain | `RouteNode`, `GraphContext`, `RouteMetrics`, `RouteSegmentsInfo`, `VehicleRouteInfo`, `FleetRouteInfo`, `OptimizationResult` — pure data |
-| `route_optimization_service.py` | Application | Orchestrates the full optimization workflow |
-| `osmnx_graph_generator.py` | Infrastructure | Graph construction, geocoding, and coordinate-conversion delegate creation |
-| `route_calculator.py` | Infrastructure | Segment-level metric computation (ETA, length, cost) |
-| `tsp_genetic_algorithm.py` | Infrastructure | Multi-vehicle Genetic Algorithm optimization loop with hybrid clustered seeding, internal operators, and optional plotter |
-| `matplotlib_plotter.py` | Infrastructure | Visualization of `FleetRouteInfo` |
-| `api/main.py` | Entry Point | HTTP request handling via FastAPI |
-| `api/schemas.py` | Entry Point | Pydantic HTTP schemas |
-| `api/dependencies.py` | Entry Point | Dependency wiring for FastAPI |
-| `console/main.py` | Entry Point | Future: CLI wiring and execution |
+| `src/domain/interfaces/*` | Domain | Contracts for the application and infrastructure |
+| `src/domain/models/*` | Domain | Data structures and typed aggregates |
+| `RouteOptimizationService` | Application | End-to-end workflow orchestration |
+| `OSMnxGraphGenerator` | Infrastructure | Graph generation, geocoding, `graph_id`, coordinate conversion |
+| `RouteCalculator` | Infrastructure | Segment computation and graph-aware metrics |
+| `src/infrastructure/genetic_algorithm/*` | Infrastructure | GA operators, population generation, heuristic distance strategies |
+| `TSPGeneticAlgorithm` | Infrastructure | Evolution loop over injected collaborators |
+| `src/infrastructure/caching/*` | Infrastructure | Persistent caching adapters and cache-aware builders |
+| `api/*` | Entry point | HTTP transport and dependency composition |
+| `console/main.py` | Entry point | Local execution and demonstration wiring |

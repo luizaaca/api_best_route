@@ -1,244 +1,212 @@
-# TSP Genetic Algorithm API
+# API Best Route
 
-Esta API utiliza um Algoritmo Genético para otimizar rotas entre um ponto de origem e múltiplos destinos, considerando prioridades e estimativas de tempo de chegada (ETA) baseadas em dados do OpenStreetMap. A solução agora é distribuída entre `n` veículos, retornando explicitamente a rota de cada veículo e os totais agregados da frota.
+`API Best Route` is a route-optimization service built around a multi-vehicle Genetic Algorithm over real street-network data from OpenStreetMap. The application resolves locations, builds a projected road graph, computes an adjacency matrix of route segments, and optimizes the visit order across one or more vehicles.
 
-A população inicial do algoritmo deixou de ser puramente aleatória: ela agora é gerada por uma estratégia híbrida que combina sementes heurísticas e indivíduos aleatórios. As sementes heurísticas usam `k-means` sobre as coordenadas projetadas (`RouteNode.coords`) para separar destinos por veículo e, em seguida, ordenam os pontos de cada cluster com heurísticas espaciais como nearest-neighbor e convex hull quando o formato do cluster justificar esse refinamento.
+The current implementation combines:
 
-O código está organizado em pacotes sob `src/` (domínio, aplicação, infraestrutura), com a API em `api/` e uma entrada de console em `console/`. O algoritmo genético contém seus operadores internamente e aceita injeção de um plotter opcional para visualização.
+- domain interfaces and models under `src/domain`;
+- an orchestration layer in `src/application`;
+- infrastructure implementations under `src/infrastructure`, including modular GA components and persistent caching adapters;
+- delivery layers in `api/` and `console/`.
 
-## Instalação
+For detailed change history, see the files under `changelog/`.
 
-1. Navegue até o diretório `api_best_route`:
-   ```
-   cd api_best_route
-   ```
+## Highlights
 
-2. Instale as dependências:
-   ```
-   pip install -r requirements.txt
-   ```
+- multi-vehicle route optimization with fleet-level aggregates;
+- modular GA composition with injectable selection, crossover, mutation, and population-generation components;
+- hybrid population seeding using heuristic and random generators;
+- heuristic distance strategies based on projected Euclidean distance or adjacency-matrix metrics;
+- persistent geocoding and adjacency-segment caching using SQLite;
+- deterministic `graph_id` generation for cache-safe graph reuse;
+- optional plotting support through `IPlotter`.
 
-## Executando a API
+## Project Layout
 
-Execute o servidor com Uvicorn:
+```text
+api_best_route/
+├── api/
+│   ├── dependencies.py
+│   ├── main.py
+│   └── schemas.py
+├── changelog/
+├── console/
+│   └── main.py
+├── src/
+│   ├── application/
+│   │   └── route_optimization_service.py
+│   ├── domain/
+│   │   ├── interfaces/
+│   │   └── models/
+│   └── infrastructure/
+│       ├── caching/
+│       ├── genetic_algorithm/
+│       │   ├── crossover/
+│       │   ├── distance/
+│       │   ├── mutation/
+│       │   ├── population/
+│       │   └── selection/
+│       ├── matplotlib_plotter.py
+│       ├── osmnx_graph_generator.py
+│       ├── route_calculator.py
+│       └── tsp_genetic_algorithm.py
+└── tests/
 ```
+
+## Runtime Flow
+
+```mermaid
+flowchart TD
+    A[Receive request or console input] --> B[Resolve origin and destinations]
+    B --> C[Build projected OSM graph]
+    C --> D[Generate deterministic graph_id]
+    D --> E[Build cached adjacency matrix]
+    E --> F[Create heuristic distance strategy]
+    F --> G[Create hybrid population generator]
+    G --> H[Run TSPGeneticAlgorithm]
+    H --> I[Convert coordinates back to lat/lon]
+    I --> J[Return optimization result]
+```
+
+## Installation
+
+Install the project dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Run the API
+
+```bash
 uvicorn api.main:app --reload
 ```
 
-A API estará disponível em `http://127.0.0.1:8000`. Acesse `http://127.0.0.1:8000/docs` para a documentação interativa do Swagger.
+The interactive API documentation is available at:
 
-## Executando o Console
+- `http://127.0.0.1:8000/docs`
 
-O console é um ponto de entrada alternativo à API, útil para execuções locais e depuração:
-```
+## Run the Console Example
+
+```bash
 python -m console.main
 ```
 
-O script em `console/main.py` demonstra a injeção de dependências: é possível passar um `MatplotlibPlotter` via `optimizer_factory` para visualizar a evolução da melhor solução geração a geração. Edite o arquivo para configurar origem, destinos, número de veículos e parâmetros do algoritmo.
+The console entry point demonstrates the same dependency graph used by the API, with an optional `MatplotlibPlotter` for visualization.
 
-## Inicialização da população
+## API Summary
 
-O `TSPGeneticAlgorithm` agora inicializa a população em modo híbrido:
+### `POST /optimize_route`
 
-- uma fração da população nasce de sementes heurísticas baseadas em agrupamento espacial por veículo;
-- a fração restante continua sendo gerada aleatoriamente para preservar diversidade genética.
+Main request parameters:
 
-O fluxo heurístico atual é:
+- `origin`: address string or `[lat, lon]` coordinates;
+- `destinations`: list of `{location, priority}` items;
+- `max_generation`;
+- `max_processing_time`;
+- `vehicle_count`;
+- `population_size`;
+- `weight_type`;
+- `cost_type`.
 
-1. separar a origem dos destinos;
-2. aplicar `k-means` sobre `RouteNode.coords`, que já estão em coordenadas projetadas do grafo;
-3. gerar um cluster por veículo, permitindo clusters vazios quando há mais veículos do que destinos;
-4. ordenar os destinos de cada cluster com nearest-neighbor;
-5. aplicar convex hull apenas em clusters maiores e geometricamente mais espalhados;
-6. perturbar parte das sementes heurísticas com pequenas trocas locais para aumentar a diversidade inicial.
+Main response fields:
 
-Essa estratégia acelera a busca inicial por boas soluções sem remover a capacidade exploratória do algoritmo genético.
+- `routes_by_vehicle`;
+- `totals`;
+- `best_fitness`;
+- `population_size`;
+- `generations_run`.
 
-## Endpoint
+## Optimization Model
 
-### POST /optimize_route
+### Genetic Algorithm Composition
 
-Otimiza a rota usando o algoritmo genético.
+The optimizer itself is orchestration-only. Concrete behavior is injected at composition time.
 
-#### Parâmetros de Entrada (JSON)
-- `origin` (string): Ponto de origem, como "Praça da Sé, São Paulo".
-- `destinations` (array): Lista de destinos, cada um com:
-  - `location` (string ou array): Nome do lugar (ex: "Edifício Copan, São Paulo") ou coordenadas [latitude, longitude].
-  - `priority` (integer): Prioridade do destino (ex: 1 para alta prioridade).
-- `max_generation` (integer, opcional): Número máximo de gerações (padrão: 50).
-- `max_processing_time` (integer, opcional): Tempo máximo de processamento em milissegundos (padrão: 10000).
-- `population_size` (integer, opcional): Tamanho da população inicial do algoritmo genético (padrão: 10).
-- `vehicle_count` (integer, opcional): Número de veículos disponíveis para distribuir os destinos (padrão: 1).
-- `weight_type` (string, opcional): Estratégia de peso usada no cálculo dos caminhos do grafo (padrão: `"eta"`). Atualmente o único valor suportado é `eta`.
-- `cost_type` (string, opcional): Estratégia de custo/fitness agregada sobre os segmentos (padrão: `"priority"`). Use `null` para desabilitar o custo agregado e otimizar pelo critério temporal da frota.
-
-#### Exemplo de Requisição
-```json
-{
-  "origin": "Praça da Sé, São Paulo",
-  "destinations": [
-    {"location": "Edifício Copan, São Paulo", "priority": 1},
-    {"location": "Mercado Municipal de São Paulo", "priority": 2},
-    {"location": [-23.5465, -46.6367], "priority": 3}
-  ],
-  "max_generation": 50,
-  "max_processing_time": 10000,
-  "population_size": 20,
-  "vehicle_count": 2,
-  "weight_type": "eta",
-  "cost_type": "priority"
-}
-```
-
-#### Resposta (JSON)
-- `routes_by_vehicle` (array): Lista de veículos com sua rota otimizada, `vehicle_id` explícito e totais do veículo.
-  - `route[0]`: sempre representa a origem do veículo.
-  - `route[1:]`: destinos atribuídos ao veículo, na ordem otimizada.
-- `totals` (objeto): Métricas agregadas da solução inteira.
-  - `total_length`: soma das distâncias percorridas pela frota.
-  - `min_vehicle_eta`: menor ETA entre os veículos.
-  - `max_vehicle_eta`: maior ETA entre os veículos, representando o tempo de conclusão da frota.
-  - `total_cost`: soma do custo agregado dos veículos, quando `cost_type` estiver habilitado.
-- `best_fitness` (float): Valor do fitness da melhor rota (custo total).
-- `population_size` (integer): Tamanho da população usada.
-- `generations_run` (integer): Número de gerações executadas (aproximado).
-
-#### Exemplo de Resposta
-```json
-{
-  "routes_by_vehicle": [
-    {
-      "vehicle_id": 1,
-      "route": [
-        {
-          "location": "Praça da Sé, São Paulo",
-          "coords": [-23.5501, -46.6339],
-          "length": 0.0,
-          "eta": 0.0,
-          "cost": 0.0,
-          "path": []
-        },
-        {
-          "location": "Edifício Copan, São Paulo",
-          "coords": [-23.5489, -46.6388],
-          "length": 1520.5,
-          "eta": 420.0,
-          "cost": 420.0,
-          "path": [[-23.5501, -46.6339], [-23.5489, -46.6388]]
-        }
-      ],
-      "totals": {
-        "total_length": 1520.5,
-        "total_eta": 420.0,
-        "total_cost": 420.0
-      }
-    },
-    {
-      "vehicle_id": 2,
-      "route": [
-        {
-          "location": "Praça da Sé, São Paulo",
-          "coords": [-23.5501, -46.6339],
-          "length": 0.0,
-          "eta": 0.0,
-          "cost": 0.0,
-          "path": []
-        },
-        {
-          "location": "Mercado Municipal de São Paulo",
-          "coords": [-23.5416, -46.6291],
-          "length": 980.2,
-          "eta": 315.0,
-          "cost": 378.0,
-          "path": [[-23.5501, -46.6339], [-23.5416, -46.6291]]
-        }
-      ],
-      "totals": {
-        "total_length": 980.2,
-        "total_eta": 315.0,
-        "total_cost": 378.0
-      }
+```mermaid
+classDiagram
+    class TSPGeneticAlgorithm {
+        +solve(...)
     }
-  ],
-  "totals": {
-    "total_length": 2500.7,
-    "min_vehicle_eta": 315.0,
-    "max_vehicle_eta": 420.0,
-    "total_cost": 798.0
-  },
-  "best_fitness": 798.0,
-  "population_size": 20,
-  "generations_run": 37
-}
+    class ISelectionStrategy
+    class ICrossoverStrategy
+    class IMutationStrategy
+    class IPopulationGenerator
+    class HybridPopulationGenerator
+    class RandomPopulationGenerator
+    class HeuristicPopulationGenerator
+
+    TSPGeneticAlgorithm --> ISelectionStrategy
+    TSPGeneticAlgorithm --> ICrossoverStrategy
+    TSPGeneticAlgorithm --> IMutationStrategy
+    TSPGeneticAlgorithm --> IPopulationGenerator
+    HybridPopulationGenerator ..|> IPopulationGenerator
+    HybridPopulationGenerator --> RandomPopulationGenerator
+    HybridPopulationGenerator --> HeuristicPopulationGenerator
 ```
 
-Veículos sem entregas continuam presentes na resposta com `vehicle_id`, rota contendo apenas o segmento nulo da origem e totais zerados:
+### Heuristic Population Seeding
 
-```json
-{
-  "vehicle_id": 3,
-  "route": [
-    {
-      "location": "Praça da Sé, São Paulo",
-      "coords": [-23.5501, -46.6339],
-      "length": 0.0,
-      "eta": 0.0,
-      "cost": 0.0,
-      "path": []
-    }
-  ],
-  "totals": {
-    "total_length": 0.0,
-    "total_eta": 0.0,
-    "total_cost": 0.0
-  }
-}
-```
+The hybrid seeding pipeline combines:
 
-## Notas
-- O algoritmo resolve estratégias por identificador string: hoje `weight_type="eta"` e `cost_type="priority"` são os defaults suportados.
-- Quando `cost_type` está habilitado, o fitness da solução é calculado a partir do custo agregado da frota.
-- Quando `cost_type` é `null`, o fallback temporal do fitness considera `max_vehicle_eta`, isto é, o makespan da frota.
-- O primeiro item de cada `route` é sempre a origem, mesmo quando o veículo também possui destinos atribuídos.
-- A população pode distribuir zero destinos para um veículo quando isso fizer parte de uma solução candidata; nesse caso o veículo permanece apenas com a origem.
-- O objeto `totals` da frota não soma mais ETAs dos veículos; como eles podem rodar em paralelo, ele expõe tempos mínimo e máximo entre os veículos.
-- O agrupamento espacial usa `RouteNode.coords` em coordenadas projetadas do grafo, e não latitude/longitude brutas.
-- A inicialização híbrida combina indivíduos heurísticos e aleatórios para equilibrar qualidade inicial e diversidade da população.
-- A matriz de adjacência deixou de ser montada dentro do algoritmo genético; ela é preparada na composição da infraestrutura e injetada no otimizador.
-- Certifique-se de que as localizações sejam válidas e acessíveis via OpenStreetMap.
-- O tempo de processamento pode variar dependendo do número de destinos e parâmetros.
+- `RandomPopulationGenerator` for exploration;
+- `HeuristicPopulationGenerator` for stronger initial candidates;
+- adjacency-aware distance strategies for heuristic ordering;
+- mixed ordering mode with controlled diversification.
 
-## Dependências
-- FastAPI: framework para construção da API.
-- Uvicorn: servidor ASGI para execução da aplicação.
-- NumPy: pacote numérico usado na seleção de pais no algoritmo genético.
-- NetworkX: estrutura de grafos utilizada para roteamento e cálculo de distâncias.
-- OSMnx: construção e projeção de grafos de ruas a partir de OpenStreetMap.
-- geopy: geocodificação e reverso-geocodificação de coordenadas, usado pelo `OSMnxGraphGenerator` para nomear pontos.
-- scikit-learn: implementação do `KMeans` usada para agrupar destinos por veículo durante a geração heurística da população inicial.
-- Shapely e PyProj: manipulação de geometrias e transformação entre CRS.
-- Matplotlib: dependência opcional para implementações de `IPlotter`.
+## Caching Overview
 
-O arquivo `requirements.txt` contém todas as dependências necessárias e pode ser instalado com `pip install -r requirements.txt`.
+The project uses two separate caching layers:
 
-## Configuração
+1. **OSMnx HTTP cache** for OpenStreetMap downloads;
+2. **application-level SQLite caches** for:
+   - geocoding results;
+   - adjacency segments.
 
-### Cache do OSMnx
+### Graph Identity
 
-O `OSMnxGraphGenerator` aceita um parâmetro `cache_folder` que define onde os dados baixados do OpenStreetMap serão armazenados em disco. Isso evita requisições repetidas à API do OSM durante o desenvolvimento.
+Each generated graph is assigned a deterministic `graph_id` derived from:
 
-O valor é resolvido na seguinte ordem de precedência:
-1. Parâmetro `cache_folder` passado explicitamente ao construtor.
-2. Variável de ambiente `OSMNX_CACHE_FOLDER`.
-3. Valor padrão: `"cache"` (diretório relativo à raiz do projeto).
+- normalized bbox coordinates;
+- the effective graph-selection spec:
+  - canonicalized `custom_filter` when present;
+  - otherwise `network_type`.
 
-Exemplo via variável de ambiente:
-```bash
-export OSMNX_CACHE_FOLDER=/tmp/osmnx_cache
-uvicorn api.main:app --reload
-```
+This `graph_id` is exposed through `GraphContext` and `RouteCalculator`, and is used to namespace adjacency cache entries safely.
 
-Exemplo via parâmetro (em `api/dependencies.py` ou `console/main.py`):
-```python
-OSMnxGraphGenerator(cache_folder="/tmp/osmnx_cache")
-```
+### Segment Cache Key
+
+Adjacency cache keys are composed from:
+
+- `graph_id`
+- `start_node_id`
+- `end_node_id`
+- `weight_type`
+- `cost_type`
+
+This prevents collisions across different graph downloads or route-metric configurations.
+
+## Configuration
+
+### OSMnx Cache Folder
+
+`OSMnxGraphGenerator` resolves its cache folder with the following precedence:
+
+1. constructor argument `cache_folder`;
+2. environment variable `OSMNX_CACHE_FOLDER`;
+3. default project-relative folder: `cache`.
+
+### Persistent Cache Files
+
+The default API and console wiring use:
+
+- `cache/geocoding.db`
+- `cache/adjacency_segments.db`
+
+## Notes
+
+- `weight_type="eta"` is the currently supported weight strategy in the route calculator.
+- `cost_type="priority"` enables aggregated priority-weighted fitness.
+- when `cost_type` is disabled, the fleet fitness falls back to `max_vehicle_eta`.
+- empty vehicles are valid individuals and remain represented in the output.
+- change details and release-by-release implementation notes belong in `changelog/`, not in this README.

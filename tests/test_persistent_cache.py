@@ -8,7 +8,7 @@ import networkx as nx
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.domain.models import RouteNode
-from src.infrastructure.cache import (
+from src.infrastructure.caching import (
     CachedAdjacencyMatrixBuilder,
     CachedGeocodingResolver,
     SQLiteAdjacencySegmentCache,
@@ -83,6 +83,7 @@ def test_cached_adjacency_matrix_builder_reuses_persisted_segments():
         calculator = FakeRouteCalculator()
         calculator.graph = nx.MultiDiGraph()
         calculator.graph.graph["crs"] = "EPSG:3857"
+        calculator.graph.graph["graph_id"] = "persistent-test-graph"
         nodes = make_nodes(2)
 
         first_matrix = builder.build(
@@ -94,8 +95,11 @@ def test_cached_adjacency_matrix_builder_reuses_persisted_segments():
 
         assert sorted(first_matrix) == sorted(second_matrix)
         assert first_matrix[(1, 2)].eta == second_matrix[(1, 2)].eta
-        with sqlite3.connect(os.path.join(temp_dir, "adjacency.db")) as connection:
+        connection = sqlite3.connect(os.path.join(temp_dir, "adjacency.db"))
+        try:
             count = connection.execute(
                 "SELECT COUNT(*) FROM adjacency_segment_cache"
             ).fetchone()[0]
+        finally:
+            connection.close()
         assert count == 6

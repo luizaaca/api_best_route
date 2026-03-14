@@ -14,6 +14,11 @@ class RouteCalculator(IRouteCalculator):
     def __init__(self, graph: nx.MultiDiGraph):
         self.graph = graph
 
+    @property
+    def graph_id(self) -> str:
+        """Return the deterministic cache identifier of the bound graph."""
+        return str(self.graph.graph.get("graph_id", "unknown-graph"))
+
     def compute_segment(
         self,
         start_node: RouteNode,

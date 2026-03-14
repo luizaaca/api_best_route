@@ -5,6 +5,9 @@ from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
 
 @runtime_checkable
 class IRouteCalculator(Protocol):
+    @property
+    def graph_id(self) -> str: ...
+
     def compute_segment(
         self,
         start_node: RouteNode,

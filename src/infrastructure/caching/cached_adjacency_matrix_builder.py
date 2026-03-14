@@ -1,0 +1,60 @@
+from src.domain.interfaces import (
+    IAdjacencyMatrixBuilder,
+    IAdjacencySegmentCache,
+    IRouteCalculator,
+)
+from src.domain.models import RouteNode, RouteSegment
+
+
+class CachedAdjacencyMatrixBuilder(IAdjacencyMatrixBuilder):
+    """Build adjacency matrices while reusing cached segments when available."""
+
+    def __init__(self, segment_cache: IAdjacencySegmentCache):
+        """Store the segment cache used across matrix builds."""
+        self._segment_cache = segment_cache
+
+    def build(
+        self,
+        route_calculator: IRouteCalculator,
+        route_nodes: list[RouteNode],
+        weight_type: str = "eta",
+        cost_type: str | None = "priority",
+    ) -> dict[tuple[int, int], RouteSegment]:
+        """Build an adjacency matrix while filling and reading the segment cache."""
+        weight_function = route_calculator.get_weight_function(weight_type)
+        cost_function = route_calculator.get_cost_function(cost_type)
+        graph_key = route_calculator.graph_id
+        matrix: dict[tuple[int, int], RouteSegment] = {}
+
+        for i, from_node in enumerate(route_nodes):
+            for j, to_node in enumerate(route_nodes):
+                if i == j:
+                    continue
+                cached_segment = self._segment_cache.get_segment(
+                    graph_key,
+                    from_node.node_id,
+                    to_node.node_id,
+                    weight_type,
+                    cost_type,
+                )
+                if cached_segment is not None:
+                    matrix[(from_node.node_id, to_node.node_id)] = cached_segment
+                    continue
+
+                segment = route_calculator.compute_segment(
+                    start_node=from_node,
+                    end_node=to_node,
+                    weight_function=weight_function,
+                    cost_function=cost_function,
+                )
+                self._segment_cache.set_segment(
+                    graph_key,
+                    from_node.node_id,
+                    to_node.node_id,
+                    weight_type,
+                    cost_type,
+                    segment,
+                )
+                matrix[(from_node.node_id, to_node.node_id)] = segment
+
+        return matrix

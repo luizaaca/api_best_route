@@ -12,7 +12,7 @@ class AdjacencyCostPopulationDistanceStrategy(BaseAdjacencyPopulationDistanceStr
         self,
         start_node: RouteNode,
         end_node: RouteNode,
-    ) -> float:
+    ) -> float | None:
         """Return the precomputed segment cost between two nodes."""
         segment = self._get_segment(start_node, end_node)
-        return float(segment.cost if segment.cost is not None else segment.eta)
+        return float(segment.cost) if segment.cost is not None else None

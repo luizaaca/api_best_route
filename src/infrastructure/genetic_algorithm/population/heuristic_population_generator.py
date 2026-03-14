@@ -18,12 +18,32 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
         """Store the distance strategy used during heuristic ordering."""
         self._distance_strategy = distance_strategy
 
+    def _require_distance(self, start_node: RouteNode, end_node: RouteNode) -> float:
+        """Return a distance value or fail clearly when the metric is unavailable."""
+        distance = self._distance_strategy.distance(start_node, end_node)
+        if distance is None:
+            raise ValueError(
+                "Heuristic distance strategy returned no distance for "
+                f"segment {start_node.node_id}->{end_node.node_id}."
+            )
+        return distance
+
+    def _resolve_mixed_strategy(
+        self,
+        cluster_nodes: list[RouteNode],
+        rng: random.Random,
+    ) -> str:
+        """Pick a reproducible ordering strategy for the mixed heuristic mode."""
+        if not self.should_use_convex_hull(cluster_nodes):
+            return "nearest_neighbor"
+        return rng.choice(["nearest_neighbor", "hull_guided"])
+
     def route_distance(self, origin: RouteNode, nodes: list[RouteNode]) -> float:
         """Measure the cumulative heuristic distance of an ordered node path."""
         total_distance = 0.0
         current = origin
         for node in nodes:
-            total_distance += self._distance_strategy.distance(current, node)
+            total_distance += self._require_distance(current, node)
             current = node
         return total_distance
 
@@ -76,7 +96,7 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
         while remaining_nodes:
             next_node = min(
                 remaining_nodes,
-                key=lambda node: self._distance_strategy.distance(current_node, node),
+                key=lambda node: self._require_distance(current_node, node),
             )
             ordered_nodes.append(next_node)
             remaining_nodes.remove(next_node)
@@ -128,11 +148,11 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
         for index in range(len(ordered_nodes) + 1):
             previous_node = origin if index == 0 else ordered_nodes[index - 1]
             next_node = ordered_nodes[index] if index < len(ordered_nodes) else None
-            added_distance = self._distance_strategy.distance(previous_node, candidate)
+            added_distance = self._require_distance(previous_node, candidate)
             removed_distance = 0.0
             if next_node is not None:
-                added_distance += self._distance_strategy.distance(candidate, next_node)
-                removed_distance = self._distance_strategy.distance(
+                added_distance += self._require_distance(candidate, next_node)
+                removed_distance = self._require_distance(
                     previous_node,
                     next_node,
                 )
@@ -154,7 +174,7 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
 
         entry_node = min(
             hull_nodes,
-            key=lambda node: self._distance_strategy.distance(origin, node),
+            key=lambda node: self._require_distance(origin, node),
         )
         clockwise = self.rotate_nodes(hull_nodes, entry_node)
         counterclockwise = self.rotate_nodes(list(reversed(hull_nodes)), entry_node)
@@ -188,17 +208,15 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
         origin: RouteNode,
         clustered_destinations: list[list[RouteNode]],
         ordering_strategy: str = "mixed",
+        rng: random.Random | None = None,
     ) -> Individual:
         """Build one valid individual from already-clustered destinations."""
+        strategy_rng = rng or random.Random()
         individual: Individual = []
         for cluster in clustered_destinations:
             strategy = ordering_strategy
             if ordering_strategy == "mixed":
-                strategy = (
-                    "hull_guided"
-                    if self.should_use_convex_hull(cluster)
-                    else "nearest_neighbor"
-                )
+                strategy = self._resolve_mixed_strategy(cluster, strategy_rng)
             ordered_cluster = self.order_cluster_destinations(origin, cluster, strategy)
             individual.append([origin, *ordered_cluster])
         return individual
@@ -207,19 +225,21 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
     def perturb_clustered_individual(
         individual: Individual,
         intensity: int = 1,
+        rng: random.Random | None = None,
     ) -> Individual:
         """Apply small local perturbations to diversify heuristic seeds."""
+        strategy_rng = rng or random.Random()
         perturbed = copy.deepcopy(individual)
         for _ in range(max(1, intensity)):
             candidate_routes = [route for route in perturbed if len(route) > 2]
             if not candidate_routes:
                 break
-            route = random.choice(candidate_routes)
+            route = strategy_rng.choice(candidate_routes)
             positions = list(range(1, len(route)))
             if len(positions) < 2:
                 continue
-            mutation_type = random.choice(("swap", "insert", "reverse"))
-            first_index, second_index = sorted(random.sample(positions, 2))
+            mutation_type = strategy_rng.choice(("swap", "insert", "reverse"))
+            first_index, second_index = sorted(strategy_rng.sample(positions, 2))
             if mutation_type == "swap":
                 route[first_index], route[second_index] = (
                     route[second_index],
@@ -249,6 +269,7 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
         vehicle_slots = max(1, vehicle_count)
         heuristic_population: Population = []
         for seed_index in range(population_size):
+            strategy_rng = random.Random(seed_index)
             clustered_destinations = self.cluster_destinations(
                 destinations,
                 vehicle_slots,
@@ -258,11 +279,13 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
                 origin,
                 clustered_destinations,
                 ordering_strategy="mixed",
+                rng=strategy_rng,
             )
             if seed_index > 0:
                 individual = self.perturb_clustered_individual(
                     individual,
                     intensity=seed_index,
+                    rng=strategy_rng,
                 )
             heuristic_population.append(individual)
         return heuristic_population

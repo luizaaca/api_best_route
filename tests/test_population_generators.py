@@ -1,11 +1,13 @@
 import os
 import random
 import sys
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.domain.models import RouteNode
 from src.infrastructure.genetic_algorithm import (
+    AdjacencyCostPopulationDistanceStrategy,
     AdjacencyEtaPopulationDistanceStrategy,
     EuclideanPopulationDistanceStrategy,
     HeuristicPopulationGenerator,
@@ -100,3 +102,53 @@ def test_heuristic_population_generator_uses_distance_strategy():
         sorted(flatten_destination_ids(individual)) == [2, 3, 4, 5]
         for individual in population
     )
+
+
+def test_adjacency_cost_distance_strategy_returns_none_without_cost():
+    calculator = FakeRouteCalculator()
+    origin, destination = make_nodes(1)
+    adjacency_matrix = build_adjacency_matrix(
+        calculator,
+        [origin, destination],
+        cost_type=None,
+    )
+    strategy = AdjacencyCostPopulationDistanceStrategy(adjacency_matrix)
+
+    assert strategy.distance(origin, destination) is None
+
+
+def test_heuristic_population_generator_fails_clearly_when_distance_missing():
+    calculator = FakeRouteCalculator()
+    nodes = make_nodes(2)
+    adjacency_matrix = build_adjacency_matrix(calculator, nodes, cost_type=None)
+    generator = HeuristicPopulationGenerator(
+        AdjacencyCostPopulationDistanceStrategy(adjacency_matrix)
+    )
+
+    with pytest.raises(ValueError, match="returned no distance"):
+        generator.generate(nodes, population_size=1, vehicle_count=1)
+
+
+def test_mixed_ordering_diversifies_heuristic_population_when_hull_is_eligible():
+    origin = RouteNode("Origin", 1, (0.0, 0.0))
+    destinations = [
+        RouteNode("Node 2", 2, (0.0, 10.0)),
+        RouteNode("Node 3", 3, (10.0, 10.0)),
+        RouteNode("Node 4", 4, (10.0, 0.0)),
+        RouteNode("Node 5", 5, (5.0, -5.0)),
+        RouteNode("Node 6", 6, (4.0, 4.0)),
+        RouteNode("Node 7", 7, (6.0, 5.0)),
+    ]
+    generator = HeuristicPopulationGenerator(EuclideanPopulationDistanceStrategy())
+
+    individuals = [
+        generator.build_clustered_individual(
+            origin,
+            [destinations],
+            ordering_strategy="mixed",
+            rng=random.Random(seed),
+        )
+        for seed in range(6)
+    ]
+
+    assert len({tuple(flatten_destination_ids(individual)) for individual in individuals}) >= 2

@@ -1,9 +1,11 @@
+import os
+import hashlib
 from typing import Callable, Union
+
+import networkx as nx
+import osmnx as ox
 from pyproj import Transformer
 from shapely.geometry import MultiPoint
-import osmnx as ox
-import networkx as nx
-import os
 
 from src.domain.interfaces import IGeocodingResolver, IGraphGenerator
 from src.domain.models import GraphContext, RouteNode
@@ -16,7 +18,7 @@ class OSMnxGraphGenerator(IGraphGenerator):
         self,
         geocoder: IGeocodingResolver,
         network_type: str = "drive",
-        custom_filter: str | None = None,
+        custom_filter: str | list[str] | None = None,
         cache_folder: str | None = None,
     ):
         self.network_type = network_type
@@ -38,6 +40,55 @@ class OSMnxGraphGenerator(IGraphGenerator):
         ]
         print(f"OSMnx cache folder set to: {ox.settings.cache_folder}")
 
+    @staticmethod
+    def _normalize_coordinate(value: float) -> str:
+        """Return a stable textual representation for bbox coordinates."""
+        return f"{float(value):.6f}"
+
+    @staticmethod
+    def _normalize_filter_fragment(filter_fragment: str) -> str:
+        """Normalize whitespace so equivalent Overpass filters hash identically."""
+        return " ".join(filter_fragment.split())
+
+    @classmethod
+    def _build_graph_selection_spec(
+        cls,
+        network_type: str,
+        custom_filter: str | list[str] | None,
+    ) -> str:
+        """Return the canonical graph-selection specification for cache identity."""
+        if custom_filter is None:
+            return f"network_type:{network_type}"
+        if isinstance(custom_filter, list):
+            normalized_filters = sorted(
+                cls._normalize_filter_fragment(filter_item)
+                for filter_item in custom_filter
+            )
+            return f"custom_filter_list:{'||'.join(normalized_filters)}"
+        return f"custom_filter:{cls._normalize_filter_fragment(custom_filter)}"
+
+    @classmethod
+    def _build_graph_id(
+        cls,
+        center: tuple[float, float],
+        dist: float,
+        network_type: str,
+        custom_filter: str | list[str] | None,
+    ) -> str:
+        """Build a deterministic graph identifier from bbox and selection spec."""
+        west, south, east, north = ox.utils_geo.bbox_from_point(center, dist=dist)
+        selection_spec = cls._build_graph_selection_spec(network_type, custom_filter)
+        unique_str = ":".join(
+            [
+                cls._normalize_coordinate(north),
+                cls._normalize_coordinate(south),
+                cls._normalize_coordinate(east),
+                cls._normalize_coordinate(west),
+                selection_spec,
+            ]
+        )
+        return hashlib.md5(unique_str.encode("utf-8")).hexdigest()[:12]
+
     def initialize(
         self,
         origin: Union[str, tuple[float, float]],
@@ -50,6 +101,12 @@ class OSMnxGraphGenerator(IGraphGenerator):
             [info[0] for info in all_locations_info]
         )
         g_proj = self._create_projected_graph(center, radius)
+        g_proj.graph["graph_id"] = self._build_graph_id(
+            center,
+            radius,
+            self.network_type,
+            self.custom_filter,
+        )
         route_nodes_raw = self._find_route_nodes(g_proj, all_locations_info)
         self._set_node_priorities(
             g_proj, route_nodes_raw[1:], [dest[1] for dest in destinations]
