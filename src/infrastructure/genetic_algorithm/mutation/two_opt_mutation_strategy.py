@@ -5,14 +5,15 @@ single vehicle route, approximating a 2-opt local-search move while preserving
 the multi-vehicle representation.
 """
 
-import copy
 import random
 
 from src.domain.interfaces import IMutationStrategy
 from src.domain.models import Individual
 
+from .base_copying_mutation_strategy import BaseCopyingMutationStrategy
 
-class TwoOptMutationStrategy(IMutationStrategy):
+
+class TwoOptMutationStrategy(BaseCopyingMutationStrategy, IMutationStrategy):
     """Mutate an individual with a 2-opt-style subsequence reversal.
 
     The strategy selects one candidate vehicle route and reverses a contiguous
@@ -20,8 +21,7 @@ class TwoOptMutationStrategy(IMutationStrategy):
     position.
     """
 
-    @staticmethod
-    def _apply_two_opt(solution: Individual) -> None:
+    def _mutate_in_place(self, solution: Individual) -> None:
         """Reverse a destination subsequence inside one eligible route.
 
         Args:
@@ -39,23 +39,3 @@ class TwoOptMutationStrategy(IMutationStrategy):
         route[start_index : end_index + 1] = reversed(
             route[start_index : end_index + 1]
         )
-
-    def mutate(
-        self,
-        solution: Individual,
-        mutation_probability: float,
-    ) -> Individual:
-        """Return a mutated copy of the provided solution.
-
-        Args:
-            solution: Individual selected for mutation.
-            mutation_probability: Probability that the mutation is applied.
-
-        Returns:
-            A deep-copied individual that may contain a 2-opt-style local
-            improvement move when the mutation is triggered.
-        """
-        mutated_solution = copy.deepcopy(solution)
-        if random.random() < mutation_probability:
-            self._apply_two_opt(mutated_solution)
-        return mutated_solution

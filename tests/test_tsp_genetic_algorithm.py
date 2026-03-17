@@ -17,12 +17,18 @@ from src.domain.interfaces import (
 )
 from src.infrastructure.genetic_algorithm import (
     AdjacencyEtaPopulationDistanceStrategy,
+    CycleCrossoverStrategy,
+    EdgeRecombinationCrossoverStrategy,
     HeuristicPopulationGenerator,
     HybridPopulationGenerator,
+    InsertionMutationStrategy,
+    InversionMutationStrategy,
     OrderCrossoverStrategy,
     PartiallyMappedCrossoverStrategy,
+    RankSelectionStrategy,
     RandomPopulationGenerator,
     RoulleteSelectionStrategy,
+    StochasticUniversalSamplingSelectionStrategy,
     SwapAndRedistributeMutationStrategy,
     TournamentSelectionStrategy,
     TwoOptMutationStrategy,
@@ -267,6 +273,36 @@ def test_partially_mapped_crossover_preserves_all_destinations_and_origins():
     )
 
 
+def test_cycle_crossover_preserves_all_destinations_and_origins():
+    random.seed(23)
+    origin, n2, n3, n4, n5, n6 = make_nodes(5)
+    parent1 = [[origin, n2, n3, n4], [origin, n5, n6]]
+    parent2 = [[origin, n4, n6], [origin, n2, n5, n3]]
+
+    child = CycleCrossoverStrategy().crossover(parent1, parent2)
+
+    assert len(child) == 2
+    assert all(route[0].node_id == origin.node_id for route in child)
+    assert sorted(flatten_destination_ids(child)) == sorted(
+        [n2.node_id, n3.node_id, n4.node_id, n5.node_id, n6.node_id]
+    )
+
+
+def test_edge_recombination_crossover_preserves_all_destinations_and_origins():
+    random.seed(29)
+    origin, n2, n3, n4, n5, n6 = make_nodes(5)
+    parent1 = [[origin, n2, n3, n4], [origin, n5, n6]]
+    parent2 = [[origin, n6, n4], [origin, n3, n5, n2]]
+
+    child = EdgeRecombinationCrossoverStrategy().crossover(parent1, parent2)
+
+    assert len(child) == 2
+    assert all(route[0].node_id == origin.node_id for route in child)
+    assert sorted(flatten_destination_ids(child)) == sorted(
+        [n2.node_id, n3.node_id, n4.node_id, n5.node_id, n6.node_id]
+    )
+
+
 def test_mutate_preserves_all_destinations_and_origins():
     random.seed(2)
     origin, n2, n3, n4, n5 = make_nodes(4)
@@ -299,6 +335,66 @@ def test_two_opt_mutation_preserves_all_destinations_and_origins():
     )
 
 
+def test_inversion_mutation_preserves_all_destinations_and_origins():
+    random.seed(31)
+    origin, n2, n3, n4, n5 = make_nodes(4)
+    individual = [[origin, n2, n3, n4, n5], [origin]]
+
+    mutated = InversionMutationStrategy().mutate(
+        individual,
+        mutation_probability=1.0,
+    )
+
+    assert len(mutated) == 2
+    assert all(route[0].node_id == origin.node_id for route in mutated)
+    assert sorted(flatten_destination_ids(mutated)) == sorted(
+        [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
+    )
+
+
+def test_inversion_mutation_respects_zero_probability():
+    random.seed(37)
+    origin, n2, n3, n4 = make_nodes(3)
+    individual = [[origin, n2, n3, n4], [origin]]
+
+    mutated = InversionMutationStrategy().mutate(
+        individual,
+        mutation_probability=0.0,
+    )
+
+    assert route_signature(mutated) == route_signature(individual)
+
+
+def test_insertion_mutation_preserves_all_destinations_and_origins():
+    random.seed(41)
+    origin, n2, n3, n4, n5 = make_nodes(4)
+    individual = [[origin, n2], [origin, n3, n4, n5]]
+
+    mutated = InsertionMutationStrategy().mutate(
+        individual,
+        mutation_probability=1.0,
+    )
+
+    assert len(mutated) == 2
+    assert all(route[0].node_id == origin.node_id for route in mutated)
+    assert sorted(flatten_destination_ids(mutated)) == sorted(
+        [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
+    )
+
+
+def test_insertion_mutation_respects_zero_probability():
+    random.seed(43)
+    origin, n2, n3, n4 = make_nodes(3)
+    individual = [[origin, n2], [origin, n3, n4]]
+
+    mutated = InsertionMutationStrategy().mutate(
+        individual,
+        mutation_probability=0.0,
+    )
+
+    assert route_signature(mutated) == route_signature(individual)
+
+
 def test_tournament_selection_returns_population_members():
     random.seed(19)
     nodes = make_nodes(4)
@@ -318,6 +414,82 @@ def test_tournament_selection_returns_population_members():
         population,
         evaluated_population,
         optimizer._fitness,
+    )
+
+    assert parent1 in population
+    assert parent2 in population
+
+
+def test_rank_selection_returns_population_members():
+    random.seed(47)
+    nodes = make_nodes(4)
+    adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
+    optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
+    population = optimizer._population_generator.generate(
+        nodes,
+        population_size=4,
+        vehicle_count=2,
+    )
+    evaluated_population = [
+        optimizer._evaluate_individual(individual, adjacency_matrix)
+        for individual in population
+    ]
+
+    parent1, parent2 = RankSelectionStrategy().select_parents(
+        population,
+        evaluated_population,
+        optimizer._fitness,
+    )
+
+    assert parent1 in population
+    assert parent2 in population
+
+
+def test_sus_selection_returns_population_members():
+    random.seed(53)
+    nodes = make_nodes(4)
+    adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
+    optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
+    population = optimizer._population_generator.generate(
+        nodes,
+        population_size=4,
+        vehicle_count=2,
+    )
+    evaluated_population = [
+        optimizer._evaluate_individual(individual, adjacency_matrix)
+        for individual in population
+    ]
+
+    parent1, parent2 = StochasticUniversalSamplingSelectionStrategy().select_parents(
+        population,
+        evaluated_population,
+        optimizer._fitness,
+    )
+
+    assert parent1 in population
+    assert parent2 in population
+
+
+def test_sus_selection_handles_identical_fitness_values():
+    random.seed(59)
+    nodes = make_nodes(2)
+    origin, n2, n3 = nodes
+    individual = [[origin, n2], [origin, n3]]
+    population = [copy.deepcopy(individual) for _ in range(4)]
+    evaluated_population = [
+        RouteSegmentsInfo(
+            segments=[],
+            total_eta=10.0,
+            total_length=100.0,
+            total_cost=5.0,
+        )
+        for _ in range(4)
+    ]
+
+    parent1, parent2 = StochasticUniversalSamplingSelectionStrategy().select_parents(
+        population,
+        evaluated_population,
+        lambda info: info.total_eta,
     )
 
     assert parent1 in population
