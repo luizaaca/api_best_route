@@ -140,17 +140,7 @@ classDiagram
     class ICrossoverStrategy
     class IMutationStrategy
     class IPopulationGenerator
-    class RoulleteSelectionStrategy
-    class OrderCrossoverStrategy
-    class SwapAndRedistributeMutationStrategy
-    class HybridPopulationGenerator
-    class RandomPopulationGenerator
-    class HeuristicPopulationGenerator
     class IHeuristicDistanceStrategy
-    class EuclideanPopulationDistanceStrategy
-    class AdjacencyLengthPopulationDistanceStrategy
-    class AdjacencyEtaPopulationDistanceStrategy
-    class AdjacencyCostPopulationDistanceStrategy
 
     TSPGeneticAlgorithm --> ISelectionStrategy
     TSPGeneticAlgorithm --> ICrossoverStrategy
@@ -158,7 +148,18 @@ classDiagram
     TSPGeneticAlgorithm --> IPopulationGenerator
 
     RoulleteSelectionStrategy ..|> ISelectionStrategy
+    RankSelectionStrategy ..|> ISelectionStrategy
+    StochasticUniversalSamplingSelectionStrategy ..|> ISelectionStrategy
+    TournamentSelectionStrategy ..|> ISelectionStrategy
+
     OrderCrossoverStrategy ..|> ICrossoverStrategy
+    CycleCrossoverStrategy ..|> ICrossoverStrategy
+    PartiallyMappedCrossoverStrategy ..|> ICrossoverStrategy
+    EdgeRecombinationCrossoverStrategy ..|> ICrossoverStrategy
+
+    InsertionMutationStrategy ..|> IMutationStrategy
+    InversionMutationStrategy ..|> IMutationStrategy
+    TwoOptMutationStrategy ..|> IMutationStrategy
     SwapAndRedistributeMutationStrategy ..|> IMutationStrategy
 
     HybridPopulationGenerator ..|> IPopulationGenerator

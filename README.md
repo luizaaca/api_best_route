@@ -145,6 +145,26 @@ classDiagram
     HybridPopulationGenerator --> HeuristicPopulationGenerator
 ```
 
+### Available GA Operators
+
+| Category | Implementation | Description |
+|---|---|---|
+| **Selection** | `RoulleteSelectionStrategy` | Fitness-proportionate selection via inverse-fitness weights |
+| | `RankSelectionStrategy` | Rank-based weights; avoids dominance by a single high-fitness individual |
+| | `StochasticUniversalSamplingSelectionStrategy` | Lower-variance roulette variant using two evenly-spaced pointers |
+| | `TournamentSelectionStrategy` | Samples K competitors and elects the best; pressure controlled by `tournament_size` |
+| **Crossover** | `OrderCrossoverStrategy` | Preserves relative order of a copied segment; fills remainder from the second parent |
+| | `CycleCrossoverStrategy` | Preserves absolute positions via position-to-position cycle tracing |
+| | `PartiallyMappedCrossoverStrategy` | Copies a middle segment and resolves conflicts via iterative mapping |
+| | `EdgeRecombinationCrossoverStrategy` | Preserves adjacency edges; builds a unified edge map from both parents |
+| **Mutation** | `InsertionMutationStrategy` | Removes one node and re-inserts it at a different position; supports cross-vehicle relocation |
+| | `InversionMutationStrategy` | Reverses the sub-sequence between two indices; local diversity operator |
+| | `TwoOptMutationStrategy` | Same reversal as inversion, motivated by 2-opt local search edge un-crossing |
+| | `SwapAndRedistributeMutationStrategy` | Combines cross-vehicle redistribution and within-route position swap |
+| **Population** | `RandomPopulationGenerator` | Produces fully shuffled random individuals |
+| | `HeuristicPopulationGenerator` | Seeds with nearest-neighbour or convex-hull ordering guided by a distance strategy |
+| | `HybridPopulationGenerator` | Composes random and heuristic generators at a configurable ratio |
+
 ### Heuristic Population Seeding
 
 The hybrid seeding pipeline combines:
