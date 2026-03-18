@@ -8,6 +8,7 @@ between waypoints.
 
 import copy
 import time
+from collections.abc import Callable
 from typing import Tuple
 
 from src.domain.interfaces import (
@@ -173,6 +174,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         crossover_strategy: ICrossoverStrategy | None = None,
         mutation_strategy: IMutationStrategy | None = None,
         population_generator: IPopulationGenerator | None = None,
+        logger: Callable[[str], None] | None = None,
     ):
         """Create an optimizer that delegates GA operations to injected collaborators.
 
@@ -185,6 +187,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
             crossover_strategy: Strategy for combining parents to create offspring.
             mutation_strategy: Strategy for mutating offspring solutions.
             population_generator: Generator for the initial population.
+            logger: Optional callable used to emit runtime messages.
 
         Raises:
             ValueError: If any required strategy dependency is not provided.
@@ -205,6 +208,12 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         self._crossover_strategy = crossover_strategy
         self._mutation_strategy = mutation_strategy
         self._population_generator = population_generator
+        self._logger = logger
+
+    def _log(self, message: str) -> None:
+        """Emit one runtime message when a logger is configured."""
+        if self._logger is not None:
+            self._logger(message)
 
     def solve(
         self,
@@ -238,7 +247,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
                 its fitness value (`best_fitness`), the final population size, and the
                 number of generations actually executed.
         """
-        print(f"Running optimizer with vehicle_count={vehicle_count}")
+        self._log(f"Running optimizer with vehicle_count={vehicle_count}")
         population = self._population_generator.generate(
             route_nodes, self.population_size, vehicle_count
         )
@@ -260,12 +269,12 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         while generation < max_generation:
             current_time = time.time() * 1000
             if current_time - start_time > max_processing_time:
-                print(
+                self._log(
                     f"Time limit of {max_processing_time} ms reached. Stopping the algorithm."
                 )
                 break
 
-            print(f"Processing generation {generation}...")
+            self._log(f"Processing generation {generation}...")
             generation += 1
             population_calculated: list[FleetRouteInfo] = [
                 self._evaluate_individual(individual, self._adjacency_matrix)
@@ -289,7 +298,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
                     population_calculated[0],
                 )
 
-            print(
+            self._log(
                 f"Generation {generation}: Best fitness = {best_fitness} - Elapsed time: {current_time - start_time:.2f} ms"
             )
             if self._plotter is not None:
@@ -313,11 +322,11 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
             population = new_population
 
         best_route = best_individual[1]
-        print("Best routes by vehicle:")
+        self._log("Best routes by vehicle:")
         for info in best_route.routes_by_vehicle:
             nodes = " -> ".join([seg.name for seg in info.segments])
-            print(f"  Vehicle {info.vehicle_id}: {nodes}")
-        print(f"Total aggregated cost: {best_route.total_cost or 0.0}")
+            self._log(f"  Vehicle {info.vehicle_id}: {nodes}")
+        self._log(f"Total aggregated cost: {best_route.total_cost or 0.0}")
 
         return OptimizationResult(
             best_route=best_route,

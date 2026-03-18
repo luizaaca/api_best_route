@@ -1,0 +1,34 @@
+{
+  "mode": "random",
+  "problem": {
+    "origin": "Praça da República, São Paulo",
+    "destinations": [
+      {"location": "Edifício Copan, São Paulo", "priority": 1},
+      {"location": "Mercado Municipal de São Paulo", "priority": 2},
+      {"location": "Pátio do Colégio, São Paulo", "priority": 1},
+      {"location": "Pinacoteca de São Paulo", "priority": 3}
+    ],
+    "weight_type": "eta",
+    "cost_type": "priority"
+  },
+  "output": {
+    "plot": false,
+    "verbose": false,
+    "show_best_run_details": true
+  },
+  "random_search": {
+    "n": 8,
+    "seed": 42,
+    "allowed_generators": ["random", "heuristic", "hybrid"],
+    "allowed_selection": ["roulette", "rank", "sus", "tournament"],
+    "allowed_crossover": ["order", "pmx", "cycle", "edge_recombination"],
+    "allowed_mutation": ["swap_redistribute", "inversion", "insertion", "two_opt"],
+    "ranges": {
+      "population_size": {"type": "int", "min": 10, "max": 30},
+      "mutation_probability": {"type": "float", "min": 0.2, "max": 0.8, "round": 3},
+      "max_generation": {"type": "int", "min": 50, "max": 150},
+      "max_processing_time": {"type": "int", "min": 10000, "max": 20000},
+      "vehicle_count": {"type": "int", "min": 1, "max": 2}
+    }
+  }
+}

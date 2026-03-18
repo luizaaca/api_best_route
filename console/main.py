@@ -5,6 +5,12 @@ construct the application services and run the genetic algorithm from a
 standalone script.
 """
 
+import argparse
+
+from console.lab.config import LabConfigLoader
+from console.lab.orchestration import LabBenchmarkRunner
+from console.lab.reporting import LabConsoleReportRenderer
+from console.lab.runtime_logging import build_runtime_logger
 from src.application.route_optimization_service import RouteOptimizationService
 from src.infrastructure.caching import (
     CachedAdjacencyMatrixBuilder,
@@ -29,6 +35,32 @@ from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
 from src.infrastructure.route_calculator import RouteCalculator
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
 from src.infrastructure.matplotlib_plotter import MatplotlibPlotter
+
+
+def _build_graph_generator(logger=None) -> OSMnxGraphGenerator:
+    """Create the shared graph generator used by console flows.
+
+    Returns:
+        A configured graph generator with persistent geocoding cache.
+    """
+    return OSMnxGraphGenerator(
+        geocoder=CachedGeocodingResolver(
+            cache=SQLiteGeocodingCache("cache/geocoding.db"),
+            fallback_resolver=PhotonGeocodingResolver(),
+        ),
+        logger=logger,
+    )
+
+
+def _build_adjacency_matrix_builder() -> CachedAdjacencyMatrixBuilder:
+    """Create the shared adjacency-matrix builder used by console flows.
+
+    Returns:
+        A configured adjacency-matrix builder with persistent SQLite cache.
+    """
+    return CachedAdjacencyMatrixBuilder(
+        SQLiteAdjacencySegmentCache("cache/adjacency_segments.db")
+    )
 
 
 def _build_population_distance_strategy(adjacency_matrix, weight_type, cost_type):
@@ -95,12 +127,7 @@ def run_console_example():
     command line, using hard-coded locations and parameters.
     """
     service = RouteOptimizationService(
-        graph_generator=OSMnxGraphGenerator(
-            geocoder=CachedGeocodingResolver(
-                cache=SQLiteGeocodingCache("cache/geocoding.db"),
-                fallback_resolver=PhotonGeocodingResolver(),
-            )
-        ),
+        graph_generator=_build_graph_generator(),
         route_calculator_factory=RouteCalculator,
         optimizer_factory=_build_default_optimizer,
         plotter_factory=MatplotlibPlotter,
@@ -154,5 +181,69 @@ def run_console_example():
     input("\nPressione Enter para sair...")
 
 
-if __name__ == "__main__":
+def run_lab_benchmark(config_file: str) -> None:
+    """Run the sequential console lab benchmark for a JSON config file.
+
+    Args:
+        config_file: Path to the lab JSON configuration file.
+    """
+    session_config = LabConfigLoader.load(config_file)
+    logger = build_runtime_logger(session_config.output.verbose)
+    runner = LabBenchmarkRunner(
+        graph_generator=_build_graph_generator(logger=logger),
+        route_calculator_factory=RouteCalculator,
+        adjacency_matrix_builder=_build_adjacency_matrix_builder(),
+        plotter_factory=MatplotlibPlotter,
+        logger=logger,
+    )
+    report = runner.run(config_file, session_config=session_config)
+    print(LabConsoleReportRenderer.render(report))
+
+
+def _build_argument_parser() -> argparse.ArgumentParser:
+    """Create the console argument parser.
+
+    Returns:
+        The configured top-level argument parser.
+    """
+    parser = argparse.ArgumentParser(
+        description=(
+            "Console entrypoint for route optimization. Run the legacy "
+            "interactive example or execute lab-mode benchmark sessions "
+            "from JSON configuration files."
+        )
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    lab_parser = subparsers.add_parser(
+        "lab",
+        help="Run a sequential lab-mode benchmark session from a JSON config file.",
+    )
+    lab_parser.add_argument(
+        "--config",
+        required=True,
+        help=(
+            "Path to a lab JSON configuration file, for example "
+            "'lab/explicit.config.json', 'lab/grid.config.json', or "
+            "'lab/random.config.json'."
+        ),
+    )
+    return parser
+
+
+def main() -> None:
+    """Dispatch the requested console command.
+
+    When no subcommand is provided, the legacy demo flow is executed to preserve
+    backwards compatibility with the original console example.
+    """
+    parser = _build_argument_parser()
+    args = parser.parse_args()
+    if args.command == "lab":
+        run_lab_benchmark(args.config)
+        return
     run_console_example()
+
+
+if __name__ == "__main__":
+    main()

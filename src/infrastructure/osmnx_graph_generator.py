@@ -8,6 +8,7 @@ location.
 
 import os
 import hashlib
+import re
 from typing import Callable, Union
 
 import networkx as nx
@@ -22,12 +23,17 @@ from src.domain.models import GraphContext, RouteNode
 class OSMnxGraphGenerator(IGraphGenerator):
     """Graph generator using OSMnx to build and project a street network."""
 
+    _COORDINATE_STRING_PATTERN = re.compile(
+        r"^\s*(?P<lat>-?\d+(?:\.\d+)?)\s*,\s*(?P<lon>-?\d+(?:\.\d+)?)\s*$"
+    )
+
     def __init__(
         self,
         geocoder: IGeocodingResolver,
         network_type: str = "drive",
         custom_filter: str | list[str] | None = None,
         cache_folder: str | None = None,
+        logger: Callable[[str], None] | None = None,
     ):
         """Initialize the graph generator with geocoding and OSMnx settings.
 
@@ -38,12 +44,14 @@ class OSMnxGraphGenerator(IGraphGenerator):
             custom_filter: Optional Overpass API filter(s) to apply to the
                 graph extraction.
             cache_folder: Optional folder path to store OSMnx cache files.
+            logger: Optional callable used to emit runtime messages.
         """
         self.network_type = network_type
         self.custom_filter = custom_filter
         self._geocoder = geocoder
+        self._logger = logger
 
-        print("Configuring OSMnx settings...")
+        self._log("Configuring OSMnx settings...")
         ox.settings.use_cache = True
         ox.settings.cache_folder = cache_folder or os.getenv(
             "OSMNX_CACHE_FOLDER", "cache"
@@ -56,7 +64,12 @@ class OSMnxGraphGenerator(IGraphGenerator):
             "surface",
             "oneway",
         ]
-        print(f"OSMnx cache folder set to: {ox.settings.cache_folder}")
+        self._log(f"OSMnx cache folder set to: {ox.settings.cache_folder}")
+
+    def _log(self, message: str) -> None:
+        """Emit one runtime message when a logger is configured."""
+        if self._logger is not None:
+            self._logger(message)
 
     @staticmethod
     def _normalize_coordinate(value: float) -> str:
@@ -67,6 +80,52 @@ class OSMnxGraphGenerator(IGraphGenerator):
     def _normalize_filter_fragment(filter_fragment: str) -> str:
         """Normalize whitespace so equivalent Overpass filters hash identically."""
         return " ".join(filter_fragment.split())
+
+    @classmethod
+    def _parse_coordinate_string(
+        cls,
+        location: str,
+    ) -> tuple[float, float] | None:
+        """Parse a string formatted as ``latitude, longitude``.
+
+        Args:
+            location: Text that may represent a coordinate pair.
+
+        Returns:
+            A ``(latitude, longitude)`` tuple when the input matches the
+            expected coordinate pattern; otherwise ``None``.
+        """
+        match = cls._COORDINATE_STRING_PATTERN.match(location)
+        if match is None:
+            return None
+        return (float(match.group("lat")), float(match.group("lon")))
+
+    @staticmethod
+    def _format_coords(coords: tuple[float, float]) -> str:
+        """Format coordinates for a stable fallback display name."""
+        return f"Coords: ({coords[0]:.4f}, {coords[1]:.4f})"
+
+    def _reverse_geocode_or_fallback(self, coords: tuple[float, float]) -> str:
+        """Resolve coordinates to a name, falling back to a formatted label."""
+        try:
+            return self._geocoder.reverse_geocode(coords)
+        except Exception:
+            return self._format_coords(coords)
+
+    def _resolve_location(
+        self, loc: Union[str, tuple[float, float]]
+    ) -> tuple[tuple[float, float], str]:
+        """Resolve a location input into coordinates and a human-readable name."""
+        if isinstance(loc, str):
+            parsed_coords = self._parse_coordinate_string(loc)
+            if parsed_coords is None:
+                self._log(f"Geocoding location: {loc}")
+                return self._geocoder.geocode(loc)
+            else:
+                loc = parsed_coords
+
+        self._log(f"Processing coordinates: {loc}")
+        return loc, self._reverse_geocode_or_fallback(loc)
 
     @classmethod
     def _build_graph_selection_spec(
@@ -161,20 +220,7 @@ class OSMnxGraphGenerator(IGraphGenerator):
         Returns:
             A list of tuples containing ((lat, lon), name) for each location.
         """
-        result = []
-        for loc in locations:
-            if isinstance(loc, str):
-                print(f"Geocoding location: {loc}")
-                lat_lon, name = self._geocoder.geocode(loc)
-            else:
-                print(f"Processing coordinates: {loc}")
-                try:
-                    name = self._geocoder.reverse_geocode(loc)
-                except Exception:
-                    name = f"Coords: ({loc[0]:.4f}, {loc[1]:.4f})"
-                lat_lon = loc
-            result.append((lat_lon, name))
-        return result
+        return [self._resolve_location(loc) for loc in locations]
 
     def _get_center_and_dist(
         self, coords: list[tuple[float, float]]
@@ -253,7 +299,7 @@ class OSMnxGraphGenerator(IGraphGenerator):
             x, y = transformer.transform(lon, lat)
             node_id = ox.distance.nearest_nodes(g_proj, X=x, Y=y)
             route_nodes.append((nome, node_id, (x, y)))
-            print(
+            self._log(
                 f"Location: {nome} -> Node ID: {node_id} | (x, y): ({x:.1f}, {y:.1f})"
             )
         return route_nodes

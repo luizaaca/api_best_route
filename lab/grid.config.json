@@ -1,0 +1,33 @@
+{
+  "mode": "grid",
+  "problem": {
+    "origin": "Praça da República, São Paulo",
+    "destinations": [
+      {"location": "Edifício Copan, São Paulo", "priority": 1},
+      {"location": "Mercado Municipal de São Paulo", "priority": 2},
+      {"location": "Pátio do Colégio, São Paulo", "priority": 1}
+    ],
+    "weight_type": "eta",
+    "cost_type": "priority"
+  },
+  "output": {
+    "plot": false,
+    "verbose": false,
+    "show_best_run_details": false
+  },
+  "defaults": {
+    "vehicle_count": 2,
+    "max_generation": 80,
+    "max_processing_time": 12000,
+    "population_generator": {"name": "hybrid", "params": {"heuristic_ratio": 0.4}},
+    "selection": {"name": "roulette", "params": {}},
+    "crossover": {"name": "order", "params": {}},
+    "mutation": {"name": "inversion", "params": {}}
+  },
+  "search_space": {
+    "population_size": [12, 24],
+    "mutation_probability": [0.3, 0.5, 0.7],
+    "selection.name": ["roulette", "rank"],
+    "mutation.name": ["inversion", "two_opt"]
+  }
+}

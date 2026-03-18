@@ -32,6 +32,11 @@ api_best_route/
 ├── changelog/
 ├── console/
 │   └── main.py
+├── lab/
+│   ├── README.md
+│   ├── explicit.config.json
+│   ├── grid.config.json
+│   └── random.config.json
 ├── src/
 │   ├── application/
 │   │   └── route_optimization_service.py
@@ -93,6 +98,18 @@ python -m console.main
 ```
 
 The console entry point demonstrates the same dependency graph used by the API, with an optional `MatplotlibPlotter` for visualization.
+
+## Lab Mode
+
+Lab mode provides sequential benchmark execution for route-optimization experiments. It supports explicit run lists, Cartesian grid exploration, and policy-driven random search from a single JSON configuration file.
+
+Run lab mode with:
+
+```bash
+python -m console.main lab --config lab/explicit.config.json
+```
+
+For the full contract, mode-specific behavior, and ready-to-run example files, see [`lab/README.md`](lab/README.md).
 
 ## API Summary
 
