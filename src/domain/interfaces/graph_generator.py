@@ -18,35 +18,37 @@ class IGraphGenerator(Protocol):
         self,
         origin: str | tuple[float, float],
         destinations: list[tuple[str | tuple[float, float], int]],
-    ) -> GraphContext: ...
-    """Initialize and return the graph context for optimization.
+    ) -> GraphContext:
+        """Initialize and return the graph context for optimization.
 
-    This method should perform any necessary geocoding, graph extraction,
-    and preprocessing to create the data structures needed by route
-    optimization.
+        This method should perform any necessary geocoding, graph extraction,
+        and preprocessing to create the data structures needed by route
+        optimization.
 
-    Args:
-        origin: The starting location, either as an address string or a
-            (latitude, longitude) tuple.
-        destinations: A list of destination entries, each being a tuple
-            (location, priority) where location is an address string or a
-            (latitude, longitude) tuple.
+        Args:
+            origin: The starting location, either as an address string or a
+                (latitude, longitude) tuple.
+            destinations: A list of destination entries, each being a tuple
+                (location, priority) where location is an address string or a
+                (latitude, longitude) tuple.
 
-    Returns:
-        A GraphContext containing the prepared graph and route nodes.
-    """
+        Returns:
+            A GraphContext containing the prepared graph and route nodes.
+        """
+        ...
 
     def build_coordinate_converter(
         self,
         context: GraphContext,
-    ) -> Callable[[float, float], tuple[float, float]]: ...
-    """Return a function that converts projected graph coordinates back to
-    geographic latitude/longitude.
+    ) -> Callable[[float, float], tuple[float, float]]:
+        """Return a function that converts projected graph coordinates back to
+        geographic latitude/longitude.
 
-    Args:
-        context: The GraphContext created during initialization.
+        Args:
+            context: The GraphContext created during initialization.
 
-    Returns:
-        A callable accepting (x, y) coordinates in the graph's CRS and
-        returning (latitude, longitude).
-    """
+        Returns:
+            A callable accepting (x, y) coordinates in the graph's CRS and
+            returning (latitude, longitude).
+        """
+        ...

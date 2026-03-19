@@ -9,13 +9,13 @@ from src.domain.models import FleetRouteInfo
 class IPlotter(Protocol):
     """Protocol for plotting route information."""
 
-    def plot(self, route_info: FleetRouteInfo) -> None: ...
+    def plot(self, route_info: FleetRouteInfo) -> None:
+        """Render a visualization of the optimized fleet route.
 
-    """Render a visualization of the optimized fleet route.
+        Args:
+            route_info: The fleet route information produced by the optimizer.
 
-    Args:
-        route_info: The fleet route information produced by the optimizer.
-
-    Returns:
-        None. 
-    """
+        Returns:
+            None.
+        """
+        ...

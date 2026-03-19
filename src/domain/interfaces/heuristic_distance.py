@@ -18,14 +18,15 @@ class IHeuristicDistanceStrategy(Protocol):
         self,
         start_node: RouteNode,
         end_node: RouteNode,
-    ) -> float | None: ...
-    """Estimate a heuristic distance value between two route points.
+    ) -> float | None:
+        """Estimate a heuristic distance value between two route points.
 
-    Args:
-        start_node: The starting route node.
-        end_node: The ending route node.
+        Args:
+            start_node: The starting route node.
+            end_node: The ending route node.
 
-    Returns:
-        A float representing the heuristic distance, or None if the
-        strategy cannot compute a meaningful value.
-    """
+        Returns:
+            A float representing the heuristic distance, or None if the
+            strategy cannot compute a meaningful value.
+        """
+        ...

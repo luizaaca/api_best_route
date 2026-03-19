@@ -25,13 +25,13 @@ class IRouteCalculator(Protocol):
     """
 
     @property
-    def graph_id(self) -> str: ...
+    def graph_id(self) -> str:
+        """Returns a deterministic identifier for the underlying graph.
 
-    """Returns a deterministic identifier for the underlying graph.
-
-    This identifier may be used for caching or deduplication of computed
-    adjacency matrices.
-    """
+        This identifier may be used for caching or deduplication of computed
+        adjacency matrices.
+        """
+        ...
 
     def compute_segment(
         self,
@@ -39,65 +39,65 @@ class IRouteCalculator(Protocol):
         end_node: RouteNode,
         weight_function: Any = ...,
         cost_function: Any | None = ...,
-    ) -> RouteSegment: ...
+    ) -> RouteSegment:
+        """Compute a route segment between two nodes.
 
-    """Compute a route segment between two nodes.
+        Args:
+            start_node: The graph node where the segment begins.
+            end_node: The graph node where the segment ends.
+            weight_function: A callable used by the underlying graph search
+                algorithm to weight edges (e.g., ETA, distance).
+            cost_function: Optional callable to compute a secondary cost
+                (e.g., priority-adjusted ETA) for the segment.
 
-    Args:
-        start_node: The graph node where the segment begins.
-        end_node: The graph node where the segment ends.
-        weight_function: A callable used by the underlying graph search
-            algorithm to weight edges (e.g., ETA, distance).
-        cost_function: Optional callable to compute a secondary cost
-            (e.g., priority-adjusted ETA) for the segment.
-
-    Returns:
-        A RouteSegment containing traversal metrics, path coordinates, and
-        optional cost metadata.
-    """
+        Returns:
+            A RouteSegment containing traversal metrics, path coordinates, and
+            optional cost metadata.
+        """
+        ...
 
     def compute_route_segments_info(
         self,
         segments: list[RouteSegment],
-    ) -> RouteSegmentsInfo: ...
+    ) -> RouteSegmentsInfo:
+        """Aggregate a list of precomputed segments into fleet-level totals.
 
-    """Aggregate a list of precomputed segments into fleet-level totals.
+        Args:
+            segments: A list of RouteSegment instances typically produced by
+                compute_segment().
 
-    Args:
-        segments: A list of RouteSegment instances typically produced by
-            compute_segment().
+        Returns:
+            A RouteSegmentsInfo instance containing total ETA, length, and any
+            computed cost aggregate.
+        """
+        ...
 
-    Returns:
-        A RouteSegmentsInfo instance containing total ETA, length, and any
-        computed cost aggregate.
-    """
+    def get_weight_function(self, weight_type: str) -> Callable:
+        """Return a weight function suitable for networkx shortest-path
+        algorithms.
 
-    def get_weight_function(self, weight_type: str) -> Callable: ...
+        The returned callable should match the signature expected by
+        networkx shortest-path functions (u, v, edge_data) and return a numeric
+        weight.
 
-    """Return a weight function suitable for networkx shortest-path
-    algorithms.
+        Args:
+            weight_type: A string key indicating the type of weight to compute.
 
-    The returned callable should match the signature expected by
-    networkx shortest-path functions (u, v, edge_data) and return a numeric
-    weight.
+        Returns:
+            A callable to be passed as the `weight` argument into networkx's
+            shortest path functions.
+        """
+        ...
 
-    Args:
-        weight_type: A string key indicating the type of weight to compute.
+    def get_cost_function(self, cost_type: str | None) -> Callable | None:
+        """Return a cost function to adjust segment costs based on custom
+        business rules.
 
-    Returns:
-        A callable to be passed as the `weight` argument into networkx's
-        shortest path functions.
-    """
+        Args:
+            cost_type: The identifier for the desired cost strategy.
 
-    def get_cost_function(self, cost_type: str | None) -> Callable | None: ...
-
-    """Return a cost function to adjust segment costs based on custom
-    business rules.
-
-    Args:
-        cost_type: The identifier for the desired cost strategy.
-
-    Returns:
-        A callable taking (node_id, eta) and returning a cost, or None if
-        no additional cost should be applied.
-    """
+        Returns:
+            A callable taking (node_id, eta) and returning a cost, or None if
+            no additional cost should be applied.
+        """
+        ...

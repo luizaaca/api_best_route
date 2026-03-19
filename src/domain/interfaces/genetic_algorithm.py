@@ -20,19 +20,19 @@ class ISelectionStrategy(Protocol):
         population: Population,
         evaluated_population: list[FleetRouteInfo],
         fitness_function: Callable[[FleetRouteInfo], float],
-    ) -> tuple[Individual, Individual]: ...
+    ) -> tuple[Individual, Individual]:
+        """Choose two individuals from the current population to act as parents.
 
-    """Choose two individuals from the current population to act as parents.
+        Args:
+            population: The current population of candidate solutions.
+            evaluated_population: The population evaluated with fitness scores.
+            fitness_function: A callable that returns a fitness score for a given
+                FleetRouteInfo.
 
-    Args:
-        population: The current population of candidate solutions.
-        evaluated_population: The population evaluated with fitness scores.
-        fitness_function: A callable that returns a fitness score for a given
-            FleetRouteInfo.
-
-    Returns:
-        A pair of Individuals selected to be parents for the next generation.
-    """
+        Returns:
+            A pair of Individuals selected to be parents for the next generation.
+        """
+        ...
 
 
 @runtime_checkable
@@ -43,17 +43,17 @@ class ICrossoverStrategy(Protocol):
         self,
         parent1: Individual,
         parent2: Individual,
-    ) -> Individual: ...
+    ) -> Individual:
+        """Combine two parent individuals into a new offspring.
 
-    """Combine two parent individuals into a new offspring.
+        Args:
+            parent1: The first parent individual.
+            parent2: The second parent individual.
 
-    Args:
-        parent1: The first parent individual.
-        parent2: The second parent individual.
-
-    Returns:
-        A new Individual representing the crossover result.
-    """
+        Returns:
+            A new Individual representing the crossover result.
+        """
+        ...
 
 
 @runtime_checkable
@@ -64,17 +64,17 @@ class IMutationStrategy(Protocol):
         self,
         solution: Individual,
         mutation_probability: float,
-    ) -> Individual: ...
+    ) -> Individual:
+        """Mutate a candidate solution based on a given probability.
 
-    """Mutate a candidate solution based on a given probability.
+        Args:
+            solution: The individual to mutate.
+            mutation_probability: The probability of applying a mutation.
 
-    Args:
-        solution: The individual to mutate.
-        mutation_probability: The probability of applying a mutation.
-
-    Returns:
-        A potentially modified Individual.
-    """
+        Returns:
+            A potentially modified Individual.
+        """
+        ...
 
 
 @runtime_checkable
@@ -86,19 +86,19 @@ class IPopulationGenerator(Protocol):
         location_list: VehicleRoute,
         population_size: int,
         vehicle_count: int,
-    ) -> Population: ...
+    ) -> Population:
+        """Generate a new population of candidate solutions.
 
-    """Generate a new population of candidate solutions.
+        Args:
+            location_list: The base route (or set of locations) used to seed the
+                population.
+            population_size: The number of individuals to generate.
+            vehicle_count: The number of vehicles used in the optimization.
 
-    Args:
-        location_list: The base route (or set of locations) used to seed the
-            population.
-        population_size: The number of individuals to generate.
-        vehicle_count: The number of vehicles used in the optimization.
-
-    Returns:
-        A list of Individuals representing the initial population.
-    """
+        Returns:
+            A list of Individuals representing the initial population.
+        """
+        ...
 
 
 __all__ = [
