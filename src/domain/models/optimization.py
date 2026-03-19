@@ -1,6 +1,8 @@
 """Domain model representing the result of a route optimization run."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from .ga_generation_record import GenerationRecord
 
 from .route import FleetRouteInfo
 
@@ -13,3 +15,4 @@ class OptimizationResult:
     best_fitness: float
     population_size: int
     generations_run: int
+    generation_records: list[GenerationRecord] = field(default_factory=list)

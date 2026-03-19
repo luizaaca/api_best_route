@@ -1,15 +1,10 @@
-"""Genetic algorithm implementation for multi-vehicle route optimization.
+"""Genetic algorithm facade for multi-vehicle route optimization.
 
-This module implements a simple genetic algorithm where each individual is a
-set of vehicle routes. It relies on a precomputed adjacency matrix of
-RouteSegment objects to evaluate fitness and determine the cost of traveling
-between waypoints.
+This module preserves the route-optimizer-facing API while delegating the
+generic GA execution loop to the problem-agnostic `GeneticAlgorithm` engine.
 """
 
-import copy
-import time
 from collections.abc import Callable
-from typing import Tuple
 
 from src.domain.interfaces import (
     ICrossoverStrategy,
@@ -20,45 +15,37 @@ from src.domain.interfaces import (
     ISelectionStrategy,
 )
 from src.domain.models import (
+    EvaluatedRouteSolution,
     FleetRouteInfo,
+    GenerationOperators,
+    GenerationRecord,
     Individual,
     OptimizationResult,
     RouteNode,
+    RoutePopulationSeedData,
     RouteSegment,
     RouteSegmentsInfo,
+    RouteGeneticSolution,
     VehicleRoute,
     VehicleRouteInfo,
 )
+from src.infrastructure.fixed_genetic_state_controller import FixedGeneticStateController
+from src.infrastructure.genetic_algorithm_engine import GeneticAlgorithm
+from src.infrastructure.legacy_crossover_strategy_adapter import LegacyCrossoverStrategyAdapter
+from src.infrastructure.legacy_mutation_strategy_adapter import LegacyMutationStrategyAdapter
+from src.infrastructure.legacy_population_generator_adapter import LegacyPopulationGeneratorAdapter
+from src.infrastructure.legacy_selection_strategy_adapter import LegacySelectionStrategyAdapter
 from src.infrastructure.route_calculator import AdjacencyMatrix
+from src.infrastructure.tsp_genetic_problem import TSPGeneticProblem
 
 
 class TSPGeneticAlgorithm(IRouteOptimizer):
-    """Genetic algorithm for multi-vehicle TSP optimization over a fixed adjacency matrix."""
+    """Route-specific optimizer facade over the generic genetic algorithm engine."""
 
     @staticmethod
     def _build_origin_route_segment(origin: RouteNode) -> RouteSegment:
-        """Create a zero-length RouteSegment representing the route origin.
-
-        The optimizer prepends this segment to each vehicle route so that the
-        first segment always represents the starting point.
-
-        Args:
-            origin: The origin RouteNode.
-
-        Returns:
-            A RouteSegment with zero distance and ETA rooted at the origin.
-        """
-        return RouteSegment(
-            start=origin.node_id,
-            end=origin.node_id,
-            eta=0,
-            length=0,
-            path=[],
-            segment=[origin.node_id],
-            name=origin.name,
-            coords=origin.coords,
-            cost=0,
-        )
+        """Delegate origin-segment creation to the route-domain problem adapter."""
+        return TSPGeneticProblem._build_origin_route_segment(origin)
 
     @classmethod
     def _prepend_origin_segment(
@@ -66,21 +53,9 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         origin: RouteNode,
         route_info: RouteSegmentsInfo,
     ) -> RouteSegmentsInfo:
-        """Ensure the origin segment appears at the beginning of a route.
-
-        Args:
-            origin: The origin RouteNode.
-            route_info: The computed RouteSegmentsInfo for a vehicle route.
-
-        Returns:
-            A new RouteSegmentsInfo with the origin segment prepended.
-        """
-        return RouteSegmentsInfo(
-            segments=[cls._build_origin_route_segment(origin), *route_info.segments],
-            total_eta=route_info.total_eta,
-            total_length=route_info.total_length,
-            total_cost=route_info.total_cost,
-        )
+        """Delegate origin prepending to the route-domain problem adapter."""
+        _ = cls
+        return TSPGeneticProblem._prepend_origin_segment(origin, route_info)
 
     @classmethod
     def _build_empty_vehicle_route_info(
@@ -88,47 +63,15 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         route: VehicleRoute,
         vehicle_id: int,
     ) -> VehicleRouteInfo:
-        """Produce a VehicleRouteInfo for an empty route (no destinations).
-
-        This ensures that vehicles with no assigned destinations still have a
-        valid RouteSegmentsInfo structure containing the origin segment.
-
-        Args:
-            route: The vehicle's route list of RouteNode objects (at least origin).
-            vehicle_id: The vehicle identifier.
-
-        Returns:
-            A VehicleRouteInfo representing an empty route with only an origin.
-        """
-        origin = route[0]
-        route_info = cls._prepend_origin_segment(
-            origin,
-            RouteSegmentsInfo(
-                total_eta=0,
-                total_length=0,
-                total_cost=0,
-            ),
-        )
-        return VehicleRouteInfo.from_route_segments_info(vehicle_id, route_info)
+        """Delegate empty-route handling to the route-domain problem adapter."""
+        _ = cls
+        return TSPGeneticProblem._build_empty_vehicle_route_info(route, vehicle_id)
 
     @staticmethod
     def _fitness(route_info: FleetRouteInfo) -> float:
-        """Compute the fitness score for a fleet route.
+        """Delegate route fitness computation to the route-domain problem adapter."""
+        return TSPGeneticProblem._fitness(route_info)
 
-        If a total cost is available it is used as the fitness metric. Otherwise,
-        the maximum vehicle ETA (makespan) is used.
-
-        Args:
-            route_info: The fleet route information to evaluate.
-
-        Returns:
-            A scalar fitness value to minimize.
-        """
-        if route_info.total_cost is not None:
-            return route_info.total_cost
-        return route_info.max_vehicle_eta
-
-    # helper for evaluating an individual comprised of multiple vehicle routes
     def _evaluate_individual(
         self,
         individual: Individual,
@@ -143,26 +86,11 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         Returns:
             A FleetRouteInfo representing the evaluated fitness and route details.
         """
-        infos: list[VehicleRouteInfo] = []
-        for vehicle_id, route in enumerate(individual, start=1):
-            origin = route[0]
-            if len(route) < 2:
-                infos.append(self._build_empty_vehicle_route_info(route, vehicle_id))
-                continue
-            segments = [
-                adjacency_matrix[(route[i].node_id, route[i + 1].node_id)]
-                for i in range(len(route) - 1)
-            ]
-            route_info = self._prepend_origin_segment(
-                origin,
-                RouteSegmentsInfo.from_segments(segments),
-            )
-            infos.append(
-                VehicleRouteInfo.from_route_segments_info(vehicle_id, route_info)
-            )
-        return FleetRouteInfo.from_vehicle_routes(infos)
-
-    # ----------------------------------------------------------
+        if adjacency_matrix is self._adjacency_matrix:
+            return self._problem.evaluate_individual(RouteGeneticSolution(individual))
+        return TSPGeneticProblem(adjacency_matrix).evaluate_individual(
+            RouteGeneticSolution(individual)
+        )
 
     def __init__(
         self,
@@ -200,6 +128,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
             raise ValueError("mutation_strategy is required")
         if population_generator is None:
             raise ValueError("population_generator is required")
+        self._problem = TSPGeneticProblem(adjacency_matrix)
         self._adjacency_matrix = adjacency_matrix
         self.population_size = population_size
         self.mutation_probability = mutation_probability
@@ -214,6 +143,44 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         """Emit one runtime message when a logger is configured."""
         if self._logger is not None:
             self._logger(message)
+
+    def _build_legacy_generation_operators(
+        self,
+    ) -> GenerationOperators[
+        RouteGeneticSolution,
+        EvaluatedRouteSolution,
+        RoutePopulationSeedData,
+    ]:
+        """Build the fixed operator bundle that mirrors legacy optimizer wiring."""
+        return GenerationOperators(
+            selection=LegacySelectionStrategyAdapter(self._selection_strategy),
+            crossover=LegacyCrossoverStrategyAdapter(self._crossover_strategy),
+            mutation=LegacyMutationStrategyAdapter(self._mutation_strategy),
+            mutation_probability=self.mutation_probability,
+            population_generator=LegacyPopulationGeneratorAdapter(
+                self._population_generator
+            ),
+        )
+
+    def _handle_generation(
+        self,
+        record: GenerationRecord,
+        evaluated_solution: EvaluatedRouteSolution,
+    ) -> None:
+        """Handle one generation callback from the generic engine.
+
+        Args:
+            record: Structured runtime record for the generation.
+            evaluated_solution: Best evaluated route solution of the generation.
+        """
+        self._log(
+            (
+                f"Generation {record.generation}: Best fitness = {record.best_fitness} "
+                f"- Elapsed time: {record.elapsed_time_ms:.2f} ms"
+            )
+        )
+        if self._plotter is not None:
+            self._plotter.plot(evaluated_solution.route_info)
 
     def solve(
         self,
@@ -248,89 +215,37 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
                 number of generations actually executed.
         """
         self._log(f"Running optimizer with vehicle_count={vehicle_count}")
-        population = self._population_generator.generate(
-            route_nodes, self.population_size, vehicle_count
+        seed_data = RoutePopulationSeedData(
+            route_nodes=route_nodes,
+            vehicle_count=vehicle_count,
         )
-        if not population:
-            return OptimizationResult(
-                best_route=FleetRouteInfo(),
-                best_fitness=0,
-                population_size=0,
-                generations_run=0,
-            )
-        best_fitness = float("inf")
-        best_individual: Tuple[Individual, FleetRouteInfo] = (
-            [],
-            FleetRouteInfo(),
+        generation_records: list[GenerationRecord] = []
+        engine = GeneticAlgorithm[
+            RouteGeneticSolution,
+            EvaluatedRouteSolution,
+            RoutePopulationSeedData,
+            OptimizationResult,
+        ](
+            problem=self._problem,
+            state_controller=FixedGeneticStateController(
+                state_name="legacy-fixed",
+                operators=self._build_legacy_generation_operators(),
+            ),
+            logger=None,
+            on_generation=generation_records.append,
+            on_generation_evaluated=self._handle_generation,
         )
-        generation = 0
-        start_time = time.time() * 1000
-
-        while generation < max_generation:
-            current_time = time.time() * 1000
-            if current_time - start_time > max_processing_time:
-                self._log(
-                    f"Time limit of {max_processing_time} ms reached. Stopping the algorithm."
-                )
-                break
-
-            self._log(f"Processing generation {generation}...")
-            generation += 1
-            population_calculated: list[FleetRouteInfo] = [
-                self._evaluate_individual(individual, self._adjacency_matrix)
-                for individual in population
-            ]
-
-            population_tuple, population_calculated_tuple = zip(
-                *sorted(
-                    zip(population, population_calculated),
-                    key=lambda x: self._fitness(x[1]),
-                )
-            )
-            population = list(population_tuple)
-            population_calculated = list(population_calculated_tuple)
-
-            current_best_fitness = self._fitness(population_calculated[0])
-            if current_best_fitness < best_fitness:
-                best_fitness = current_best_fitness
-                best_individual = (
-                    population[0],
-                    population_calculated[0],
-                )
-
-            self._log(
-                f"Generation {generation}: Best fitness = {best_fitness} - Elapsed time: {current_time - start_time:.2f} ms"
-            )
-            if self._plotter is not None:
-                self._plotter.plot(population_calculated[0])
-
-            new_population = [copy.deepcopy(population[0])]
-
-            while len(new_population) < self.population_size:
-                parent1, parent2 = self._selection_strategy.select_parents(
-                    population,
-                    population_calculated,
-                    self._fitness,
-                )
-                child = self._crossover_strategy.crossover(parent1, parent2)
-                child = self._mutation_strategy.mutate(
-                    child,
-                    self.mutation_probability,
-                )
-                new_population.append(child)
-
-            population = new_population
-
-        best_route = best_individual[1]
+        result = engine.solve(
+            seed_data=seed_data,
+            population_size=self.population_size,
+            max_generations=max_generation,
+            max_processing_time=max_processing_time,
+        )
+        result.generation_records = generation_records
+        best_route = result.best_route
         self._log("Best routes by vehicle:")
         for info in best_route.routes_by_vehicle:
             nodes = " -> ".join([seg.name for seg in info.segments])
             self._log(f"  Vehicle {info.vehicle_id}: {nodes}")
         self._log(f"Total aggregated cost: {best_route.total_cost or 0.0}")
-
-        return OptimizationResult(
-            best_route=best_route,
-            best_fitness=best_fitness,
-            population_size=len(population),
-            generations_run=generation,
-        )
+        return result

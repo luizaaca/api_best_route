@@ -132,6 +132,7 @@ class RouteOptimizationService:
             best_fitness=result.best_fitness,
             population_size=result.population_size,
             generations_run=result.generations_run,
+            generation_records=result.generation_records,
         )
 
         return result

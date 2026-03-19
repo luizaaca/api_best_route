@@ -293,3 +293,140 @@ The service does not know how graph caching, adjacency caching, or GA operator c
 | `src/infrastructure/caching/*` | Infrastructure | Persistent caching adapters and cache-aware builders |
 | `api/*` | Entry point | HTTP transport and dependency composition |
 | `console/main.py` | Entry point | Local execution and demonstration wiring |
+
+## 12. Target Architecture — Generic Adaptive GA
+
+The next architectural evolution of `API Best Route` is a refactor from a route-shaped GA implementation into a **problem-agnostic genetic algorithm core** with a route-specific adapter and configuration-driven adaptive behavior.
+
+This target architecture preserves the route-optimization application boundary while removing route semantics from the GA execution engine itself.
+
+### 12.1 Target responsibility split
+
+The future responsibility split is:
+
+- **Generic GA core**
+    - population lifecycle orchestration;
+    - generation loop execution;
+    - ranking flow;
+    - elitism;
+    - parent selection;
+    - crossover;
+    - mutation;
+    - optional reseeding/injection;
+    - termination by time, generation budget, or future convergence rules;
+    - state-controller consultation;
+    - generation-record emission.
+
+- **GA domain abstraction**
+    - define the abstract solution model the GA depends on;
+    - expose evaluated-solution semantics such as fitness and comparable metrics;
+    - isolate problem-specific meaning from the engine.
+
+- **Route adapter / facade**
+    - accept route-specific inputs such as `route_nodes` and adjacency information;
+    - evaluate route solutions using routing semantics;
+    - assemble `FleetRouteInfo` and related route aggregates;
+    - preserve the `IRouteOptimizer` contract used by the application service;
+    - translate generic GA outputs back into route-domain results.
+
+### 12.2 Why `TSPGeneticAlgorithm` remains as an adapter
+
+The future generic engine does not eliminate the need for a route-specific adapter.
+
+`IPopulationGenerator` alone is not sufficient to replace the current `TSPGeneticAlgorithm` role, because population generation only answers how candidate solutions are created or reseeded. It does not cover:
+
+- route evaluation through the adjacency matrix;
+- route-specific fitness translation;
+- empty-route and origin-segment handling;
+- fleet-route result assembly;
+- route-optimizer integration through `IRouteOptimizer`.
+
+For that reason, `TSPGeneticAlgorithm` should evolve into a **thin route adapter/facade** over the generic engine instead of remaining the owner of the GA loop.
+
+### 12.3 Domain abstraction for GA-compatible solutions
+
+The GA must stop depending directly on route-specific concepts such as `FleetRouteInfo`, `VehicleRoute`, or route-shaped `Individual` assumptions.
+
+The target model is a domain abstraction where route concepts become one concrete specialization. A useful separation is:
+
+- **raw solution abstraction**
+    - manipulated by generation, mutation, crossover, cloning, and normalization;
+- **evaluated solution abstraction**
+    - exposes fitness and comparable metrics needed by ranking, records, logging, and transition rules.
+
+This enables future changes in route structure, vehicle policy, or problem representation without forcing architectural changes in the GA core.
+
+### 12.4 Adaptive state model
+
+Adaptive behavior will be configured through a runtime state model rather than hardcoded phase classes in production.
+
+The target components are:
+
+- `GenerationContext`
+    - runtime metrics for one generation, such as generation index, progress ratio, best fitness, stale generations, improvement ratio, and other convergence signals;
+- `GenerationRecord`
+    - one structured record describing what happened in a generation;
+- `ConfiguredState`
+    - one state definition containing the active operator bundle and ordered transition rules;
+- `StateController`
+    - resolves the active state during execution;
+- `TransitionRule`
+    - defines when the controller should activate a target state;
+- concrete `Specification` classes
+    - evaluate concrete runtime conditions against `GenerationContext`.
+
+### 12.5 Rule semantics
+
+The adaptive runtime semantics follow the conceptual model already validated in the notebook under `concepts/stateful_ga_phase_example.ipynb`.
+
+- A `TransitionRule` evaluates its internal specifications with **AND** semantics.
+- A state evaluates its ordered transition rules with **OR** semantics.
+- The **first matching rule wins** and activates its target state.
+- Specifications are **concrete classes** with constructor parameters; configuration selects which class to instantiate and which parameters to pass.
+
+This keeps semantics in code and composition in configuration.
+
+## 13. Phase 1 Boundary Decisions
+
+The following decisions define the implementation boundary for the refactor.
+
+1. The GA core must be problem agnostic and must not depend on route-domain models.
+2. `TSPGeneticAlgorithm` remains as the route-optimizer-facing adapter/facade over the generic engine.
+3. Production adaptive states are configuration-composed, not predefined domain-specific state classes.
+4. Transition specifications are concrete classes instantiated from configuration parameters.
+5. `TransitionRule` uses AND semantics across its specifications.
+6. A state uses ordered OR semantics across its transition rules, where the first match wins.
+7. The console lab and its configuration format may be redesigned around the new stateful composition model without backward compatibility.
+8. The API keeps the current scalar parameters and gains adaptive GA configuration as an additional input path.
+
+### 13.1 Planned composition view
+
+```mermaid
+flowchart TD
+        A[FastAPI / Console / Lab] --> B[RouteOptimizationService]
+        B --> C[TSPGeneticAlgorithm adapter]
+        C --> D[Generic GeneticAlgorithm engine]
+        C --> E[Route domain adapter / evaluator]
+
+        D --> F[StateController]
+        F --> G[ConfiguredState]
+        G --> H[TransitionRule]
+        H --> I[Concrete Specification]
+
+        D --> J[Selection Strategy]
+        D --> K[Crossover Strategy]
+        D --> L[Mutation Strategy]
+        D --> M[Population / Reseeding Strategy]
+        D --> N[GenerationRecord sink]
+
+        E --> O[FleetRouteInfo / OptimizationResult]
+```
+
+### 13.2 Implementation consequence
+
+Any change proposed in later phases should be rejected if it violates one of these boundaries:
+
+- putting route semantics back into the generic engine;
+- encoding transition semantics directly in configuration files instead of concrete specification classes;
+- moving route-adapter responsibilities into entry-point factories or application services;
+- coupling generation records directly to lab-only reporting concerns.
