@@ -48,14 +48,21 @@
 # 9. Melhorar testes unitários
 - criar testes unitários para as funções principais do código, como a função de cálculo de distância.
 
-# 9.1 Cria console app dinamico estilo app de linha de comando
+# 9.1 Cria console app dinamico estilo app de linha de comando [X]
 - criar um console app que permita ao usuário inserir os parâmetros de otimização (origem, destinos, número de veículos, etc.) de forma interativa, e exibir os resultados no console, para facilitar testes rápidos e demonstrações sem a necessidade de uma interface web.
 - permitir criar as configurações para o builder do algoritmo escolhendo estrategias e plugando componentes como plotter, matriz de adjacência, heurísticas, etc.
 - permitir mostrar o plot em execução ou somente ao fim do processo de otimização.
 
-# 9.2 Criar modo benchmark/lab
+# 9.2 Criar modo benchmark/lab [X]
 - adicionar um modo de benchmark que execute duas rodadas comparativas, uma sem heurísticas e outra com heurísticas, com resultado exibido apenas no console.
 - esse modo deve ser habilitado por algum parâmetro explícito de laboratório, por exemplo `lab_mode`, para não interferir no fluxo normal da API/console.
+
+# 9.3 Permitir saida de resumo e logs em outros formatos (ex: JSON) []
+- melhorar report e logs (incluir level e permitir vários adaptadores com diferentes levels)
+- criar opção para exportar os resultados e logs do processo de otimização em formatos estruturados como JSON, facilitando a análise posterior e a integração com outras ferramentas, além da saída tradicional no console.
+
+# 9.4 Implementar GA Adaptativo []
+- implementar um algoritmo genético adaptativo que ajuste dinamicamente os parâmetros de mutação e cruzamento com base no progresso da otimização, para melhorar a eficiência e a qualidade das soluções geradas ao longo do tempo.
 
 # 10. Usar abstract factory para criar classes de acordo com tipo de busca
 - implementar uma fabrica abstrata que crie as instancias de otimizadores, plotters e outras dependências de acordo com o modo de operação:
