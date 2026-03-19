@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Sequence
 
-from src.domain.interfaces import ISelectionStrategy
-from src.domain.interfaces.ga_selection_strategy import IGeneticSelectionStrategy
+from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
+    IGeneticSelectionStrategy,
+)
+from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
+    ISelectionStrategy,
+)
 from src.domain.models.evaluated_route_solution import EvaluatedRouteSolution
 from src.domain.models.route_genetic_solution import RouteGeneticSolution
 
@@ -30,8 +35,8 @@ class LegacySelectionStrategyAdapter(
 
     def select_parents(
         self,
-        population: list[RouteGeneticSolution],
-        evaluated_population: list[EvaluatedRouteSolution],
+        population: Sequence[RouteGeneticSolution],
+        evaluated_population: Sequence[EvaluatedRouteSolution],
     ) -> tuple[RouteGeneticSolution, RouteGeneticSolution]:
         """Select two parent route solutions using the legacy strategy.
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, Sequence, TypeVar, runtime_checkable
 
-from .ga_solution import IGeneticSolution
+from ..ga_solution import IGeneticSolution
 
 TSeedData = TypeVar("TSeedData", contravariant=True)
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
@@ -14,7 +14,8 @@ TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 class IGeneticPopulationGenerator(Protocol[TSeedData, TSolution]):
     """Generate or inject GA solutions from problem-specific seed data.
 
-    The same abstraction is used for the initial population and optional reseeding/injection during adaptive execution.
+    The same abstraction is used for the initial population and optional
+    reseeding/injection during adaptive execution.
     """
 
     @property

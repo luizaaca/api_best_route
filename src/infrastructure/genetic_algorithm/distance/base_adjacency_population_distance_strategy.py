@@ -4,7 +4,9 @@ These strategies are used to compute heuristic distances for seeding or
 ordering the genetic algorithm's initial population.
 """
 
-from src.domain.interfaces import IHeuristicDistanceStrategy
+from src.domain.interfaces.geo_graph.heuristic_distance import (
+    IHeuristicDistanceStrategy,
+)
 from src.domain.models import RouteNode, RouteSegment
 from src.infrastructure.route_calculator import AdjacencyMatrix
 

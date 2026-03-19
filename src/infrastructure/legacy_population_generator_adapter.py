@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from src.domain.interfaces import IPopulationGenerator
-from src.domain.interfaces.ga_population_generator import IGeneticPopulationGenerator
+from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
+    IGeneticPopulationGenerator,
+)
+from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
+    IPopulationGenerator,
+)
 from src.domain.models.ga_generation_context import GenerationContext
 from src.domain.models.route_genetic_solution import RouteGeneticSolution
 from src.domain.models.route_population_seed_data import RoutePopulationSeedData

@@ -8,7 +8,9 @@ distribution.
 import random
 from collections.abc import Callable
 
-from src.domain.interfaces import ISelectionStrategy
+from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
+    ISelectionStrategy,
+)
 from src.domain.models import FleetRouteInfo, Individual, Population
 
 

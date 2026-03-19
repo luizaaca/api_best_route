@@ -5,7 +5,12 @@ import numpy as np
 from shapely.geometry import MultiPoint, Polygon
 from sklearn.cluster import KMeans
 
-from src.domain.interfaces import IHeuristicDistanceStrategy, IPopulationGenerator
+from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
+    IPopulationGenerator,
+)
+from src.domain.interfaces.geo_graph.heuristic_distance import (
+    IHeuristicDistanceStrategy,
+)
 from src.domain.models import Individual, Population, RouteNode, VehicleRoute
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from src.domain.interfaces.ga_problem import IGeneticProblem
+from src.domain.interfaces.genetic_algorithm.ga_problem import IGeneticProblem
 from src.domain.models.evaluated_route_solution import EvaluatedRouteSolution
 from src.domain.models.genetic_algorithm import VehicleRoute
 from src.domain.models.optimization import OptimizationResult

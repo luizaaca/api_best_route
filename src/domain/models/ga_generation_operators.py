@@ -5,12 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
-from src.domain.interfaces.ga_crossover_strategy import IGeneticCrossoverStrategy
-from src.domain.interfaces.ga_evaluated_solution import IEvaluatedGeneticSolution
-from src.domain.interfaces.ga_mutation_strategy import IGeneticMutationStrategy
-from src.domain.interfaces.ga_population_generator import IGeneticPopulationGenerator
-from src.domain.interfaces.ga_selection_strategy import IGeneticSelectionStrategy
-from src.domain.interfaces.ga_solution import IGeneticSolution
+from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
+    IEvaluatedGeneticSolution,
+)
+from src.domain.interfaces.genetic_algorithm.ga_solution import IGeneticSolution
+from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
+    IGeneticCrossoverStrategy,
+)
+from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
+    IGeneticMutationStrategy,
+)
+from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
+    IGeneticPopulationGenerator,
+)
+from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
+    IGeneticSelectionStrategy,
+)
 
 OperatorMetadataValue = str | int | float | bool | None
 

@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from src.domain.interfaces.ga_evaluated_solution import IEvaluatedGeneticSolution
+from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
+    IEvaluatedGeneticSolution,
+)
 
 from .route import FleetRouteInfo
 from .route_genetic_solution import RouteGeneticSolution

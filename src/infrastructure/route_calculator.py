@@ -9,7 +9,7 @@ optimization algorithms.
 from typing import Any, cast
 import networkx as nx
 
-from src.domain.interfaces import IRouteCalculator
+from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
 from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
 
 

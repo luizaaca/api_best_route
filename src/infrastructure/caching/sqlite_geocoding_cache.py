@@ -7,7 +7,7 @@ geocoding lookups to reduce repeated external API calls.
 import sqlite3
 from pathlib import Path
 
-from src.domain.interfaces import IGeocodingCache
+from src.domain.interfaces.caching.geocoding_cache import IGeocodingCache
 
 
 class SQLiteGeocodingCache(IGeocodingCache):

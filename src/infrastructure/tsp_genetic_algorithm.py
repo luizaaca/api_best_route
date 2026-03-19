@@ -6,14 +6,20 @@ generic GA execution loop to the problem-agnostic `GeneticAlgorithm` engine.
 
 from collections.abc import Callable
 
-from src.domain.interfaces import (
+from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
     ICrossoverStrategy,
+)
+from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
     IMutationStrategy,
-    IPlotter,
+)
+from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
     IPopulationGenerator,
-    IRouteOptimizer,
+)
+from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
     ISelectionStrategy,
 )
+from src.domain.interfaces.plotting.plotter import IPlotter
+from src.domain.interfaces.route_optimization.route_optimizer import IRouteOptimizer
 from src.domain.models import (
     EvaluatedRouteSolution,
     FleetRouteInfo,

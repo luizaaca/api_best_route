@@ -4,7 +4,7 @@ This module provides a real-time visualization of route optimization progress,
 rendering the graph, static POIs, and dynamic route segments with fitness tracking.
 """
 
-from src.domain.interfaces import IPlotter
+from src.domain.interfaces.plotting.plotter import IPlotter
 from matplotlib.collections import LineCollection
 from src.domain.models import FleetRouteInfo, GraphContext
 import matplotlib.pyplot as plt

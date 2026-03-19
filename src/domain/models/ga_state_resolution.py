@@ -5,8 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, TypeVar
 
-from src.domain.interfaces.ga_evaluated_solution import IEvaluatedGeneticSolution
-from src.domain.interfaces.ga_solution import IGeneticSolution
+from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
+    IEvaluatedGeneticSolution,
+)
+from src.domain.interfaces.genetic_algorithm.ga_solution import IGeneticSolution
 from .ga_generation_operators import GenerationOperators
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)

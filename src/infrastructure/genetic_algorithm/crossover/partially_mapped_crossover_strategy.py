@@ -6,7 +6,9 @@ representation used by the route optimization genetic algorithm.
 
 import random
 
-from src.domain.interfaces import ICrossoverStrategy
+from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
+    ICrossoverStrategy,
+)
 from src.domain.models import RouteNode
 
 from .base_permutation_crossover_strategy import BasePermutationCrossoverStrategy

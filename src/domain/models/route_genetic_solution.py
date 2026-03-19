@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass
 
-from src.domain.interfaces.ga_solution import IGeneticSolution
+from src.domain.interfaces.genetic_algorithm.ga_solution import IGeneticSolution
 
 from .genetic_algorithm import Individual
 

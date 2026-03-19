@@ -8,13 +8,19 @@ import networkx as nx
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
-from src.domain.interfaces import (
+from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
     ICrossoverStrategy,
+)
+from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
     IMutationStrategy,
+)
+from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
     IPopulationGenerator,
-    IRouteCalculator,
+)
+from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
     ISelectionStrategy,
 )
+from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
 from src.infrastructure.genetic_algorithm import (
     AdjacencyEtaPopulationDistanceStrategy,
     CycleCrossoverStrategy,

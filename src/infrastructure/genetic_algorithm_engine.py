@@ -9,10 +9,14 @@ from collections.abc import Callable
 from time import perf_counter
 from typing import Generic, TypeVar
 
-from src.domain.interfaces.ga_evaluated_solution import IEvaluatedGeneticSolution
-from src.domain.interfaces.ga_problem import IGeneticProblem
-from src.domain.interfaces.ga_solution import IGeneticSolution
-from src.domain.interfaces.ga_state_controller import IGeneticStateController
+from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
+    IEvaluatedGeneticSolution,
+)
+from src.domain.interfaces.genetic_algorithm.ga_problem import IGeneticProblem
+from src.domain.interfaces.genetic_algorithm.ga_solution import IGeneticSolution
+from src.domain.interfaces.genetic_algorithm.ga_state_controller import (
+    IGeneticStateController,
+)
 from src.domain.models.ga_generation_context import GenerationContext
 from src.domain.models.ga_generation_record import GenerationRecord
 

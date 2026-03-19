@@ -1,6 +1,8 @@
 """Population generator that mixes random and heuristic seeds."""
 
-from src.domain.interfaces import IPopulationGenerator
+from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
+    IPopulationGenerator,
+)
 from src.domain.models import Population, VehicleRoute
 
 

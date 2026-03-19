@@ -4,7 +4,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from console.lab.runtime_logging import RuntimeLogger, emit_ignored_params_message
-from src.domain.interfaces import IMutationStrategy
+from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
+    IMutationStrategy,
+)
 from src.infrastructure.genetic_algorithm.mutation import (
     InsertionMutationStrategy,
     InversionMutationStrategy,

@@ -1,12 +1,11 @@
 """Application service that orchestrates route optimization workflows."""
 
 from typing import Callable
-from src.domain.interfaces import (
-    IGraphGenerator,
-    IRouteCalculator,
-    IRouteOptimizer,
-    IPlotter,
-)
+
+from src.domain.interfaces.geo_graph.graph_generator import IGraphGenerator
+from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
+from src.domain.interfaces.plotting.plotter import IPlotter
+from src.domain.interfaces.route_optimization.route_optimizer import IRouteOptimizer
 from src.domain.models import (
     FleetRouteInfo,
     OptimizationResult,

@@ -16,7 +16,8 @@ import osmnx as ox
 from pyproj import Transformer
 from shapely.geometry import MultiPoint
 
-from src.domain.interfaces import IGeocodingResolver, IGraphGenerator
+from src.domain.interfaces.geo_graph.geocoding_resolver import IGeocodingResolver
+from src.domain.interfaces.geo_graph.graph_generator import IGraphGenerator
 from src.domain.models import GraphContext, RouteNode
 
 

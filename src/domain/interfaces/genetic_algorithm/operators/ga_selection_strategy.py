@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol, Sequence, TypeVar, runtime_checkable
 
-from .ga_evaluated_solution import IEvaluatedGeneticSolution
-from .ga_solution import IGeneticSolution
+from ..ga_evaluated_solution import IEvaluatedGeneticSolution
+from ..ga_solution import IGeneticSolution
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar(

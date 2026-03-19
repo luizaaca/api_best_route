@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
-from src.domain.interfaces import IMutationStrategy
-from src.domain.interfaces.ga_mutation_strategy import IGeneticMutationStrategy
+from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
+    IGeneticMutationStrategy,
+)
+from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
+    IMutationStrategy,
+)
 from src.domain.models.route_genetic_solution import RouteGeneticSolution
 
 

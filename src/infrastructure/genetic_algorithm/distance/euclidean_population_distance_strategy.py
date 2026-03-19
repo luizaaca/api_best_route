@@ -2,7 +2,9 @@
 
 from math import dist
 
-from src.domain.interfaces import IHeuristicDistanceStrategy
+from src.domain.interfaces.geo_graph.heuristic_distance import (
+    IHeuristicDistanceStrategy,
+)
 from src.domain.models import RouteNode
 
 

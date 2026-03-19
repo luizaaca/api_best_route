@@ -4,7 +4,7 @@ from typing import Protocol, cast
 
 from geopy.geocoders import Photon
 
-from src.domain.interfaces import IGeocodingResolver
+from src.domain.interfaces.geo_graph.geocoding_resolver import IGeocodingResolver
 
 
 class _PhotonLocationLike(Protocol):

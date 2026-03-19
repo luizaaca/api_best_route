@@ -1,6 +1,7 @@
 """Domain protocol for evaluated GA solutions.
 
-This protocol defines the minimum data the engine needs after a raw solution has been evaluated by the problem layer.
+This protocol defines the minimum data the engine needs after a raw solution
+has been evaluated by the problem layer.
 """
 
 from __future__ import annotations
@@ -14,7 +15,8 @@ from .ga_solution import IGeneticSolution
 class IEvaluatedGeneticSolution(Protocol):
     """Represent one evaluated solution used by the GA engine.
 
-    The evaluated solution exposes comparable fitness information and optional metrics while keeping the evaluation semantics inside the problem domain.
+    The evaluated solution exposes comparable fitness information and optional
+    metrics while keeping the evaluation semantics inside the problem domain.
     """
 
     @property

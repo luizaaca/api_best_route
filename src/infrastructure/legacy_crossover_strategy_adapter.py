@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
-from src.domain.interfaces import ICrossoverStrategy
-from src.domain.interfaces.ga_crossover_strategy import IGeneticCrossoverStrategy
+from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
+    ICrossoverStrategy,
+)
+from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
+    IGeneticCrossoverStrategy,
+)
 from src.domain.models.route_genetic_solution import RouteGeneticSolution
 
 

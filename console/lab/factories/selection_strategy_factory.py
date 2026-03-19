@@ -9,7 +9,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from console.lab.runtime_logging import RuntimeLogger, emit_ignored_params_message
-from src.domain.interfaces import ISelectionStrategy
+from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
+    ISelectionStrategy,
+)
 from src.infrastructure.genetic_algorithm.selection import (
     RankSelectionStrategy,
     RoulleteSelectionStrategy,

@@ -4,7 +4,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from console.lab.runtime_logging import RuntimeLogger, emit_ignored_params_message
-from src.domain.interfaces import ICrossoverStrategy
+from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
+    ICrossoverStrategy,
+)
 from src.infrastructure.genetic_algorithm.crossover import (
     CycleCrossoverStrategy,
     EdgeRecombinationCrossoverStrategy,

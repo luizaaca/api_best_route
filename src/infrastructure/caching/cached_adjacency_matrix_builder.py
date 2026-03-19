@@ -4,11 +4,9 @@ This implementation checks a persistent segment cache before computing a
 segment and stores newly computed segments for future reuse.
 """
 
-from src.domain.interfaces import (
-    IAdjacencyMatrixBuilder,
-    IAdjacencySegmentCache,
-    IRouteCalculator,
-)
+from src.domain.interfaces.caching.adjacency_segment_cache import IAdjacencySegmentCache
+from src.domain.interfaces.geo_graph.adjacency_matrix_builder import IAdjacencyMatrixBuilder
+from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
 from src.domain.models import RouteNode, RouteSegment
 
 
