@@ -29,68 +29,28 @@ from src.domain.models import (
     VehicleRoute,
     VehicleRouteInfo,
 )
-from src.infrastructure.fixed_genetic_state_controller import FixedGeneticStateController
+from src.infrastructure.fixed_genetic_state_controller import (
+    FixedGeneticStateController,
+)
 from src.infrastructure.genetic_algorithm_engine import GeneticAlgorithm
-from src.infrastructure.legacy_crossover_strategy_adapter import LegacyCrossoverStrategyAdapter
-from src.infrastructure.legacy_mutation_strategy_adapter import LegacyMutationStrategyAdapter
-from src.infrastructure.legacy_population_generator_adapter import LegacyPopulationGeneratorAdapter
-from src.infrastructure.legacy_selection_strategy_adapter import LegacySelectionStrategyAdapter
+from src.infrastructure.legacy_crossover_strategy_adapter import (
+    LegacyCrossoverStrategyAdapter,
+)
+from src.infrastructure.legacy_mutation_strategy_adapter import (
+    LegacyMutationStrategyAdapter,
+)
+from src.infrastructure.legacy_population_generator_adapter import (
+    LegacyPopulationGeneratorAdapter,
+)
+from src.infrastructure.legacy_selection_strategy_adapter import (
+    LegacySelectionStrategyAdapter,
+)
 from src.infrastructure.route_calculator import AdjacencyMatrix
 from src.infrastructure.tsp_genetic_problem import TSPGeneticProblem
 
 
 class TSPGeneticAlgorithm(IRouteOptimizer):
     """Route-specific optimizer facade over the generic genetic algorithm engine."""
-
-    @staticmethod
-    def _build_origin_route_segment(origin: RouteNode) -> RouteSegment:
-        """Delegate origin-segment creation to the route-domain problem adapter."""
-        return TSPGeneticProblem._build_origin_route_segment(origin)
-
-    @classmethod
-    def _prepend_origin_segment(
-        cls,
-        origin: RouteNode,
-        route_info: RouteSegmentsInfo,
-    ) -> RouteSegmentsInfo:
-        """Delegate origin prepending to the route-domain problem adapter."""
-        _ = cls
-        return TSPGeneticProblem._prepend_origin_segment(origin, route_info)
-
-    @classmethod
-    def _build_empty_vehicle_route_info(
-        cls,
-        route: VehicleRoute,
-        vehicle_id: int,
-    ) -> VehicleRouteInfo:
-        """Delegate empty-route handling to the route-domain problem adapter."""
-        _ = cls
-        return TSPGeneticProblem._build_empty_vehicle_route_info(route, vehicle_id)
-
-    @staticmethod
-    def _fitness(route_info: FleetRouteInfo) -> float:
-        """Delegate route fitness computation to the route-domain problem adapter."""
-        return TSPGeneticProblem._fitness(route_info)
-
-    def _evaluate_individual(
-        self,
-        individual: Individual,
-        adjacency_matrix: dict[tuple[int, int], RouteSegment],
-    ) -> FleetRouteInfo:
-        """Evaluate an individual by converting it into route metrics.
-
-        Args:
-            individual: A candidate solution comprising several vehicle routes.
-            adjacency_matrix: A precomputed map of route segments between nodes.
-
-        Returns:
-            A FleetRouteInfo representing the evaluated fitness and route details.
-        """
-        if adjacency_matrix is self._adjacency_matrix:
-            return self._problem.evaluate_individual(RouteGeneticSolution(individual))
-        return TSPGeneticProblem(adjacency_matrix).evaluate_individual(
-            RouteGeneticSolution(individual)
-        )
 
     def __init__(
         self,
@@ -180,7 +140,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
             )
         )
         if self._plotter is not None:
-            self._plotter.plot(evaluated_solution.route_info)
+            self._plotter.plot(evaluated_solution._route_info)
 
     def solve(
         self,
@@ -231,7 +191,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
                 state_name="legacy-fixed",
                 operators=self._build_legacy_generation_operators(),
             ),
-            logger=None,
+            logger=self._logger,
             on_generation=generation_records.append,
             on_generation_evaluated=self._handle_generation,
         )

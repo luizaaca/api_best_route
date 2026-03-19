@@ -44,7 +44,7 @@ class LegacySelectionStrategyAdapter(
         """
         raw_population = [solution.individual for solution in population]
         raw_evaluated_population = [
-            evaluation.route_info for evaluation in evaluated_population
+            evaluation._route_info for evaluation in evaluated_population
         ]
         parent1, parent2 = self._strategy.select_parents(
             raw_population,

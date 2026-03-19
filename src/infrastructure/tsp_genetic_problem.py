@@ -82,21 +82,7 @@ class TSPGeneticProblem(
         )
         return VehicleRouteInfo.from_route_segments_info(vehicle_id, route_info)
 
-    @staticmethod
-    def _fitness(route_info: FleetRouteInfo) -> float:
-        """Return the comparable fitness score for one evaluated fleet route.
-
-        Args:
-            route_info: Fleet route information to evaluate.
-
-        Returns:
-            Route total cost when available, otherwise fleet makespan.
-        """
-        if route_info.total_cost is not None:
-            return route_info.total_cost
-        return route_info.max_vehicle_eta
-
-    def evaluate_individual(self, solution: RouteGeneticSolution) -> FleetRouteInfo:
+    def _evaluate_individual(self, solution: RouteGeneticSolution) -> FleetRouteInfo:
         """Evaluate one wrapped route solution into fleet route metrics.
 
         Args:
@@ -129,7 +115,7 @@ class TSPGeneticProblem(
         solution: RouteGeneticSolution,
     ) -> EvaluatedRouteSolution:
         """Evaluate one wrapped route solution for the generic engine."""
-        route_info = self.evaluate_individual(solution)
+        route_info = self._evaluate_individual(solution)
         return EvaluatedRouteSolution(solution=solution, route_info=route_info)
 
     def evaluate_population(
@@ -156,7 +142,7 @@ class TSPGeneticProblem(
     ) -> OptimizationResult:
         """Build the route-domain optimization result returned to callers."""
         return OptimizationResult(
-            best_route=best_evaluated_solution.route_info,
+            best_route=best_evaluated_solution._route_info,
             best_fitness=best_evaluated_solution.fitness,
             population_size=population_size,
             generations_run=generations_run,

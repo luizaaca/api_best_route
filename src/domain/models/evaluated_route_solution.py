@@ -21,9 +21,23 @@ class EvaluatedRouteSolution(IEvaluatedGeneticSolution):
         metrics: Optional extra metrics exposed to adaptive policies and logs.
     """
 
-    solution: RouteGeneticSolution
-    route_info: FleetRouteInfo
-    metrics: dict[str, Any] = field(default_factory=dict)
+    _solution: RouteGeneticSolution
+    _route_info: FleetRouteInfo
+    _metrics: dict[str, Any] = field(default_factory=dict)
+
+    def __init__(
+        self,
+        solution: RouteGeneticSolution,
+        route_info: FleetRouteInfo,
+        metrics: dict[str, Any] | None = None,
+    ) -> None:
+        self._solution = solution
+        self._route_info = route_info
+        self._metrics = {} if metrics is None else metrics
+
+    @property
+    def solution(self) -> RouteGeneticSolution:
+        return self._solution
 
     @property
     def fitness(self) -> float:
@@ -32,9 +46,9 @@ class EvaluatedRouteSolution(IEvaluatedGeneticSolution):
         Returns:
             The route total cost when available, otherwise the fleet makespan.
         """
-        if self.route_info.total_cost is not None:
-            return self.route_info.total_cost
-        return self.route_info.max_vehicle_eta
+        if self._route_info.total_cost is not None:
+            return self._route_info.total_cost
+        return self._route_info.max_vehicle_eta
 
     def metric(self, name: str, default: Any = None) -> Any:
         """Return one route metric by name.
@@ -46,13 +60,13 @@ class EvaluatedRouteSolution(IEvaluatedGeneticSolution):
         Returns:
             The matching metric value or `default`.
         """
-        if name in self.metrics:
-            return self.metrics[name]
+        if name in self._metrics:
+            return self._metrics[name]
         route_metric_map = {
-            "total_length": self.route_info.total_length,
-            "total_eta": self.route_info.total_eta,
-            "total_cost": self.route_info.total_cost,
-            "min_vehicle_eta": self.route_info.min_vehicle_eta,
-            "max_vehicle_eta": self.route_info.max_vehicle_eta,
+            "total_length": self._route_info.total_length,
+            "total_eta": self._route_info.total_eta,
+            "total_cost": self._route_info.total_cost,
+            "min_vehicle_eta": self._route_info.min_vehicle_eta,
+            "max_vehicle_eta": self._route_info.max_vehicle_eta,
         }
         return route_metric_map.get(name, default)
