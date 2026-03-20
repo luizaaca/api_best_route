@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Callable, Protocol, runtime_checkable
 
-from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.route_segment import RouteSegment
+from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
 
 
 @runtime_checkable

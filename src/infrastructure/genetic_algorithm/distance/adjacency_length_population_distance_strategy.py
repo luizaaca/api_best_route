@@ -1,6 +1,6 @@
 """Heuristic distance strategy using precomputed adjacency segment length."""
 
-from src.domain.models import RouteNode
+from src.domain.models.geo_graph.route_node import RouteNode
 
 from .base_adjacency_population_distance_strategy import (
     BaseAdjacencyPopulationDistanceStrategy,

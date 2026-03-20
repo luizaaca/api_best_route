@@ -10,7 +10,9 @@ from collections.abc import Callable
 from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
     ISelectionStrategy,
 )
-from src.domain.models import FleetRouteInfo, Individual, Population
+from src.domain.models.genetic_algorithm.individual import Individual
+from src.domain.models.genetic_algorithm.population import Population
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
 
 
 class TournamentSelectionStrategy(ISelectionStrategy):

@@ -9,7 +9,8 @@ from abc import ABC, abstractmethod
 import random
 from math import floor
 
-from src.domain.models import Individual, RouteNode
+from src.domain.models.genetic_algorithm.individual import Individual
+from src.domain.models.geo_graph.route_node import RouteNode
 
 
 class BasePermutationCrossoverStrategy(ABC):

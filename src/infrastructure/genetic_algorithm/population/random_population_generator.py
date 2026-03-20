@@ -5,7 +5,9 @@ import random
 from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
     IPopulationGenerator,
 )
-from src.domain.models import Population, RouteNode, VehicleRoute
+from src.domain.models.genetic_algorithm.population import Population
+from src.domain.models.genetic_algorithm.vehicle_route import VehicleRoute
+from src.domain.models.geo_graph.route_node import RouteNode
 
 
 class RandomPopulationGenerator(IPopulationGenerator):

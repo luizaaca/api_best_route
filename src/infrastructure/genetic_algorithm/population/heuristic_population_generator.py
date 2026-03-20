@@ -11,7 +11,10 @@ from src.domain.interfaces.genetic_algorithm.operators.population_generator_lega
 from src.domain.interfaces.geo_graph.heuristic_distance import (
     IHeuristicDistanceStrategy,
 )
-from src.domain.models import Individual, Population, RouteNode, VehicleRoute
+from src.domain.models.genetic_algorithm.individual import Individual
+from src.domain.models.genetic_algorithm.population import Population
+from src.domain.models.genetic_algorithm.vehicle_route import VehicleRoute
+from src.domain.models.geo_graph.route_node import RouteNode
 
 
 class HeuristicPopulationGenerator(IPopulationGenerator):

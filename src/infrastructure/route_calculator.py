@@ -10,10 +10,13 @@ from typing import Any, cast
 import networkx as nx
 
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
-from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.adjacency_matrix_map import AdjacencyMatrixMap
+from src.domain.models.route_optimization.route_segment import RouteSegment
+from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
 
 
-AdjacencyMatrix = dict[tuple[int, int], RouteSegment]
+AdjacencyMatrix = AdjacencyMatrixMap
 
 
 class RouteCalculator(IRouteCalculator):

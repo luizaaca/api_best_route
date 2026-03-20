@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .graph import RouteNode
+from .route_node import RouteNode
 
 
 @dataclass(slots=True)

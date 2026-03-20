@@ -18,7 +18,8 @@ from shapely.geometry import MultiPoint
 
 from src.domain.interfaces.geo_graph.geocoding_resolver import IGeocodingResolver
 from src.domain.interfaces.geo_graph.graph_generator import IGraphGenerator
-from src.domain.models import GraphContext, RouteNode
+from src.domain.models.geo_graph.graph_context import GraphContext
+from src.domain.models.geo_graph.route_node import RouteNode
 
 
 class OSMnxGraphGenerator(IGraphGenerator):

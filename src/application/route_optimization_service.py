@@ -6,13 +6,11 @@ from src.domain.interfaces.geo_graph.graph_generator import IGraphGenerator
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
 from src.domain.interfaces.plotting.plotter import IPlotter
 from src.domain.interfaces.route_optimization.route_optimizer import IRouteOptimizer
-from src.domain.models import (
-    FleetRouteInfo,
-    OptimizationResult,
-    RouteNode,
-    RouteSegment,
-    VehicleRouteInfo,
-)
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
+from src.domain.models.route_optimization.route_segment import RouteSegment
+from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
 
 
 class RouteOptimizationService:

@@ -8,7 +8,9 @@ from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy impo
 from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
     IMutationStrategy,
 )
-from src.domain.models.route_genetic_solution import RouteGeneticSolution
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
 
 
 class LegacyMutationStrategyAdapter(IGeneticMutationStrategy[RouteGeneticSolution]):

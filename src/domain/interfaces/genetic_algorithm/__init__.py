@@ -1,10 +1,6 @@
 """Domain protocols for the generic genetic algorithm engine."""
 
-from .ga_evaluated_solution import IEvaluatedGeneticSolution
-from .ga_problem import IGeneticProblem
-from .ga_solution import IGeneticSolution
-from .ga_specification import IGeneticSpecification
-from .ga_state_controller import IGeneticStateController
+from importlib import import_module
 
 __all__ = [
     "IEvaluatedGeneticSolution",
@@ -13,3 +9,22 @@ __all__ = [
     "IGeneticSpecification",
     "IGeneticStateController",
 ]
+
+_EXPORT_MAP = {
+    "IEvaluatedGeneticSolution": ".ga_evaluated_solution",
+    "IGeneticProblem": ".ga_problem",
+    "IGeneticSolution": ".ga_solution",
+    "IGeneticSpecification": ".ga_specification",
+    "IGeneticStateController": ".ga_state_controller",
+}
+
+
+def __getattr__(name: str):
+    """Lazily resolve generic GA protocol exports."""
+    module_path = _EXPORT_MAP.get(name)
+    if module_path is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = import_module(module_path, __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value

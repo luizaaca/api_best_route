@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 import copy
 import random
 
-from src.domain.models import Individual
+from src.domain.models.genetic_algorithm.individual import Individual
 
 
 class BaseCopyingMutationStrategy(ABC):

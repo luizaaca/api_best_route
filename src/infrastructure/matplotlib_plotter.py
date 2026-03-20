@@ -6,7 +6,8 @@ rendering the graph, static POIs, and dynamic route segments with fitness tracki
 
 from src.domain.interfaces.plotting.plotter import IPlotter
 from matplotlib.collections import LineCollection
-from src.domain.models import FleetRouteInfo, GraphContext
+from src.domain.models.geo_graph.graph_context import GraphContext
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import osmnx as ox

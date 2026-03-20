@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from src.domain.models import Individual
+from src.domain.models.genetic_algorithm.individual import Individual
 
 
 @runtime_checkable

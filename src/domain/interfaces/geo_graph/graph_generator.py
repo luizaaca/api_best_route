@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Callable, Protocol, runtime_checkable
 
-from src.domain.models import GraphContext
+from src.domain.models.geo_graph.graph_context import GraphContext
 
 
 @runtime_checkable

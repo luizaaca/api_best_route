@@ -10,7 +10,7 @@ import random
 from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
     IMutationStrategy,
 )
-from src.domain.models import Individual
+from src.domain.models.genetic_algorithm.individual import Individual
 
 from .base_copying_mutation_strategy import BaseCopyingMutationStrategy
 

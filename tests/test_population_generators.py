@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.domain.models import RouteNode
+from src.domain.models.geo_graph.route_node import RouteNode
 from src.infrastructure.genetic_algorithm import (
     AdjacencyCostPopulationDistanceStrategy,
     AdjacencyEtaPopulationDistanceStrategy,

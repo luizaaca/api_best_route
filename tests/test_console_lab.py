@@ -22,16 +22,14 @@ import console.lab.orchestration.lab_optimizer_builder as lab_optimizer_builder_
 from console.lab.orchestration.lab_optimizer_builder import LabOptimizerBuilder
 from console.lab.models.lab_run_config import LabRunConfig
 from console.lab.reporting import LabConsoleReportRenderer
+from src.domain.models.geo_graph.graph_context import GraphContext
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
+from src.domain.models.route_optimization.route_segment import RouteSegment
+from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
+from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
 from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
-from src.domain.models import (
-    FleetRouteInfo,
-    GraphContext,
-    OptimizationResult,
-    RouteNode,
-    RouteSegment,
-    RouteSegmentsInfo,
-    VehicleRouteInfo,
-)
 
 
 class DummyGraphGenerator:

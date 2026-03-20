@@ -1,11 +1,12 @@
-"""Domain protocol for building adjacency matrices of route segments."""
+"""Domain protocol for building adjacency matrices used by route optimization."""
 
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from src.domain.models import AdjacencyMatrixMap, RouteNode
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
+from src.domain.models.route_optimization.adjacency_matrix_map import AdjacencyMatrixMap
+from src.domain.models.geo_graph.route_node import RouteNode
 
 
 @runtime_checkable

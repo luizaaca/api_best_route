@@ -1,23 +1,10 @@
-"""Domain model exports used across the application."""
+"""Convenience exports for domain models.
 
-from .ga_generation_context import GenerationContext
-from .ga_generation_operators import GenerationOperators
-from .ga_generation_record import GenerationRecord
-from .ga_state_resolution import GenerationStateResolution
-from .ga_transition_rule import TransitionRule
-from .evaluated_route_solution import EvaluatedRouteSolution
-from .genetic_algorithm import Individual, Population, VehicleRoute
-from .graph import AdjacencyMatrixMap, GraphContext, RouteNode
-from .optimization import OptimizationResult
-from .route_genetic_solution import RouteGeneticSolution
-from .route_population_seed_data import RoutePopulationSeedData
-from .route import (
-    FleetRouteInfo,
-    RouteMetrics,
-    RouteSegment,
-    RouteSegmentsInfo,
-    VehicleRouteInfo,
-)
+The root package resolves model symbols lazily so importing one lightweight
+model does not initialize unrelated GA orchestration modules.
+"""
+
+from importlib import import_module
 
 __all__ = [
     "FleetRouteInfo",
@@ -41,3 +28,37 @@ __all__ = [
     "VehicleRoute",
     "VehicleRouteInfo",
 ]
+
+_EXPORT_MAP = {
+    "AdjacencyMatrixMap": ".route_optimization.adjacency_matrix_map",
+    "EvaluatedRouteSolution": ".genetic_algorithm.evaluated_route_solution",
+    "FleetRouteInfo": ".route_optimization.fleet_route_info",
+    "GenerationContext": ".ga_generation_context",
+    "GenerationOperators": ".ga_generation_operators",
+    "GenerationRecord": ".ga_generation_record",
+    "GenerationStateResolution": ".ga_state_resolution",
+    "GraphContext": ".geo_graph.graph_context",
+    "Individual": ".genetic_algorithm.individual",
+    "OptimizationResult": ".route_optimization.optimization_result",
+    "Population": ".genetic_algorithm.population",
+    "RouteGeneticSolution": ".genetic_algorithm.route_genetic_solution",
+    "RouteMetrics": ".route_optimization.route_metrics",
+    "RouteNode": ".geo_graph.route_node",
+    "RoutePopulationSeedData": ".geo_graph.route_population_seed_data",
+    "RouteSegment": ".route_optimization.route_segment",
+    "RouteSegmentsInfo": ".route_optimization.route_segments_info",
+    "TransitionRule": ".ga_transition_rule",
+    "VehicleRoute": ".genetic_algorithm.vehicle_route",
+    "VehicleRouteInfo": ".route_optimization.vehicle_route_info",
+}
+
+
+def __getattr__(name: str):
+    """Lazily resolve model exports on first access."""
+    module_path = _EXPORT_MAP.get(name)
+    if module_path is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = import_module(module_path, __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value

@@ -4,15 +4,13 @@ import os
 # ensure src directory is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.domain.models import (
-    FleetRouteInfo,
-    OptimizationResult,
-    RouteNode,
-    RouteSegment,
-    RouteSegmentsInfo,
-    GraphContext,
-    VehicleRouteInfo,
-)
+from src.domain.models.geo_graph.graph_context import GraphContext
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
+from src.domain.models.route_optimization.route_segment import RouteSegment
+from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
+from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
 from src.application.route_optimization_service import RouteOptimizationService
 import networkx as nx
 

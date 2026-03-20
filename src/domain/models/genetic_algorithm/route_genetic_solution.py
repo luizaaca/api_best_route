@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from src.domain.interfaces.genetic_algorithm.ga_solution import IGeneticSolution
 
-from .genetic_algorithm import Individual
+from .individual import Individual
 
 
 @dataclass(slots=True)
@@ -22,9 +22,5 @@ class RouteGeneticSolution(IGeneticSolution):
     individual: Individual
 
     def clone(self) -> "RouteGeneticSolution":
-        """Return a detached copy of the wrapped route solution.
-
-        Returns:
-            A deep-copied route solution safe for elitism and mutation.
-        """
+        """Return a detached copy of the wrapped route solution."""
         return RouteGeneticSolution(copy.deepcopy(self.individual))

@@ -11,8 +11,12 @@ from src.domain.interfaces.genetic_algorithm.operators.population_generator_lega
     IPopulationGenerator,
 )
 from src.domain.models.ga_generation_context import GenerationContext
-from src.domain.models.route_genetic_solution import RouteGeneticSolution
-from src.domain.models.route_population_seed_data import RoutePopulationSeedData
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
 
 
 class LegacyPopulationGeneratorAdapter(

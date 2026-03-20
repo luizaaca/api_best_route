@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from src.domain.models import Population, VehicleRoute
+from src.domain.models.genetic_algorithm.population import Population
+from src.domain.models.genetic_algorithm.vehicle_route import VehicleRoute
 
 
 @runtime_checkable

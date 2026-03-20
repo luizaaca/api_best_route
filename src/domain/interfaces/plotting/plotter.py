@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from src.domain.models import FleetRouteInfo
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
 
 
 @runtime_checkable

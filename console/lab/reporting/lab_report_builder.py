@@ -13,7 +13,9 @@ from console.lab.models.lab_run_config import LabRunConfig
 from console.lab.models.lab_run_result import LabRunResult
 from console.lab.models.lab_search_summary import LabSearchSummary
 from console.lab.models.lab_vehicle_route_summary import LabVehicleRouteSummary
-from src.domain.models import FleetRouteInfo, OptimizationResult, VehicleRouteInfo
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
+from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
 
 
 class LabReportBuilder:

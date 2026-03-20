@@ -9,7 +9,7 @@ import sqlite3
 from pathlib import Path
 
 from src.domain.interfaces.caching.adjacency_segment_cache import IAdjacencySegmentCache
-from src.domain.models import RouteSegment
+from src.domain.models.route_optimization.route_segment import RouteSegment
 
 
 class SQLiteAdjacencySegmentCache(IAdjacencySegmentCache):

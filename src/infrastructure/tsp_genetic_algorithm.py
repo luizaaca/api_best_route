@@ -20,21 +20,25 @@ from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy
 )
 from src.domain.interfaces.plotting.plotter import IPlotter
 from src.domain.interfaces.route_optimization.route_optimizer import IRouteOptimizer
-from src.domain.models import (
+from src.domain.models.ga_generation_operators import GenerationOperators
+from src.domain.models.ga_generation_record import GenerationRecord
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
     EvaluatedRouteSolution,
-    FleetRouteInfo,
-    GenerationOperators,
-    GenerationRecord,
-    Individual,
-    OptimizationResult,
-    RouteNode,
-    RoutePopulationSeedData,
-    RouteSegment,
-    RouteSegmentsInfo,
-    RouteGeneticSolution,
-    VehicleRoute,
-    VehicleRouteInfo,
 )
+from src.domain.models.genetic_algorithm.individual import Individual
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
+from src.domain.models.genetic_algorithm.vehicle_route import VehicleRoute
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
+from src.domain.models.route_optimization.route_segment import RouteSegment
+from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
+from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
 from src.infrastructure.fixed_genetic_state_controller import (
     FixedGeneticStateController,
 )

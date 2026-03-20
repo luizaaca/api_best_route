@@ -8,20 +8,14 @@ from typing import Any
 from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
     IEvaluatedGeneticSolution,
 )
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
 
-from .route import FleetRouteInfo
 from .route_genetic_solution import RouteGeneticSolution
 
 
 @dataclass(slots=True)
 class EvaluatedRouteSolution(IEvaluatedGeneticSolution):
-    """Store one evaluated route solution and its comparable metrics.
-
-    Attributes:
-        solution: Raw route solution that was evaluated.
-        route_info: Route-domain metrics assembled from the raw solution.
-        metrics: Optional extra metrics exposed to adaptive policies and logs.
-    """
+    """Store one evaluated route solution and its comparable metrics."""
 
     _solution: RouteGeneticSolution
     _route_info: FleetRouteInfo
@@ -39,29 +33,18 @@ class EvaluatedRouteSolution(IEvaluatedGeneticSolution):
 
     @property
     def solution(self) -> RouteGeneticSolution:
+        """Return the raw route solution that was evaluated."""
         return self._solution
 
     @property
     def fitness(self) -> float:
-        """Return the scalar fitness used by the generic GA engine.
-
-        Returns:
-            The route total cost when available, otherwise the fleet makespan.
-        """
+        """Return the scalar fitness used by the generic GA engine."""
         if self._route_info.total_cost is not None:
             return self._route_info.total_cost
         return self._route_info.max_vehicle_eta
 
     def metric(self, name: str, default: Any = None) -> Any:
-        """Return one route metric by name.
-
-        Args:
-            name: Metric identifier.
-            default: Value returned when the metric is unavailable.
-
-        Returns:
-            The matching metric value or `default`.
-        """
+        """Return one route metric by name."""
         if name in self._metrics:
             return self._metrics[name]
         route_metric_map = {

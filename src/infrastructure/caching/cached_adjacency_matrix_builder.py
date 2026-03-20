@@ -5,9 +5,12 @@ segment and stores newly computed segments for future reuse.
 """
 
 from src.domain.interfaces.caching.adjacency_segment_cache import IAdjacencySegmentCache
-from src.domain.interfaces.geo_graph.adjacency_matrix_builder import IAdjacencyMatrixBuilder
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
-from src.domain.models import RouteNode, RouteSegment
+from src.domain.interfaces.route_optimization.adjacency_matrix_builder import (
+    IAdjacencyMatrixBuilder,
+)
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.route_segment import RouteSegment
 
 
 class CachedAdjacencyMatrixBuilder(IAdjacencyMatrixBuilder):

@@ -7,7 +7,9 @@ import networkx as nx
 # ensure src directory is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.domain.models import RouteNode, RouteSegment, RouteSegmentsInfo
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.route_segment import RouteSegment
+from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
 from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
     ICrossoverStrategy,
 )

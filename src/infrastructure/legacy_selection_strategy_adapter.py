@@ -11,8 +11,12 @@ from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy imp
 from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
     ISelectionStrategy,
 )
-from src.domain.models.evaluated_route_solution import EvaluatedRouteSolution
-from src.domain.models.route_genetic_solution import RouteGeneticSolution
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
+    EvaluatedRouteSolution,
+)
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
 
 
 class LegacySelectionStrategyAdapter(

@@ -1,8 +1,11 @@
 """Adjacency matrix builder that computes segments on-demand without caching."""
 
-from src.domain.interfaces.geo_graph.adjacency_matrix_builder import IAdjacencyMatrixBuilder
+from src.domain.interfaces.route_optimization.adjacency_matrix_builder import (
+    IAdjacencyMatrixBuilder,
+)
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
-from src.domain.models import RouteNode, RouteSegment
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.route_segment import RouteSegment
 from src.infrastructure.route_calculator import build_adjacency_matrix
 
 

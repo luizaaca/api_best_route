@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from src.domain.models import OptimizationResult, RouteNode
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
 
 
 @runtime_checkable

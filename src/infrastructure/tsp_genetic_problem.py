@@ -5,16 +5,18 @@ from __future__ import annotations
 from typing import Sequence
 
 from src.domain.interfaces.genetic_algorithm.ga_problem import IGeneticProblem
-from src.domain.models.evaluated_route_solution import EvaluatedRouteSolution
-from src.domain.models.genetic_algorithm import VehicleRoute
-from src.domain.models.optimization import OptimizationResult
-from src.domain.models.route import (
-    FleetRouteInfo,
-    RouteSegment,
-    RouteSegmentsInfo,
-    VehicleRouteInfo,
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
+    EvaluatedRouteSolution,
 )
-from src.domain.models.route_genetic_solution import RouteGeneticSolution
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
+from src.domain.models.genetic_algorithm.vehicle_route import VehicleRoute
+from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
+from src.domain.models.route_optimization.route_segment import RouteSegment
+from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
+from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
 from src.infrastructure.route_calculator import AdjacencyMatrix
 
 

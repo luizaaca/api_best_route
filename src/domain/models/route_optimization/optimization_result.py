@@ -2,14 +2,14 @@
 
 from dataclasses import dataclass, field
 
-from .ga_generation_record import GenerationRecord
+from src.domain.models.ga_generation_record import GenerationRecord
 
-from .route import FleetRouteInfo
+from .fleet_route_info import FleetRouteInfo
 
 
 @dataclass
 class OptimizationResult:
-    """Encapsulates the results and metrics from a genetic algorithm run."""
+    """Encapsulate the results and metrics from a genetic algorithm run."""
 
     best_route: FleetRouteInfo
     best_fitness: float

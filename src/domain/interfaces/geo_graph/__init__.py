@@ -1,15 +1,28 @@
 """Domain protocols for graph generation, routing, and geocoding resolution."""
 
-from .adjacency_matrix_builder import IAdjacencyMatrixBuilder
-from .geocoding_resolver import IGeocodingResolver
-from .graph_generator import IGraphGenerator
-from .heuristic_distance import IHeuristicDistanceStrategy
-from .route_calculator import IRouteCalculator
+from importlib import import_module
 
 __all__ = [
-    "IAdjacencyMatrixBuilder",
     "IGeocodingResolver",
     "IGraphGenerator",
     "IHeuristicDistanceStrategy",
     "IRouteCalculator",
 ]
+
+_EXPORT_MAP = {
+    "IGeocodingResolver": ".geocoding_resolver",
+    "IGraphGenerator": ".graph_generator",
+    "IHeuristicDistanceStrategy": ".heuristic_distance",
+    "IRouteCalculator": ".route_calculator",
+}
+
+
+def __getattr__(name: str):
+    """Lazily resolve geo-graph protocol exports."""
+    module_path = _EXPORT_MAP.get(name)
+    if module_path is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = import_module(module_path, __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
