@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from functools import lru_cache
 from typing import Any
 
+from api.config import load_adaptive_ga_config
 from src.application.route_optimization_service import RouteOptimizationService
 from src.domain.interfaces.genetic_algorithm.engine.specification import (
     IGeneticSpecification,
@@ -123,6 +124,21 @@ def get_graph_generator() -> OSMnxGraphGenerator:
             fallback_resolver=PhotonGeocodingResolver(),
         )
     )
+
+
+@lru_cache
+def get_adaptive_ga_config() -> dict[str, Any]:
+    """Return the required API adaptive GA configuration loaded from disk.
+
+    Returns:
+        The parsed adaptive GA configuration read from the fixed repository-root
+        `config.json` file.
+
+    Raises:
+        FileNotFoundError: If the required config file does not exist.
+        ValueError: If the config file contents are invalid.
+    """
+    return load_adaptive_ga_config()
 
 
 def _build_population_distance_strategy(adjacency_matrix, weight_type, cost_type):
@@ -414,9 +430,49 @@ def _build_default_optimizer(
 
 def get_route_optimization_service() -> RouteOptimizationService:
     """Return the RouteOptimizationService configured with default dependencies."""
+    api_adaptive_config = get_adaptive_ga_config()
+
+    def optimizer_factory(
+        calc,
+        route_nodes,
+        weight_type,
+        cost_type,
+        plotter,
+        population_size,
+        adaptive_config=None,
+    ) -> TSPGeneticAlgorithm:
+        """Build one optimizer using the API's required adaptive configuration.
+
+        Args:
+            calc: Route calculator used to evaluate route segments.
+            route_nodes: Nodes that define the optimization problem.
+            weight_type: Requested route-weight strategy.
+            cost_type: Optional cost strategy.
+            plotter: Optional plotter used for visualization.
+            population_size: Population size for the optimization run.
+            adaptive_config: Optional config supplied by callers that still use
+                the service's adaptive-config parameter path.
+
+        Returns:
+            A configured `TSPGeneticAlgorithm` instance.
+        """
+        resolved_adaptive_config = (
+            adaptive_config if adaptive_config is not None else api_adaptive_config
+        )
+
+        return _build_default_optimizer(
+            calc=calc,
+            route_nodes=route_nodes,
+            weight_type=weight_type,
+            cost_type=cost_type,
+            plotter=plotter,
+            population_size=population_size,
+            adaptive_config=resolved_adaptive_config,
+        )
+
     return RouteOptimizationService(
         graph_generator=get_graph_generator(),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=_build_default_optimizer,
+        optimizer_factory=optimizer_factory,
         plotter_factory=None,
     )

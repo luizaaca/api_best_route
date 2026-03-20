@@ -87,6 +87,10 @@ pip install -r requirements.txt
 uvicorn api.main:app --reload
 ```
 
+The API is **config-only** and requires `api/config.json`
+file at startup. The committed default `config.json` defines the adaptive GA
+state graph used by the API.
+
 The interactive API documentation is available at:
 
 - `http://127.0.0.1:8000/docs`

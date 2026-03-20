@@ -1,0 +1,25 @@
+{
+  "initial_state": "baseline",
+  "states": [
+    {
+      "name": "baseline",
+      "selection": {
+        "name": "roulette"
+      },
+      "crossover": {
+        "name": "order"
+      },
+      "mutation": {
+        "name": "swap_redistribute"
+      },
+      "mutation_probability": 0.5,
+      "population_generator": {
+        "name": "hybrid",
+        "params": {
+          "heuristic_ratio": 0.4
+        }
+      },
+      "transition_rules": []
+    }
+  ]
+}

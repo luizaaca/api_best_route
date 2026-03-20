@@ -16,7 +16,7 @@ from api.schemas import (
     OptimizeRouteResponse,
     VehicleRouteResponse,
 )
-from api.dependencies import get_route_optimization_service
+from api.dependencies import get_adaptive_ga_config, get_route_optimization_service
 from src.application.route_optimization_service import RouteOptimizationService
 
 app = FastAPI(
@@ -32,6 +32,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def validate_adaptive_ga_config() -> None:
+    """Validate that the API adaptive GA configuration is available at startup.
+
+    Raises:
+        FileNotFoundError: If the required repository-root `config.json` file is
+            missing.
+        ValueError: If the config file contents are invalid.
+    """
+    get_adaptive_ga_config()
 
 
 @app.post("/optimize_route", response_model=OptimizeRouteResponse)
