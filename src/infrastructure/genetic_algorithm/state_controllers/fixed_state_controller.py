@@ -4,16 +4,22 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
+from src.domain.interfaces.genetic_algorithm.engine.state_controller import (
+    IGeneticStateController,
+)
 from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
     IEvaluatedGeneticSolution,
 )
 from src.domain.interfaces.genetic_algorithm.ga_solution import IGeneticSolution
-from src.domain.interfaces.genetic_algorithm.ga_state_controller import (
-    IGeneticStateController,
+from src.domain.models.genetic_algorithm.engine.generation_context import (
+    GenerationContext,
 )
-from src.domain.models.ga_generation_context import GenerationContext
-from src.domain.models.ga_generation_operators import GenerationOperators
-from src.domain.models.ga_state_resolution import GenerationStateResolution
+from src.domain.models.genetic_algorithm.engine.generation_operators import (
+    GenerationOperators,
+)
+from src.domain.models.genetic_algorithm.engine.state_resolution import (
+    GenerationStateResolution,
+)
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar("TEvaluated", bound=IEvaluatedGeneticSolution)

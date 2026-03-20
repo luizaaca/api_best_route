@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from src.domain.models.ga_generation_context import GenerationContext
+from src.domain.models.genetic_algorithm.engine.generation_context import (
+    GenerationContext,
+)
 
 
 @runtime_checkable

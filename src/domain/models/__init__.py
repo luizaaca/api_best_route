@@ -1,7 +1,6 @@
 """Convenience exports for domain models.
 
-The root package resolves model symbols lazily so importing one lightweight
-model does not initialize unrelated GA orchestration modules.
+The root package resolves model symbols lazily so importing one lightweight model does not initialize unrelated GA orchestration modules.
 """
 
 from importlib import import_module
@@ -33,10 +32,10 @@ _EXPORT_MAP = {
     "AdjacencyMatrixMap": ".route_optimization.adjacency_matrix_map",
     "EvaluatedRouteSolution": ".genetic_algorithm.evaluated_route_solution",
     "FleetRouteInfo": ".route_optimization.fleet_route_info",
-    "GenerationContext": ".ga_generation_context",
-    "GenerationOperators": ".ga_generation_operators",
-    "GenerationRecord": ".ga_generation_record",
-    "GenerationStateResolution": ".ga_state_resolution",
+    "GenerationContext": ".genetic_algorithm.engine.generation_context",
+    "GenerationOperators": ".genetic_algorithm.engine.generation_operators",
+    "GenerationRecord": ".genetic_algorithm.engine.generation_record",
+    "GenerationStateResolution": ".genetic_algorithm.engine.state_resolution",
     "GraphContext": ".geo_graph.graph_context",
     "Individual": ".genetic_algorithm.individual",
     "OptimizationResult": ".route_optimization.optimization_result",
@@ -47,7 +46,7 @@ _EXPORT_MAP = {
     "RoutePopulationSeedData": ".geo_graph.route_population_seed_data",
     "RouteSegment": ".route_optimization.route_segment",
     "RouteSegmentsInfo": ".route_optimization.route_segments_info",
-    "TransitionRule": ".ga_transition_rule",
+    "TransitionRule": ".genetic_algorithm.engine.transition_rule",
     "VehicleRoute": ".genetic_algorithm.vehicle_route",
     "VehicleRouteInfo": ".route_optimization.vehicle_route_info",
 }

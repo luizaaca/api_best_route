@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass, field
 
-from src.domain.models.ga_generation_record import GenerationRecord
+from src.domain.models.genetic_algorithm.engine.generation_record import (
+    GenerationRecord,
+)
 
 from .fleet_route_info import FleetRouteInfo
 

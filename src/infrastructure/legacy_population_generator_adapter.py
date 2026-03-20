@@ -10,7 +10,9 @@ from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator i
 from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
     IPopulationGenerator,
 )
-from src.domain.models.ga_generation_context import GenerationContext
+from src.domain.models.genetic_algorithm.engine.generation_context import (
+    GenerationContext,
+)
 from src.domain.models.genetic_algorithm.route_genetic_solution import (
     RouteGeneticSolution,
 )

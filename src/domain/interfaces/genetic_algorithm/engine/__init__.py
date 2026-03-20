@@ -3,24 +3,18 @@
 from importlib import import_module
 
 __all__ = [
-    "IEvaluatedGeneticSolution",
-    "IGeneticProblem",
-    "IGeneticSolution",
     "IGeneticSpecification",
     "IGeneticStateController",
 ]
 
 _EXPORT_MAP = {
-    "IEvaluatedGeneticSolution": ".ga_evaluated_solution",
-    "IGeneticProblem": ".ga_problem",
-    "IGeneticSolution": ".ga_solution",
-    "IGeneticSpecification": ".engine.specification",
-    "IGeneticStateController": ".engine.state_controller",
+    "IGeneticSpecification": ".specification",
+    "IGeneticStateController": ".state_controller",
 }
 
 
 def __getattr__(name: str):
-    """Lazily resolve generic GA protocol exports."""
+    """Lazily resolve generic GA engine protocol exports."""
     module_path = _EXPORT_MAP.get(name)
     if module_path is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

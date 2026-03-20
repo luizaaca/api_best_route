@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from typing import Generic, Protocol, TypeVar, runtime_checkable
 
-from src.domain.models.ga_generation_context import GenerationContext
-from src.domain.models.ga_state_resolution import GenerationStateResolution
-from .ga_evaluated_solution import IEvaluatedGeneticSolution
-from .ga_solution import IGeneticSolution
+from src.domain.models.genetic_algorithm.engine.generation_context import (
+    GenerationContext,
+)
+from src.domain.models.genetic_algorithm.engine.state_resolution import (
+    GenerationStateResolution,
+)
+from ..ga_evaluated_solution import IEvaluatedGeneticSolution
+from ..ga_solution import IGeneticSolution
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar("TEvaluated", bound=IEvaluatedGeneticSolution)

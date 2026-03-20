@@ -9,7 +9,7 @@ from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
     IEvaluatedGeneticSolution,
 )
 from src.domain.interfaces.genetic_algorithm.ga_solution import IGeneticSolution
-from .ga_generation_operators import GenerationOperators
+from .generation_operators import GenerationOperators
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar("TEvaluated", bound=IEvaluatedGeneticSolution)

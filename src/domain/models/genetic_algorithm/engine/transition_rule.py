@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from src.domain.interfaces.genetic_algorithm.ga_specification import (
+from src.domain.interfaces.genetic_algorithm.engine.specification import (
     IGeneticSpecification,
 )
-from .ga_generation_context import GenerationContext
+from .generation_context import GenerationContext
 
 
 @dataclass(slots=True)

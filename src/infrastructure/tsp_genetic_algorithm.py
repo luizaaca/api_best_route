@@ -20,8 +20,12 @@ from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy
 )
 from src.domain.interfaces.plotting.plotter import IPlotter
 from src.domain.interfaces.route_optimization.route_optimizer import IRouteOptimizer
-from src.domain.models.ga_generation_operators import GenerationOperators
-from src.domain.models.ga_generation_record import GenerationRecord
+from src.domain.models.genetic_algorithm.engine.generation_operators import (
+    GenerationOperators,
+)
+from src.domain.models.genetic_algorithm.engine.generation_record import (
+    GenerationRecord,
+)
 from src.domain.models.genetic_algorithm.evaluated_route_solution import (
     EvaluatedRouteSolution,
 )
@@ -39,7 +43,7 @@ from src.domain.models.route_optimization.optimization_result import Optimizatio
 from src.domain.models.route_optimization.route_segment import RouteSegment
 from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
 from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
-from src.infrastructure.fixed_genetic_state_controller import (
+from src.infrastructure.genetic_algorithm.state_controllers.fixed_state_controller import (
     FixedGeneticStateController,
 )
 from src.infrastructure.genetic_algorithm_engine import GeneticAlgorithm

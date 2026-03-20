@@ -14,11 +14,15 @@ from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
 )
 from src.domain.interfaces.genetic_algorithm.ga_problem import IGeneticProblem
 from src.domain.interfaces.genetic_algorithm.ga_solution import IGeneticSolution
-from src.domain.interfaces.genetic_algorithm.ga_state_controller import (
+from src.domain.interfaces.genetic_algorithm.engine.state_controller import (
     IGeneticStateController,
 )
-from src.domain.models.ga_generation_context import GenerationContext
-from src.domain.models.ga_generation_record import GenerationRecord
+from src.domain.models.genetic_algorithm.engine.generation_context import (
+    GenerationContext,
+)
+from src.domain.models.genetic_algorithm.engine.generation_record import (
+    GenerationRecord,
+)
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar("TEvaluated", bound=IEvaluatedGeneticSolution)
