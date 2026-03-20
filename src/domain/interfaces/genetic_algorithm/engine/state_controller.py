@@ -10,12 +10,13 @@ from src.domain.models.genetic_algorithm.engine.generation_context import (
 from src.domain.models.genetic_algorithm.engine.state_resolution import (
     GenerationStateResolution,
 )
+from .seed_data import IGeneticSeedData
 from ..ga_evaluated_solution import IEvaluatedGeneticSolution
 from ..ga_solution import IGeneticSolution
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar("TEvaluated", bound=IEvaluatedGeneticSolution)
-TSeedData = TypeVar("TSeedData")
+TSeedData = TypeVar("TSeedData", bound=IGeneticSeedData)
 
 
 @runtime_checkable

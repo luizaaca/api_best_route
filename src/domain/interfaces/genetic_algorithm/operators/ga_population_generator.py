@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Protocol, Sequence, TypeVar, runtime_checkable
 
+from ..engine.seed_data import IGeneticSeedData
 from ..ga_solution import IGeneticSolution
 
-TSeedData = TypeVar("TSeedData", contravariant=True)
+TSeedData = TypeVar("TSeedData", bound=IGeneticSeedData, contravariant=True)
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 
 

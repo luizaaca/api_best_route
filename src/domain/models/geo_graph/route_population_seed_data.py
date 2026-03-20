@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.domain.interfaces.genetic_algorithm.engine.seed_data import (
+    IGeneticSeedData,
+)
 from .route_node import RouteNode
 
 
 @dataclass(slots=True)
-class RoutePopulationSeedData:
+class RoutePopulationSeedData(IGeneticSeedData):
     """Carry the route-domain seed inputs required by population generators.
 
     Attributes:

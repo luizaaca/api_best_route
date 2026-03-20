@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
+from src.domain.interfaces.genetic_algorithm.engine.seed_data import (
+    IGeneticSeedData,
+)
 from src.domain.interfaces.genetic_algorithm.engine.state_controller import (
     IGeneticStateController,
 )
@@ -23,7 +26,7 @@ from src.domain.models.genetic_algorithm.engine.state_resolution import (
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar("TEvaluated", bound=IEvaluatedGeneticSolution)
-TSeedData = TypeVar("TSeedData")
+TSeedData = TypeVar("TSeedData", bound=IGeneticSeedData)
 
 
 class FixedGeneticStateController(

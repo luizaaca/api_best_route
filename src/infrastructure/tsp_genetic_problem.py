@@ -12,6 +12,10 @@ from src.domain.models.genetic_algorithm.route_genetic_solution import (
     RouteGeneticSolution,
 )
 from src.domain.models.genetic_algorithm.vehicle_route import VehicleRoute
+from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
 from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
 from src.domain.models.route_optimization.optimization_result import OptimizationResult
 from src.domain.models.route_optimization.route_segment import RouteSegment
@@ -36,6 +40,25 @@ class TSPGeneticProblem(
             adjacency_matrix: Precomputed route-segment adjacency matrix.
         """
         self._adjacency_matrix = adjacency_matrix
+
+    def build_seed_data(
+        self,
+        route_nodes: list[RouteNode],
+        vehicle_count: int,
+    ) -> RoutePopulationSeedData:
+        """Build the route-domain seed payload for GA population generators.
+
+        Args:
+            route_nodes: Ordered route nodes that define the routing problem.
+            vehicle_count: Number of vehicles available for route construction.
+
+        Returns:
+            The route-specific seed payload consumed by population generators.
+        """
+        return RoutePopulationSeedData(
+            route_nodes=route_nodes,
+            vehicle_count=vehicle_count,
+        )
 
     @staticmethod
     def _build_origin_route_segment(origin) -> RouteSegment:

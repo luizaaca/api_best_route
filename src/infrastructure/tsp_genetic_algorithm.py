@@ -201,10 +201,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
                 number of generations actually executed.
         """
         self._log(f"Running optimizer with vehicle_count={vehicle_count}")
-        seed_data = RoutePopulationSeedData(
-            route_nodes=route_nodes,
-            vehicle_count=vehicle_count,
-        )
+        seed_data = self._problem.build_seed_data(route_nodes, vehicle_count)
         generation_records: list[GenerationRecord] = []
         engine = GeneticAlgorithm[
             RouteGeneticSolution,

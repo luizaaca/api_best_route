@@ -7,8 +7,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from time import perf_counter
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, cast
 
+from src.domain.interfaces.genetic_algorithm.engine.seed_data import (
+    IGeneticSeedData,
+)
 from src.domain.interfaces.genetic_algorithm.ga_evaluated_solution import (
     IEvaluatedGeneticSolution,
 )
@@ -26,7 +29,7 @@ from src.domain.models.genetic_algorithm.engine.generation_record import (
 
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar("TEvaluated", bound=IEvaluatedGeneticSolution)
-TSeedData = TypeVar("TSeedData")
+TSeedData = TypeVar("TSeedData", bound=IGeneticSeedData)
 TResult = TypeVar("TResult")
 
 
@@ -183,7 +186,8 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
             resolution = self._state_controller.resolve(context)
             operators = resolution.operators
 
-            new_population: list[TSolution] = [population[0].clone()]
+            elite_solution = cast(TSolution, population[0].clone())
+            new_population: list[TSolution] = [elite_solution]
             while len(new_population) < population_size:
                 parent1, parent2 = operators.selection.select_parents(
                     population,

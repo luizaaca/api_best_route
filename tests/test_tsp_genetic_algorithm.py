@@ -43,6 +43,7 @@ from src.infrastructure.genetic_algorithm import (
 )
 from src.infrastructure.route_calculator import build_adjacency_matrix
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
+from src.infrastructure.tsp_genetic_problem import TSPGeneticProblem
 
 
 class FakeRouteCalculator(IRouteCalculator):
@@ -542,6 +543,16 @@ def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
     )
     assert result.best_route.min_vehicle_eta == 0
     assert result.best_route.max_vehicle_eta >= 0
+
+
+def test_problem_build_seed_data_preserves_route_inputs():
+    nodes = make_nodes(3)
+    problem = TSPGeneticProblem({})
+
+    seed_data = problem.build_seed_data(nodes, vehicle_count=4)
+
+    assert seed_data.route_nodes == nodes
+    assert seed_data.vehicle_count == 4
 
 
 def test_solve_uses_injected_ga_components():

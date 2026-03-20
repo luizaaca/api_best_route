@@ -3,11 +3,13 @@
 from importlib import import_module
 
 __all__ = [
+    "IGeneticSeedData",
     "IGeneticSpecification",
     "IGeneticStateController",
 ]
 
 _EXPORT_MAP = {
+    "IGeneticSeedData": ".seed_data",
     "IGeneticSpecification": ".specification",
     "IGeneticStateController": ".state_controller",
 }
