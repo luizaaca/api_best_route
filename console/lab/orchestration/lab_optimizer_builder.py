@@ -10,14 +10,12 @@ from console.lab.factories import (
 )
 from console.lab.models.lab_run_config import LabRunConfig
 from console.lab.runtime_logging import emit_runtime_message
-from src.infrastructure.genetic_algorithm import (
-    AdjacencyCostPopulationDistanceStrategy,
-    AdjacencyEtaPopulationDistanceStrategy,
-    AdjacencyLengthPopulationDistanceStrategy,
-    EuclideanPopulationDistanceStrategy,
+from src.infrastructure.genetic_algorithm.builders.distance_strategy_builder import (
+    build_population_distance_strategy,
 )
 from src.infrastructure.route_calculator import AdjacencyMatrix
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
+from src.infrastructure.tsp_optimizer_factory import TSPOptimizerFactory
 
 
 class LabOptimizerBuilder:
@@ -39,13 +37,11 @@ class LabOptimizerBuilder:
         Returns:
             A heuristic distance strategy instance.
         """
-        if cost_type not in (None, "", "none"):
-            return AdjacencyCostPopulationDistanceStrategy(adjacency_matrix)
-        if weight_type == "length":
-            return AdjacencyLengthPopulationDistanceStrategy(adjacency_matrix)
-        if weight_type == "eta":
-            return AdjacencyEtaPopulationDistanceStrategy(adjacency_matrix)
-        return EuclideanPopulationDistanceStrategy()
+        return build_population_distance_strategy(
+            adjacency_matrix,
+            weight_type,
+            cost_type,
+        )
 
     @classmethod
     def build(
@@ -102,7 +98,7 @@ class LabOptimizerBuilder:
             params=run_config.mutation.params,
             logger=logger,
         )
-        return TSPGeneticAlgorithm(
+        return TSPOptimizerFactory.create(
             adjacency_matrix=adjacency_matrix,
             plotter=plotter,
             population_size=run_config.population_size,
@@ -112,4 +108,5 @@ class LabOptimizerBuilder:
             mutation_strategy=mutation_strategy,
             population_generator=population_generator,
             logger=logger,
+            optimizer_type=TSPGeneticAlgorithm,
         )

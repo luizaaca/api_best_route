@@ -20,10 +20,6 @@ from src.infrastructure.caching import (
     SQLiteGeocodingCache,
 )
 from src.infrastructure.genetic_algorithm import (
-    AdjacencyCostPopulationDistanceStrategy,
-    AdjacencyEtaPopulationDistanceStrategy,
-    AdjacencyLengthPopulationDistanceStrategy,
-    EuclideanPopulationDistanceStrategy,
     HeuristicPopulationGenerator,
     HybridPopulationGenerator,
     OrderCrossoverStrategy,
@@ -31,10 +27,14 @@ from src.infrastructure.genetic_algorithm import (
     RoulleteSelectionStrategy,
     SwapAndRedistributeMutationStrategy,
 )
+from src.infrastructure.genetic_algorithm.builders.distance_strategy_builder import (
+    build_population_distance_strategy,
+)
 from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
 from src.infrastructure.route_calculator import RouteCalculator
-from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
 from src.infrastructure.matplotlib_plotter import MatplotlibPlotter
+from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
+from src.infrastructure.tsp_optimizer_factory import TSPOptimizerFactory
 
 
 def _build_graph_generator(logger=None) -> OSMnxGraphGenerator:
@@ -61,17 +61,6 @@ def _build_adjacency_matrix_builder() -> CachedAdjacencyMatrixBuilder:
     return CachedAdjacencyMatrixBuilder(
         SQLiteAdjacencySegmentCache("cache/adjacency_segments.db")
     )
-
-
-def _build_population_distance_strategy(adjacency_matrix, weight_type, cost_type):
-    """Select the default heuristic distance strategy for population seeding."""
-    if cost_type not in (None, "", "none"):
-        return AdjacencyCostPopulationDistanceStrategy(adjacency_matrix)
-    if weight_type == "length":
-        return AdjacencyLengthPopulationDistanceStrategy(adjacency_matrix)
-    if weight_type == "eta":
-        return AdjacencyEtaPopulationDistanceStrategy(adjacency_matrix)
-    return EuclideanPopulationDistanceStrategy()
 
 
 def _build_default_optimizer(
@@ -104,9 +93,9 @@ def _build_default_optimizer(
         cost_type=cost_type,
     )
     heuristic_generator = HeuristicPopulationGenerator(
-        _build_population_distance_strategy(adjacency_matrix, weight_type, cost_type)
+        build_population_distance_strategy(adjacency_matrix, weight_type, cost_type)
     )
-    return TSPGeneticAlgorithm(
+    return TSPOptimizerFactory.create(
         adjacency_matrix=adjacency_matrix,
         plotter=plotter,
         population_size=population_size,

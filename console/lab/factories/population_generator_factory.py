@@ -10,27 +10,13 @@ from src.domain.interfaces.genetic_algorithm.operators.population_generator_lega
 from src.domain.interfaces.geo_graph.heuristic_distance import (
     IHeuristicDistanceStrategy,
 )
-from src.infrastructure.genetic_algorithm.population import (
-    HeuristicPopulationGenerator,
-    HybridPopulationGenerator,
-    RandomPopulationGenerator,
+from src.infrastructure.genetic_algorithm.builders.legacy_component_builders import (
+    build_legacy_population_generator,
 )
 
 
 class PopulationGeneratorFactory:
     """Create configured population generators for lab runs."""
-
-    @staticmethod
-    def _copy_params(params: Mapping[str, Any] | None) -> dict[str, Any]:
-        """Return a shallow mutable copy of the provided parameter mapping.
-
-        Args:
-            params: Optional parameter mapping supplied by the caller.
-
-        Returns:
-            A mutable dictionary containing the provided parameters.
-        """
-        return dict(params or {})
 
     @classmethod
     def create(
@@ -56,38 +42,16 @@ class PopulationGeneratorFactory:
             ValueError: If the generator name is unknown or unsupported params are
                 provided.
         """
-        normalized_name = name.strip().lower()
-        resolved_params = cls._copy_params(params)
-
-        if normalized_name == "random":
-            emit_ignored_params_message(
-                logger,
-                "population generator",
-                normalized_name,
-                resolved_params,
-            )
-            return RandomPopulationGenerator()
-        if normalized_name == "heuristic":
-            emit_ignored_params_message(
-                logger,
-                "population generator",
-                normalized_name,
-                resolved_params,
-            )
-            return HeuristicPopulationGenerator(distance_strategy)
-        if normalized_name == "hybrid":
-            heuristic_ratio = float(resolved_params.pop("heuristic_ratio", 0.4))
-            emit_ignored_params_message(
-                logger,
-                "population generator",
-                normalized_name,
-                resolved_params,
-            )
-            return HybridPopulationGenerator(
-                random_population_generator=RandomPopulationGenerator(),
-                heuristic_population_generator=HeuristicPopulationGenerator(
-                    distance_strategy
-                ),
-                heuristic_ratio=heuristic_ratio,
-            )
-        raise ValueError(f"Unknown population generator: {name}")
+        return build_legacy_population_generator(
+            name=name,
+            distance_strategy=distance_strategy,
+            params=params,
+            ignored_params_reporter=lambda kind, normalized_name, ignored_params: (
+                emit_ignored_params_message(
+                    logger,
+                    kind,
+                    normalized_name,
+                    ignored_params,
+                )
+            ),
+        )

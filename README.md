@@ -144,8 +144,15 @@ Main response fields:
 
 The optimizer itself is orchestration-only. Concrete behavior is injected at composition time.
 
+The current composition seam is shared across the API and console entry points:
+
+- `TSPOptimizerFactory` centralizes `TSPGeneticAlgorithm` construction;
+- `src/infrastructure/genetic_algorithm/builders/` centralizes reusable GA collaborator builders;
+- the API still owns loading `api/config.json`, but it now delegates adaptive state-controller composition to shared infrastructure builders instead of wiring all adaptive pieces inline.
+
 ```mermaid
 classDiagram
+    class TSPOptimizerFactory
     class TSPGeneticAlgorithm {
         +solve(...)
     }
@@ -156,7 +163,10 @@ classDiagram
     class HybridPopulationGenerator
     class RandomPopulationGenerator
     class HeuristicPopulationGenerator
+    class SharedGABuilders
 
+    TSPOptimizerFactory --> TSPGeneticAlgorithm
+    SharedGABuilders --> TSPOptimizerFactory
     TSPGeneticAlgorithm --> ISelectionStrategy
     TSPGeneticAlgorithm --> ICrossoverStrategy
     TSPGeneticAlgorithm --> IMutationStrategy
@@ -165,6 +175,23 @@ classDiagram
     HybridPopulationGenerator --> RandomPopulationGenerator
     HybridPopulationGenerator --> HeuristicPopulationGenerator
 ```
+
+### Shared composition responsibilities
+
+The current composition responsibilities are split as follows:
+
+- `api/dependencies.py`
+    - loads the required adaptive GA config from `api/config.json`;
+    - builds the adjacency matrix for each optimization request;
+    - delegates adaptive controller creation to shared builders.
+- `console/main.py`
+    - keeps the console-specific defaults and plotting choice;
+    - delegates optimizer assembly to `TSPOptimizerFactory`.
+- `console/lab/orchestration/lab_optimizer_builder.py`
+    - keeps lab-run-specific operator resolution and logging;
+    - delegates final optimizer assembly to `TSPOptimizerFactory`.
+- `src/infrastructure/genetic_algorithm/builders/`
+    - contains shared distance-strategy, legacy-component, and adaptive-state-controller builders.
 
 ### Available GA Operators
 

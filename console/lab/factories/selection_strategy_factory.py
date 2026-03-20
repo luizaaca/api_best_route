@@ -12,28 +12,13 @@ from console.lab.runtime_logging import RuntimeLogger, emit_ignored_params_messa
 from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
     ISelectionStrategy,
 )
-from src.infrastructure.genetic_algorithm.selection import (
-    RankSelectionStrategy,
-    RoulleteSelectionStrategy,
-    StochasticUniversalSamplingSelectionStrategy,
-    TournamentSelectionStrategy,
+from src.infrastructure.genetic_algorithm.builders.legacy_component_builders import (
+    build_legacy_selection_strategy,
 )
 
 
 class SelectionStrategyFactory:
     """Create configured selection strategy instances for lab runs."""
-
-    @staticmethod
-    def _copy_params(params: Mapping[str, Any] | None) -> dict[str, Any]:
-        """Return a shallow mutable copy of the provided parameter mapping.
-
-        Args:
-            params: Optional parameter mapping supplied by the caller.
-
-        Returns:
-            A mutable dictionary containing the provided parameters.
-        """
-        return dict(params or {})
 
     @classmethod
     def create(
@@ -56,40 +41,15 @@ class SelectionStrategyFactory:
             ValueError: If the strategy name is unknown or unsupported params are
                 provided.
         """
-        normalized_name = name.strip().lower()
-        resolved_params = cls._copy_params(params)
-
-        if normalized_name == "roulette":
-            emit_ignored_params_message(
-                logger,
-                "selection strategy",
-                normalized_name,
-                resolved_params,
-            )
-            return RoulleteSelectionStrategy()
-        if normalized_name == "rank":
-            emit_ignored_params_message(
-                logger,
-                "selection strategy",
-                normalized_name,
-                resolved_params,
-            )
-            return RankSelectionStrategy()
-        if normalized_name == "sus":
-            emit_ignored_params_message(
-                logger,
-                "selection strategy",
-                normalized_name,
-                resolved_params,
-            )
-            return StochasticUniversalSamplingSelectionStrategy()
-        if normalized_name == "tournament":
-            tournament_size = int(resolved_params.pop("tournament_size", 3))
-            emit_ignored_params_message(
-                logger,
-                "selection strategy",
-                normalized_name,
-                resolved_params,
-            )
-            return TournamentSelectionStrategy(tournament_size=tournament_size)
-        raise ValueError(f"Unknown selection strategy: {name}")
+        return build_legacy_selection_strategy(
+            name=name,
+            params=params,
+            ignored_params_reporter=lambda kind, normalized_name, ignored_params: (
+                emit_ignored_params_message(
+                    logger,
+                    kind,
+                    normalized_name,
+                    ignored_params,
+                )
+            ),
+        )
