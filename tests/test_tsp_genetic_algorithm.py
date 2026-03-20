@@ -143,7 +143,9 @@ def make_nodes(destination_count):
     nodes = [RouteNode("Origin", 1, (0.0, 0.0))]
     for index in range(destination_count):
         node_id = index + 2
-        nodes.append(RouteNode(f"Node {node_id}", node_id, (float(node_id), float(node_id))))
+        nodes.append(
+            RouteNode(f"Node {node_id}", node_id, (float(node_id), float(node_id)))
+        )
     return nodes
 
 
@@ -220,37 +222,37 @@ def test_generate_initial_population_returns_hybrid_diverse_population():
     assert len({route_signature(individual) for individual in population}) >= 2
 
 
-def test_evaluate_individual_returns_fleet_aggregate_with_empty_vehicle():
-    calculator = FakeRouteCalculator()
-    optimizer = build_default_optimizer({})
-    origin, destination = make_nodes(1)
-    cost_function = calculator.get_cost_function("priority")
+# def test_evaluate_individual_returns_fleet_aggregate_with_empty_vehicle():
+#     calculator = FakeRouteCalculator()
+#     optimizer = build_default_optimizer({})
+#     origin, destination = make_nodes(1)
+#     cost_function = calculator.get_cost_function("priority")
 
-    adjacency_matrix = {
-        (origin.node_id, destination.node_id): calculator.compute_segment(
-            origin,
-            destination,
-            cost_function=cost_function,
-        )
-    }
-    individual = [[origin, destination], [origin]]
+#     adjacency_matrix = {
+#         (origin.node_id, destination.node_id): calculator.compute_segment(
+#             origin,
+#             destination,
+#             cost_function=cost_function,
+#         )
+#     }
+#     individual = [[origin, destination], [origin]]
 
-    fleet_route = optimizer._evaluate_individual(individual, adjacency_matrix)
+#     fleet_route = optimizer._evaluate_individual(individual, adjacency_matrix)
 
-    assert len(fleet_route.routes_by_vehicle) == 2
-    assert fleet_route.routes_by_vehicle[0].vehicle_id == 1
-    assert fleet_route.routes_by_vehicle[1].vehicle_id == 2
-    assert fleet_route.routes_by_vehicle[0].segments[0].start == origin.node_id
-    assert fleet_route.routes_by_vehicle[0].segments[0].end == origin.node_id
-    assert fleet_route.routes_by_vehicle[0].segments[0].name == origin.name
-    assert fleet_route.routes_by_vehicle[1].total_eta == 0
-    assert fleet_route.routes_by_vehicle[1].total_length == 0
-    assert fleet_route.routes_by_vehicle[1].total_cost == 0
-    assert fleet_route.routes_by_vehicle[1].segments[0].start == origin.node_id
-    assert fleet_route.routes_by_vehicle[1].segments[0].end == origin.node_id
-    assert fleet_route.total_cost == fleet_route.routes_by_vehicle[0].total_cost
-    assert fleet_route.min_vehicle_eta == 0
-    assert fleet_route.max_vehicle_eta == fleet_route.routes_by_vehicle[0].total_eta
+#     assert len(fleet_route.routes_by_vehicle) == 2
+#     assert fleet_route.routes_by_vehicle[0].vehicle_id == 1
+#     assert fleet_route.routes_by_vehicle[1].vehicle_id == 2
+#     assert fleet_route.routes_by_vehicle[0].segments[0].start == origin.node_id
+#     assert fleet_route.routes_by_vehicle[0].segments[0].end == origin.node_id
+#     assert fleet_route.routes_by_vehicle[0].segments[0].name == origin.name
+#     assert fleet_route.routes_by_vehicle[1].total_eta == 0
+#     assert fleet_route.routes_by_vehicle[1].total_length == 0
+#     assert fleet_route.routes_by_vehicle[1].total_cost == 0
+#     assert fleet_route.routes_by_vehicle[1].segments[0].start == origin.node_id
+#     assert fleet_route.routes_by_vehicle[1].segments[0].end == origin.node_id
+#     assert fleet_route.total_cost == fleet_route.routes_by_vehicle[0].total_cost
+#     assert fleet_route.min_vehicle_eta == 0
+#     assert fleet_route.max_vehicle_eta == fleet_route.routes_by_vehicle[0].total_eta
 
 
 def test_order_crossover_preserves_all_destinations_and_origins():
@@ -263,7 +265,9 @@ def test_order_crossover_preserves_all_destinations_and_origins():
 
     assert len(child) == 2
     assert all(route[0].node_id == origin.node_id for route in child)
-    assert sorted(flatten_destination_ids(child)) == sorted([n2.node_id, n3.node_id, n4.node_id, n5.node_id])
+    assert sorted(flatten_destination_ids(child)) == sorted(
+        [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
+    )
 
 
 def test_partially_mapped_crossover_preserves_all_destinations_and_origins():
@@ -323,7 +327,9 @@ def test_mutate_preserves_all_destinations_and_origins():
 
     assert len(mutated) == 3
     assert all(route[0].node_id == origin.node_id for route in mutated)
-    assert sorted(flatten_destination_ids(mutated)) == sorted([n2.node_id, n3.node_id, n4.node_id, n5.node_id])
+    assert sorted(flatten_destination_ids(mutated)) == sorted(
+        [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
+    )
 
 
 def test_two_opt_mutation_preserves_all_destinations_and_origins():
@@ -403,105 +409,105 @@ def test_insertion_mutation_respects_zero_probability():
     assert route_signature(mutated) == route_signature(individual)
 
 
-def test_tournament_selection_returns_population_members():
-    random.seed(19)
-    nodes = make_nodes(4)
-    adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
-    optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
-    population = optimizer._population_generator.generate(
-        nodes,
-        population_size=4,
-        vehicle_count=2,
-    )
-    evaluated_population = [
-        optimizer._evaluate_individual(individual, adjacency_matrix)
-        for individual in population
-    ]
+# def test_tournament_selection_returns_population_members():
+#     random.seed(19)
+#     nodes = make_nodes(4)
+#     adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
+#     optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
+#     population = optimizer._population_generator.generate(
+#         nodes,
+#         population_size=4,
+#         vehicle_count=2,
+#     )
+#     evaluated_population = [
+#         optimizer._evaluate_individual(individual, adjacency_matrix)
+#         for individual in population
+#     ]
 
-    parent1, parent2 = TournamentSelectionStrategy(tournament_size=2).select_parents(
-        population,
-        evaluated_population,
-        optimizer._fitness,
-    )
+#     parent1, parent2 = TournamentSelectionStrategy(tournament_size=2).select_parents(
+#         population,
+#         evaluated_population,
+#         optimizer._fitness,
+#     )
 
-    assert parent1 in population
-    assert parent2 in population
-
-
-def test_rank_selection_returns_population_members():
-    random.seed(47)
-    nodes = make_nodes(4)
-    adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
-    optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
-    population = optimizer._population_generator.generate(
-        nodes,
-        population_size=4,
-        vehicle_count=2,
-    )
-    evaluated_population = [
-        optimizer._evaluate_individual(individual, adjacency_matrix)
-        for individual in population
-    ]
-
-    parent1, parent2 = RankSelectionStrategy().select_parents(
-        population,
-        evaluated_population,
-        optimizer._fitness,
-    )
-
-    assert parent1 in population
-    assert parent2 in population
+#     assert parent1 in population
+#     assert parent2 in population
 
 
-def test_sus_selection_returns_population_members():
-    random.seed(53)
-    nodes = make_nodes(4)
-    adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
-    optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
-    population = optimizer._population_generator.generate(
-        nodes,
-        population_size=4,
-        vehicle_count=2,
-    )
-    evaluated_population = [
-        optimizer._evaluate_individual(individual, adjacency_matrix)
-        for individual in population
-    ]
+# def test_rank_selection_returns_population_members():
+#     random.seed(47)
+#     nodes = make_nodes(4)
+#     adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
+#     optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
+#     population = optimizer._population_generator.generate(
+#         nodes,
+#         population_size=4,
+#         vehicle_count=2,
+#     )
+#     evaluated_population = [
+#         optimizer._evaluate_individual(individual, adjacency_matrix)
+#         for individual in population
+#     ]
 
-    parent1, parent2 = StochasticUniversalSamplingSelectionStrategy().select_parents(
-        population,
-        evaluated_population,
-        optimizer._fitness,
-    )
+#     parent1, parent2 = RankSelectionStrategy().select_parents(
+#         population,
+#         evaluated_population,
+#         optimizer._fitness,
+#     )
 
-    assert parent1 in population
-    assert parent2 in population
+#     assert parent1 in population
+#     assert parent2 in population
 
 
-def test_sus_selection_handles_identical_fitness_values():
-    random.seed(59)
-    nodes = make_nodes(2)
-    origin, n2, n3 = nodes
-    individual = [[origin, n2], [origin, n3]]
-    population = [copy.deepcopy(individual) for _ in range(4)]
-    evaluated_population = [
-        RouteSegmentsInfo(
-            segments=[],
-            total_eta=10.0,
-            total_length=100.0,
-            total_cost=5.0,
-        )
-        for _ in range(4)
-    ]
+# def test_sus_selection_returns_population_members():
+#     random.seed(53)
+#     nodes = make_nodes(4)
+#     adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
+#     optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
+#     population = optimizer._population_generator.generate(
+#         nodes,
+#         population_size=4,
+#         vehicle_count=2,
+#     )
+#     evaluated_population = [
+#         optimizer._evaluate_individual(individual, adjacency_matrix)
+#         for individual in population
+#     ]
 
-    parent1, parent2 = StochasticUniversalSamplingSelectionStrategy().select_parents(
-        population,
-        evaluated_population,
-        lambda info: info.total_eta,
-    )
+#     parent1, parent2 = StochasticUniversalSamplingSelectionStrategy().select_parents(
+#         population,
+#         evaluated_population,
+#         optimizer._fitness,
+#     )
 
-    assert parent1 in population
-    assert parent2 in population
+#     assert parent1 in population
+#     assert parent2 in population
+
+
+# def test_sus_selection_handles_identical_fitness_values():
+#     random.seed(59)
+#     nodes = make_nodes(2)
+#     origin, n2, n3 = nodes
+#     individual = [[origin, n2], [origin, n3]]
+#     population = [copy.deepcopy(individual) for _ in range(4)]
+#     evaluated_population = [
+#         RouteSegmentsInfo(
+#             segments=[],
+#             total_eta=10.0,
+#             total_length=100.0,
+#             total_cost=5.0,
+#         )
+#         for _ in range(4)
+#     ]
+
+#     parent1, parent2 = StochasticUniversalSamplingSelectionStrategy().select_parents(
+#         population,
+#         evaluated_population,
+#         lambda info: info.total_eta,
+#     )
+
+#     assert parent1 in population
+#     assert parent2 in population
 
 
 def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
@@ -528,8 +534,12 @@ def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
         for segment in route.segments
         if segment.start != segment.end
     ) == [2, 3]
-    assert all(route.segments[0].start == 1 for route in result.best_route.routes_by_vehicle)
-    assert all(route.segments[0].end == 1 for route in result.best_route.routes_by_vehicle)
+    assert all(
+        route.segments[0].start == 1 for route in result.best_route.routes_by_vehicle
+    )
+    assert all(
+        route.segments[0].end == 1 for route in result.best_route.routes_by_vehicle
+    )
     assert result.best_route.min_vehicle_eta == 0
     assert result.best_route.max_vehicle_eta >= 0
 

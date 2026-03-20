@@ -34,7 +34,15 @@ from .selection import (
     StochasticUniversalSamplingSelectionStrategy,
     TournamentSelectionStrategy,
 )
-from .state_controllers import FixedGeneticStateController
+from .specifications import (
+    ImprovementBelowSpecification,
+    ProgressAtLeastSpecification,
+    StaleAtLeastSpecification,
+)
+from .state_controllers import (
+    ConfiguredGeneticStateController,
+    FixedGeneticStateController,
+)
 
 __all__ = [
     "AdjacencyCostPopulationDistanceStrategy",
@@ -53,8 +61,12 @@ __all__ = [
     "RandomPopulationGenerator",
     "RoulleteSelectionStrategy",
     "StochasticUniversalSamplingSelectionStrategy",
+    "ConfiguredGeneticStateController",
     "FixedGeneticStateController",
+    "ImprovementBelowSpecification",
+    "ProgressAtLeastSpecification",
     "SwapAndRedistributeMutationStrategy",
+    "StaleAtLeastSpecification",
     "TournamentSelectionStrategy",
     "TwoOptMutationStrategy",
 ]

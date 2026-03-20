@@ -1,5 +1,6 @@
 import sys
 import os
+from typing import Any
 
 # ensure src directory is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -49,6 +50,7 @@ class DummyOptimizer:
         cost_type,
         plotter=None,
         population_size=10,
+        adaptive_config: dict[str, Any] | None = None,
     ):
         self.route_nodes = route_nodes
         self.weight_type = weight_type
@@ -56,6 +58,7 @@ class DummyOptimizer:
         self.plotter = plotter
         self.last_vehicle_count = None
         self.last_population_size = population_size
+        self.adaptive_config = adaptive_config
 
     def solve(self, route_nodes, max_generation, max_processing_time, vehicle_count=1):
         # record argument for verification
@@ -115,7 +118,15 @@ def test_service_uses_generators():
     # capture optimizer instance so we can inspect arguments later
     last_optimizer = None
 
-    def optimizer_factory(calc, route_nodes, weight_type, cost_type, plotter, population_size):
+    def optimizer_factory(
+        calc,
+        route_nodes,
+        weight_type,
+        cost_type,
+        plotter,
+        population_size,
+        adaptive_config=None,
+    ):
         nonlocal last_optimizer
         last_optimizer = DummyOptimizer(
             route_nodes,
@@ -123,6 +134,7 @@ def test_service_uses_generators():
             cost_type,
             plotter,
             population_size,
+            adaptive_config,
         )
         return last_optimizer
 
@@ -140,6 +152,17 @@ def test_service_uses_generators():
         population_size=17,
         weight_type="eta",
         cost_type="priority",
+        adaptive_config={
+            "initial_state": "warmup",
+            "states": [
+                {
+                    "name": "warmup",
+                    "selection": {"name": "roulette"},
+                    "crossover": {"name": "order"},
+                    "mutation": {"name": "swap_redistribute"},
+                }
+            ],
+        },
     )
     assert plotter.called
     assert generator.converter_built
@@ -148,6 +171,8 @@ def test_service_uses_generators():
     assert last_optimizer.last_population_size == 17
     assert last_optimizer.weight_type == "eta"
     assert last_optimizer.cost_type == "priority"
+    assert last_optimizer.adaptive_config is not None
+    assert last_optimizer.adaptive_config["initial_state"] == "warmup"
     assert len(last_optimizer.route_nodes) == 1
     assert result.best_route.routes_by_vehicle[0].vehicle_id == 1
     assert result.best_route.routes_by_vehicle[0].total_length == 10

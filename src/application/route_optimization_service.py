@@ -1,6 +1,8 @@
 """Application service that orchestrates route optimization workflows."""
 
-from typing import Callable
+from collections.abc import Callable
+from inspect import Parameter, signature
+from typing import Any
 
 from src.domain.interfaces.geo_graph.graph_generator import IGraphGenerator
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
@@ -20,17 +22,7 @@ class RouteOptimizationService:
         self,
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
-        optimizer_factory: Callable[
-            [
-                IRouteCalculator,
-                list[RouteNode],
-                str,
-                str | None,
-                IPlotter | None,
-                int,
-            ],
-            IRouteOptimizer,
-        ],
+        optimizer_factory: Callable[..., IRouteOptimizer],
         plotter_factory: Callable[..., IPlotter] | None = None,
     ):
         """Initialize the service with its dependencies.
@@ -45,18 +37,22 @@ class RouteOptimizationService:
         self._route_calculator_factory: Callable[..., IRouteCalculator] = (
             route_calculator_factory
         )
-        self._optimizer_factory: Callable[
-            [
-                IRouteCalculator,
-                list[RouteNode],
-                str,
-                str | None,
-                IPlotter | None,
-                int,
-            ],
-            IRouteOptimizer,
-        ] = optimizer_factory
+        self._optimizer_factory: Callable[..., IRouteOptimizer] = optimizer_factory
         self._plotter_factory: Callable[..., IPlotter] | None = plotter_factory
+
+    def _optimizer_supports_adaptive_config(self) -> bool:
+        """Return whether the configured optimizer factory accepts adaptive config.
+
+        Returns:
+            `True` when the factory declares an `adaptive_config` parameter or a
+            catch-all keyword parameter.
+        """
+        parameters = signature(self._optimizer_factory).parameters.values()
+        return any(
+            parameter.name == "adaptive_config"
+            or parameter.kind == Parameter.VAR_KEYWORD
+            for parameter in parameters
+        )
 
     def optimize(
         self,
@@ -68,6 +64,7 @@ class RouteOptimizationService:
         population_size: int = 10,
         weight_type: str = "eta",
         cost_type: str | None = "priority",
+        adaptive_config: dict[str, Any] | None = None,
     ) -> OptimizationResult:
         """Optimize routes for the given origin and destinations.
 
@@ -83,6 +80,7 @@ class RouteOptimizationService:
             population_size: Size of the genetic algorithm population.
             weight_type: Weighting strategy for route calculation (e.g., "eta").
             cost_type: Optional cost adjustment strategy.
+            adaptive_config: Optional adaptive GA state-graph configuration.
 
         Returns:
             An OptimizationResult containing the best found routes and metrics.
@@ -99,14 +97,25 @@ class RouteOptimizationService:
             plotter = self._plotter_factory(context)
 
         print("Creating optimizer with route calculator...")
-        optimizer = self._optimizer_factory(
-            route_calculator,
-            context.route_nodes,
-            weight_type,
-            cost_type,
-            plotter,
-            population_size,
-        )
+        if self._optimizer_supports_adaptive_config():
+            optimizer = self._optimizer_factory(
+                route_calculator,
+                context.route_nodes,
+                weight_type,
+                cost_type,
+                plotter,
+                population_size,
+                adaptive_config=adaptive_config,
+            )
+        else:
+            optimizer = self._optimizer_factory(
+                route_calculator,
+                context.route_nodes,
+                weight_type,
+                cost_type,
+                plotter,
+                population_size,
+            )
 
         print("Creating coordinate converter...")
         coordinate_converter = self._graph_generator.build_coordinate_converter(context)

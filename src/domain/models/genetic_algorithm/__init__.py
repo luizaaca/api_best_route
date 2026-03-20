@@ -1,6 +1,7 @@
 """Genetic-algorithm domain models."""
 
 from .engine import (
+	ConfiguredState,
     GenerationContext,
     GenerationOperators,
     GenerationRecord,
@@ -14,6 +15,7 @@ from .route_genetic_solution import RouteGeneticSolution
 from .vehicle_route import VehicleRoute
 
 __all__ = [
+	"ConfiguredState",
 	"GenerationContext",
 	"GenerationOperators",
 	"GenerationRecord",

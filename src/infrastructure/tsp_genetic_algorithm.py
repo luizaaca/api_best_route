@@ -18,6 +18,9 @@ from src.domain.interfaces.genetic_algorithm.operators.population_generator_lega
 from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
     ISelectionStrategy,
 )
+from src.domain.interfaces.genetic_algorithm.engine.state_controller import (
+    IGeneticStateController,
+)
 from src.domain.interfaces.plotting.plotter import IPlotter
 from src.domain.interfaces.route_optimization.route_optimizer import IRouteOptimizer
 from src.domain.models.genetic_algorithm.engine.generation_operators import (
@@ -76,6 +79,12 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         crossover_strategy: ICrossoverStrategy | None = None,
         mutation_strategy: IMutationStrategy | None = None,
         population_generator: IPopulationGenerator | None = None,
+        state_controller: IGeneticStateController[
+            RouteGeneticSolution,
+            EvaluatedRouteSolution,
+            RoutePopulationSeedData,
+        ]
+        | None = None,
         logger: Callable[[str], None] | None = None,
     ):
         """Create an optimizer that delegates GA operations to injected collaborators.
@@ -89,6 +98,8 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
             crossover_strategy: Strategy for combining parents to create offspring.
             mutation_strategy: Strategy for mutating offspring solutions.
             population_generator: Generator for the initial population.
+            state_controller: Optional adaptive state controller. When omitted,
+                the optimizer uses the legacy fixed operator bundle.
             logger: Optional callable used to emit runtime messages.
 
         Raises:
@@ -111,6 +122,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         self._crossover_strategy = crossover_strategy
         self._mutation_strategy = mutation_strategy
         self._population_generator = population_generator
+        self._state_controller = state_controller
         self._logger = logger
 
     def _log(self, message: str) -> None:
@@ -201,9 +213,13 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
             OptimizationResult,
         ](
             problem=self._problem,
-            state_controller=FixedGeneticStateController(
-                state_name="legacy-fixed",
-                operators=self._build_legacy_generation_operators(),
+            state_controller=(
+                self._state_controller
+                if self._state_controller is not None
+                else FixedGeneticStateController(
+                    state_name="legacy-fixed",
+                    operators=self._build_legacy_generation_operators(),
+                )
             ),
             logger=self._logger,
             on_generation=generation_records.append,

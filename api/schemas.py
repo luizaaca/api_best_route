@@ -1,7 +1,8 @@
 """Pydantic request and response schemas for the route optimization API."""
 
-from typing import Union, Optional
-from pydantic import BaseModel
+from typing import Any, Optional, Union
+
+from pydantic import BaseModel, Field
 
 
 class Destination(BaseModel):
