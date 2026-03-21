@@ -107,6 +107,7 @@ class LabReportBuilder:
             best_fitness=result.best_fitness,
             population_size=result.population_size,
             generations_run=result.generations_run,
+            generation_records=result.generation_records,
             resolved_config=run_config,
             fleet_summary=self._build_fleet_summary(result.best_route),
             vehicle_summaries=vehicle_summaries,

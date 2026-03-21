@@ -4,14 +4,20 @@ from collections.abc import Mapping
 from typing import Any
 
 from console.lab.runtime_logging import RuntimeLogger, emit_ignored_params_message
-from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
-    IPopulationGenerator,
+from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
+    IGeneticPopulationGenerator,
 )
 from src.domain.interfaces.geo_graph.heuristic_distance import (
     IHeuristicDistanceStrategy,
 )
-from src.infrastructure.genetic_algorithm.builders.legacy_component_builders import (
-    build_legacy_population_generator,
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
+from src.infrastructure.genetic_algorithm.builders.component_builders import (
+    build_population_generator,
 )
 
 
@@ -25,7 +31,7 @@ class PopulationGeneratorFactory:
         distance_strategy: IHeuristicDistanceStrategy,
         params: Mapping[str, Any] | None = None,
         logger: RuntimeLogger | None = None,
-    ) -> IPopulationGenerator:
+    ) -> IGeneticPopulationGenerator[RoutePopulationSeedData, RouteGeneticSolution]:
         """Create a population generator for the provided identifier.
 
         Args:
@@ -42,7 +48,7 @@ class PopulationGeneratorFactory:
             ValueError: If the generator name is unknown or unsupported params are
                 provided.
         """
-        return build_legacy_population_generator(
+        return build_population_generator(
             name=name,
             distance_strategy=distance_strategy,
             params=params,

@@ -6,17 +6,17 @@ generic GA execution loop to the problem-agnostic `GeneticAlgorithm` engine.
 
 from collections.abc import Callable
 
-from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
-    ICrossoverStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
+    IGeneticCrossoverStrategy,
 )
-from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
-    IMutationStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
+    IGeneticMutationStrategy,
 )
-from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
-    IPopulationGenerator,
+from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
+    IGeneticPopulationGenerator,
 )
-from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
-    ISelectionStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
+    IGeneticSelectionStrategy,
 )
 from src.domain.interfaces.genetic_algorithm.engine.state_controller import (
     IGeneticStateController,
@@ -32,11 +32,9 @@ from src.domain.models.genetic_algorithm.engine.generation_record import (
 from src.domain.models.genetic_algorithm.evaluated_route_solution import (
     EvaluatedRouteSolution,
 )
-from src.domain.models.genetic_algorithm.individual import Individual
 from src.domain.models.genetic_algorithm.route_genetic_solution import (
     RouteGeneticSolution,
 )
-from src.domain.models.genetic_algorithm.vehicle_route import VehicleRoute
 from src.domain.models.geo_graph.route_node import RouteNode
 from src.domain.models.geo_graph.route_population_seed_data import (
     RoutePopulationSeedData,
@@ -50,18 +48,6 @@ from src.infrastructure.genetic_algorithm.state_controllers.fixed_state_controll
     FixedGeneticStateController,
 )
 from src.infrastructure.genetic_algorithm_engine import GeneticAlgorithm
-from src.infrastructure.legacy_crossover_strategy_adapter import (
-    LegacyCrossoverStrategyAdapter,
-)
-from src.infrastructure.legacy_mutation_strategy_adapter import (
-    LegacyMutationStrategyAdapter,
-)
-from src.infrastructure.legacy_population_generator_adapter import (
-    LegacyPopulationGeneratorAdapter,
-)
-from src.infrastructure.legacy_selection_strategy_adapter import (
-    LegacySelectionStrategyAdapter,
-)
 from src.infrastructure.route_calculator import AdjacencyMatrix
 from src.infrastructure.tsp_genetic_problem import TSPGeneticProblem
 
@@ -75,16 +61,32 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         population_size=10,
         mutation_probability=0.5,
         plotter: IPlotter | None = None,
-        selection_strategy: ISelectionStrategy | None = None,
-        crossover_strategy: ICrossoverStrategy | None = None,
-        mutation_strategy: IMutationStrategy | None = None,
-        population_generator: IPopulationGenerator | None = None,
-        state_controller: IGeneticStateController[
-            RouteGeneticSolution,
-            EvaluatedRouteSolution,
-            RoutePopulationSeedData,
-        ]
-        | None = None,
+        selection_strategy: (
+            IGeneticSelectionStrategy[
+                RouteGeneticSolution,
+                EvaluatedRouteSolution,
+            ]
+            | None
+        ) = None,
+        crossover_strategy: (
+            IGeneticCrossoverStrategy[RouteGeneticSolution] | None
+        ) = None,
+        mutation_strategy: IGeneticMutationStrategy[RouteGeneticSolution] | None = None,
+        population_generator: (
+            IGeneticPopulationGenerator[
+                RoutePopulationSeedData,
+                RouteGeneticSolution,
+            ]
+            | None
+        ) = None,
+        state_controller: (
+            IGeneticStateController[
+                RouteGeneticSolution,
+                EvaluatedRouteSolution,
+                RoutePopulationSeedData,
+            ]
+            | None
+        ) = None,
         logger: Callable[[str], None] | None = None,
     ):
         """Create an optimizer that delegates GA operations to injected collaborators.
@@ -130,22 +132,20 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         if self._logger is not None:
             self._logger(message)
 
-    def _build_legacy_generation_operators(
+    def _build_fixed_generation_operators(
         self,
     ) -> GenerationOperators[
         RouteGeneticSolution,
         EvaluatedRouteSolution,
         RoutePopulationSeedData,
     ]:
-        """Build the fixed operator bundle that mirrors legacy optimizer wiring."""
+        """Build the fixed operator bundle used by the non-adaptive route optimizer."""
         return GenerationOperators(
-            selection=LegacySelectionStrategyAdapter(self._selection_strategy),
-            crossover=LegacyCrossoverStrategyAdapter(self._crossover_strategy),
-            mutation=LegacyMutationStrategyAdapter(self._mutation_strategy),
+            selection=self._selection_strategy,
+            crossover=self._crossover_strategy,
+            mutation=self._mutation_strategy,
             mutation_probability=self.mutation_probability,
-            population_generator=LegacyPopulationGeneratorAdapter(
-                self._population_generator
-            ),
+            population_generator=self._population_generator,
         )
 
     def _handle_generation(
@@ -214,8 +214,8 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
                 self._state_controller
                 if self._state_controller is not None
                 else FixedGeneticStateController(
-                    state_name="legacy-fixed",
-                    operators=self._build_legacy_generation_operators(),
+                    state_name="fixed-route-ga",
+                    operators=self._build_fixed_generation_operators(),
                 )
             ),
             logger=self._logger,

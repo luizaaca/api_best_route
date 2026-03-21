@@ -14,6 +14,10 @@ from .lab_run_config import LabRunConfig
 from .lab_run_result import LabRunResult
 from .lab_search_summary import LabSearchSummary
 from .lab_session_config import LabSessionConfig
+from .lab_specification_config import LabSpecificationConfig
+from .lab_state_config import LabStateConfig
+from .lab_state_graph_config import LabStateGraphConfig
+from .lab_transition_rule_config import LabTransitionRuleConfig
 from .lab_vehicle_route_summary import LabVehicleRouteSummary
 
 __all__ = [
@@ -31,5 +35,9 @@ __all__ = [
     "LabRunResult",
     "LabSearchSummary",
     "LabSessionConfig",
+    "LabSpecificationConfig",
+    "LabStateConfig",
+    "LabStateGraphConfig",
+    "LabTransitionRuleConfig",
     "LabVehicleRouteSummary",
 ]

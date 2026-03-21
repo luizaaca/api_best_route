@@ -1,4 +1,4 @@
-"""Shared builders for legacy GA components still used by composition layers."""
+"""Shared builders for GA operators used by composition layers."""
 
 from __future__ import annotations
 
@@ -8,20 +8,29 @@ from typing import Any, TypeAlias
 from src.domain.interfaces.genetic_algorithm.engine.specification import (
     IGeneticSpecification,
 )
-from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
-    ICrossoverStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
+    IGeneticCrossoverStrategy,
 )
-from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
-    IMutationStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
+    IGeneticMutationStrategy,
 )
-from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
-    IPopulationGenerator,
+from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
+    IGeneticPopulationGenerator,
 )
-from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
-    ISelectionStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
+    IGeneticSelectionStrategy,
 )
 from src.domain.interfaces.geo_graph.heuristic_distance import (
     IHeuristicDistanceStrategy,
+)
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
+    EvaluatedRouteSolution,
+)
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
 )
 from src.infrastructure.genetic_algorithm.crossover import (
     CycleCrossoverStrategy,
@@ -76,24 +85,12 @@ def _emit_ignored_params(
         reporter(component_kind, component_name, params)
 
 
-def build_legacy_selection_strategy(
+def build_selection_strategy(
     name: str,
     params: Mapping[str, Any] | None = None,
     ignored_params_reporter: IgnoredParamsReporter | None = None,
-) -> ISelectionStrategy:
-    """Build one legacy selection strategy from a stable identifier.
-
-    Args:
-        name: Strategy identifier.
-        params: Optional strategy parameters.
-        ignored_params_reporter: Optional reporter for unsupported parameters.
-
-    Returns:
-        The configured legacy selection strategy.
-
-    Raises:
-        ValueError: If the strategy name is unknown.
-    """
+) -> IGeneticSelectionStrategy[RouteGeneticSolution, EvaluatedRouteSolution]:
+    """Build one selection strategy from a stable identifier."""
     normalized_name = _normalize_component_name(name)
     resolved_params = _copy_params(params)
 
@@ -133,24 +130,12 @@ def build_legacy_selection_strategy(
     raise ValueError(f"Unknown selection strategy: {name}")
 
 
-def build_legacy_crossover_strategy(
+def build_crossover_strategy(
     name: str,
     params: Mapping[str, Any] | None = None,
     ignored_params_reporter: IgnoredParamsReporter | None = None,
-) -> ICrossoverStrategy:
-    """Build one legacy crossover strategy from a stable identifier.
-
-    Args:
-        name: Strategy identifier.
-        params: Optional strategy parameters.
-        ignored_params_reporter: Optional reporter for unsupported parameters.
-
-    Returns:
-        The configured legacy crossover strategy.
-
-    Raises:
-        ValueError: If the strategy name is unknown.
-    """
+) -> IGeneticCrossoverStrategy[RouteGeneticSolution]:
+    """Build one crossover strategy from a stable identifier."""
     normalized_name = _normalize_component_name(name)
     resolved_params = _copy_params(params)
     _emit_ignored_params(
@@ -171,24 +156,12 @@ def build_legacy_crossover_strategy(
     raise ValueError(f"Unknown crossover strategy: {name}")
 
 
-def build_legacy_mutation_strategy(
+def build_mutation_strategy(
     name: str,
     params: Mapping[str, Any] | None = None,
     ignored_params_reporter: IgnoredParamsReporter | None = None,
-) -> IMutationStrategy:
-    """Build one legacy mutation strategy from a stable identifier.
-
-    Args:
-        name: Strategy identifier.
-        params: Optional strategy parameters.
-        ignored_params_reporter: Optional reporter for unsupported parameters.
-
-    Returns:
-        The configured legacy mutation strategy.
-
-    Raises:
-        ValueError: If the strategy name is unknown.
-    """
+) -> IGeneticMutationStrategy[RouteGeneticSolution]:
+    """Build one mutation strategy from a stable identifier."""
     normalized_name = _normalize_component_name(name)
     resolved_params = _copy_params(params)
     _emit_ignored_params(
@@ -209,27 +182,13 @@ def build_legacy_mutation_strategy(
     raise ValueError(f"Unknown mutation strategy: {name}")
 
 
-def build_legacy_population_generator(
+def build_population_generator(
     name: str,
     distance_strategy: IHeuristicDistanceStrategy,
     params: Mapping[str, Any] | None = None,
     ignored_params_reporter: IgnoredParamsReporter | None = None,
-) -> IPopulationGenerator:
-    """Build one legacy population generator from a stable identifier.
-
-    Args:
-        name: Generator identifier.
-        distance_strategy: Heuristic distance strategy used by heuristic-based
-            generators.
-        params: Optional generator parameters.
-        ignored_params_reporter: Optional reporter for unsupported parameters.
-
-    Returns:
-        The configured legacy population generator.
-
-    Raises:
-        ValueError: If the generator name is unknown.
-    """
+) -> IGeneticPopulationGenerator[RoutePopulationSeedData, RouteGeneticSolution]:
+    """Build one population generator from a stable identifier."""
     normalized_name = _normalize_component_name(name)
     resolved_params = _copy_params(params)
 
@@ -268,18 +227,7 @@ def build_legacy_population_generator(
 
 
 def build_specification(config: Mapping[str, Any]) -> IGeneticSpecification:
-    """Build one adaptive transition specification from configuration.
-
-    Args:
-        config: Specification configuration containing `name` and optional
-            `params`.
-
-    Returns:
-        The configured adaptive specification.
-
-    Raises:
-        ValueError: If the specification name is unknown.
-    """
+    """Build one adaptive transition specification from configuration."""
     normalized_name = _normalize_component_name(str(config["name"]))
     resolved_params = _copy_params(config.get("params"))
 

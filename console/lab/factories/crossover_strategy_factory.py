@@ -4,11 +4,14 @@ from collections.abc import Mapping
 from typing import Any
 
 from console.lab.runtime_logging import RuntimeLogger, emit_ignored_params_message
-from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
-    ICrossoverStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
+    IGeneticCrossoverStrategy,
 )
-from src.infrastructure.genetic_algorithm.builders.legacy_component_builders import (
-    build_legacy_crossover_strategy,
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
+from src.infrastructure.genetic_algorithm.builders.component_builders import (
+    build_crossover_strategy,
 )
 
 
@@ -21,7 +24,7 @@ class CrossoverStrategyFactory:
         name: str,
         params: Mapping[str, Any] | None = None,
         logger: RuntimeLogger | None = None,
-    ) -> ICrossoverStrategy:
+    ) -> IGeneticCrossoverStrategy[RouteGeneticSolution]:
         """Create a crossover strategy for the provided identifier.
 
         Args:
@@ -36,7 +39,7 @@ class CrossoverStrategyFactory:
             ValueError: If the strategy name is unknown or unsupported params are
                 provided.
         """
-        return build_legacy_crossover_strategy(
+        return build_crossover_strategy(
             name=name,
             params=params,
             ignored_params_reporter=lambda kind, normalized_name, ignored_params: (

@@ -3,14 +3,24 @@
 import copy
 import random
 
-from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
-    IMutationStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
+    IGeneticMutationStrategy,
 )
 from src.domain.models.genetic_algorithm.individual import Individual
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
 
 
-class SwapAndRedistributeMutationStrategy(IMutationStrategy):
+class SwapAndRedistributeMutationStrategy(
+    IGeneticMutationStrategy[RouteGeneticSolution]
+):
     """Mutate an individual by reordering stops and moving stops across vehicles."""
+
+    @property
+    def name(self) -> str:
+        """Return the stable strategy identifier used by the GA runtime."""
+        return self.__class__.__name__
 
     @staticmethod
     def _mutate_distribution(solution: Individual) -> None:
@@ -56,9 +66,9 @@ class SwapAndRedistributeMutationStrategy(IMutationStrategy):
 
     def mutate(
         self,
-        solution: Individual,
+        solution: RouteGeneticSolution,
         mutation_probability: float,
-    ) -> Individual:
+    ) -> RouteGeneticSolution:
         """Return a potentially mutated copy of the provided solution.
 
         Args:
@@ -69,7 +79,7 @@ class SwapAndRedistributeMutationStrategy(IMutationStrategy):
         Returns:
             A new Individual, mutated if the random chance triggered.
         """
-        mutated_solution = copy.deepcopy(solution)
+        mutated_solution = copy.deepcopy(solution.individual)
         if random.random() < mutation_probability:
             mutation_actions = [self._mutate_distribution, self._mutate_vehicle_order]
             random.shuffle(mutation_actions)
@@ -77,4 +87,4 @@ class SwapAndRedistributeMutationStrategy(IMutationStrategy):
                 : random.randint(1, len(mutation_actions))
             ]:
                 mutation_action(mutated_solution)
-        return mutated_solution
+        return RouteGeneticSolution(mutated_solution)

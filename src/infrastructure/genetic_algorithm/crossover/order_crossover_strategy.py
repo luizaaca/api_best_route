@@ -6,16 +6,12 @@ rebuild the multi-vehicle solution.
 """
 
 import random
-
-from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
-    ICrossoverStrategy,
-)
 from src.domain.models.geo_graph.route_node import RouteNode
 
 from .base_permutation_crossover_strategy import BasePermutationCrossoverStrategy
 
 
-class OrderCrossoverStrategy(BasePermutationCrossoverStrategy, ICrossoverStrategy):
+class OrderCrossoverStrategy(BasePermutationCrossoverStrategy):
     """Preserve relative destination ordering through classic OX crossover."""
 
     def _build_child_destinations(

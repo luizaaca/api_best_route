@@ -6,6 +6,9 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
 from src.infrastructure.genetic_algorithm import (
     AdjacencyCostPopulationDistanceStrategy,
     AdjacencyEtaPopulationDistanceStrategy,
@@ -28,6 +31,8 @@ def make_nodes(destination_count):
 
 
 def flatten_destination_ids(individual):
+    if hasattr(individual, "individual"):
+        individual = individual.individual
     return [node.node_id for route in individual for node in route[1:]]
 
 
@@ -94,10 +99,13 @@ def test_heuristic_population_generator_uses_distance_strategy():
         AdjacencyEtaPopulationDistanceStrategy(adjacency_matrix)
     )
 
-    population = generator.generate(nodes, population_size=3, vehicle_count=2)
+    population = generator.generate(
+        RoutePopulationSeedData(route_nodes=nodes, vehicle_count=2),
+        population_size=3,
+    )
 
     assert len(population) == 3
-    assert all(len(individual) == 2 for individual in population)
+    assert all(len(individual.individual) == 2 for individual in population)
     assert all(
         sorted(flatten_destination_ids(individual)) == [2, 3, 4, 5]
         for individual in population
@@ -126,7 +134,10 @@ def test_heuristic_population_generator_fails_clearly_when_distance_missing():
     )
 
     with pytest.raises(ValueError, match="returned no distance"):
-        generator.generate(nodes, population_size=1, vehicle_count=1)
+        generator.generate(
+            RoutePopulationSeedData(route_nodes=nodes, vehicle_count=1),
+            population_size=1,
+        )
 
 
 def test_mixed_ordering_diversifies_heuristic_population_when_hull_is_eligible():

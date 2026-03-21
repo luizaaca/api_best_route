@@ -107,6 +107,8 @@ The console entry point demonstrates the same dependency graph used by the API, 
 
 Lab mode provides sequential benchmark execution for route-optimization experiments. It supports explicit run lists, Cartesian grid exploration, and policy-driven random search from a single JSON configuration file.
 
+The adaptive schema used by grid and random search is still transitional. Lab-specific validation rules and the final schema boundary for those search modes will be tightened in a future redesign.
+
 Run lab mode with:
 
 ```bash

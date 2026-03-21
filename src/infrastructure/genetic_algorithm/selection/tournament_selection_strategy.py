@@ -5,17 +5,22 @@ used as an alternative to roulette-based parent selection.
 """
 
 import random
-from collections.abc import Callable
+from collections.abc import Sequence
 
-from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
-    ISelectionStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
+    IGeneticSelectionStrategy,
 )
-from src.domain.models.genetic_algorithm.individual import Individual
-from src.domain.models.genetic_algorithm.population import Population
-from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
+    EvaluatedRouteSolution,
+)
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
 
 
-class TournamentSelectionStrategy(ISelectionStrategy):
+class TournamentSelectionStrategy(
+    IGeneticSelectionStrategy[RouteGeneticSolution, EvaluatedRouteSolution]
+):
     """Select parents using tournament selection.
 
     The strategy samples a subset of individuals from the population and picks
@@ -42,18 +47,21 @@ class TournamentSelectionStrategy(ISelectionStrategy):
             raise ValueError("tournament_size must be at least 2")
         self._tournament_size = tournament_size
 
+    @property
+    def name(self) -> str:
+        """Return the stable strategy identifier used by the GA runtime."""
+        return self.__class__.__name__
+
     def _select_one_parent(
         self,
-        population: Population,
-        evaluated_population: list[FleetRouteInfo],
-        fitness_function: Callable[[FleetRouteInfo], float],
-    ) -> Individual:
+        population: Sequence[RouteGeneticSolution],
+        evaluated_population: Sequence[EvaluatedRouteSolution],
+    ) -> RouteGeneticSolution:
         """Return one parent chosen from a tournament.
 
         Args:
             population: Current genetic algorithm population.
             evaluated_population: Fitness metadata aligned with ``population``.
-            fitness_function: Function used to score evaluated individuals.
 
         Returns:
             The winning individual from the sampled tournament.
@@ -62,37 +70,34 @@ class TournamentSelectionStrategy(ISelectionStrategy):
         competitor_indexes = random.sample(range(len(population)), k=competitor_count)
         best_index = min(
             competitor_indexes,
-            key=lambda index: fitness_function(evaluated_population[index]),
+            key=lambda index: evaluated_population[index].fitness,
         )
-        return population[best_index]
+        return population[best_index].clone()
 
     def select_parents(
         self,
-        population: Population,
-        evaluated_population: list[FleetRouteInfo],
-        fitness_function: Callable[[FleetRouteInfo], float],
-    ) -> tuple[Individual, Individual]:
+        population: Sequence[RouteGeneticSolution],
+        evaluated_population: Sequence[EvaluatedRouteSolution],
+    ) -> tuple[RouteGeneticSolution, RouteGeneticSolution]:
         """Return two parents selected via independent tournaments.
 
         Args:
             population: Current genetic algorithm population.
             evaluated_population: Fitness metadata aligned with ``population``.
-            fitness_function: Function used to score evaluated individuals.
 
         Returns:
             A tuple with two selected parents. When the population is empty,
             returns two empty individuals.
         """
         if not population:
-            return [], []
+            empty_solution = RouteGeneticSolution([])
+            return empty_solution, empty_solution.clone()
         parent1 = self._select_one_parent(
             population,
             evaluated_population,
-            fitness_function,
         )
         parent2 = self._select_one_parent(
             population,
             evaluated_population,
-            fitness_function,
         )
         return parent1, parent2

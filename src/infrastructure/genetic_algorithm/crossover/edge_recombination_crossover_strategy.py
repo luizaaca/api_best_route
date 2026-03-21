@@ -6,19 +6,12 @@ child destination permutation.
 """
 
 import random
-
-from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
-    ICrossoverStrategy,
-)
 from src.domain.models.geo_graph.route_node import RouteNode
 
 from .base_permutation_crossover_strategy import BasePermutationCrossoverStrategy
 
 
-class EdgeRecombinationCrossoverStrategy(
-    BasePermutationCrossoverStrategy,
-    ICrossoverStrategy,
-):
+class EdgeRecombinationCrossoverStrategy(BasePermutationCrossoverStrategy):
     """Create a child by preserving parent adjacency information when possible."""
 
     @staticmethod

@@ -5,16 +5,12 @@ inside a randomly chosen eligible vehicle route.
 """
 
 import random
-
-from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
-    IMutationStrategy,
-)
 from src.domain.models.genetic_algorithm.individual import Individual
 
 from .base_copying_mutation_strategy import BaseCopyingMutationStrategy
 
 
-class InversionMutationStrategy(BaseCopyingMutationStrategy, IMutationStrategy):
+class InversionMutationStrategy(BaseCopyingMutationStrategy):
     """Mutate an individual by inverting a destination subsequence."""
 
     def _mutate_in_place(self, solution: Individual) -> None:

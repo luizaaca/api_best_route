@@ -5,19 +5,12 @@ representation used by the route optimization genetic algorithm.
 """
 
 import random
-
-from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
-    ICrossoverStrategy,
-)
 from src.domain.models.geo_graph.route_node import RouteNode
 
 from .base_permutation_crossover_strategy import BasePermutationCrossoverStrategy
 
 
-class PartiallyMappedCrossoverStrategy(
-    BasePermutationCrossoverStrategy,
-    ICrossoverStrategy,
-):
+class PartiallyMappedCrossoverStrategy(BasePermutationCrossoverStrategy):
     """Create a child by applying PMX to the flattened destination sequence.
 
     The operator preserves the repeated origin convention of each vehicle route
@@ -48,8 +41,7 @@ class PartiallyMappedCrossoverStrategy(
         parent1_ids = [node.node_id for node in parent1_destinations]
         parent2_ids = [node.node_id for node in parent2_destinations]
         node_by_id = {
-            node.node_id: node
-            for node in parent1_destinations + parent2_destinations
+            node.node_id: node for node in parent1_destinations + parent2_destinations
         }
 
         for index in range(start_index, end_index + 1):

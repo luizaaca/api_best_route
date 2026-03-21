@@ -1,23 +1,31 @@
 import copy
+from collections.abc import Sequence
 import random
 
 import numpy as np
 from shapely.geometry import MultiPoint, Polygon
 from sklearn.cluster import KMeans
 
-from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
-    IPopulationGenerator,
+from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
+    IGeneticPopulationGenerator,
 )
 from src.domain.interfaces.geo_graph.heuristic_distance import (
     IHeuristicDistanceStrategy,
 )
 from src.domain.models.genetic_algorithm.individual import Individual
 from src.domain.models.genetic_algorithm.population import Population
-from src.domain.models.genetic_algorithm.vehicle_route import VehicleRoute
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
 from src.domain.models.geo_graph.route_node import RouteNode
 
 
-class HeuristicPopulationGenerator(IPopulationGenerator):
+class HeuristicPopulationGenerator(
+    IGeneticPopulationGenerator[RoutePopulationSeedData, RouteGeneticSolution]
+):
     """Generate seed populations using clustering and ordering heuristics."""
 
     _HULL_MIN_CLUSTER_SIZE = 6
@@ -30,6 +38,11 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
                 when ordering and clustering destinations.
         """
         self._distance_strategy = distance_strategy
+
+    @property
+    def name(self) -> str:
+        """Return the stable generator identifier used by the GA runtime."""
+        return self.__class__.__name__
 
     def _require_distance(self, start_node: RouteNode, end_node: RouteNode) -> float:
         """Return a distance value or raise if the metric cannot be computed.
@@ -399,29 +412,27 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
 
     def generate(
         self,
-        location_list: VehicleRoute,
+        seed_data: RoutePopulationSeedData,
         population_size: int,
-        vehicle_count: int,
-    ) -> Population:
+    ) -> list[RouteGeneticSolution]:
         """Return a heuristic-only initial population.
 
         This generator creates seed solutions by clustering destinations per vehicle
         and ordering within each cluster based on heuristic distance strategies.
 
         Args:
-            location_list: A vehicle route list where the first node is the origin.
+            seed_data: Route-domain seed inputs required to build valid individuals.
             population_size: Number of individuals to generate.
-            vehicle_count: Number of vehicles (clusters) to distribute destinations across.
 
         Returns:
-            A Population of heuristic seed individuals.
+            Wrapped route solutions containing heuristic seed individuals.
         """
-        if not location_list or population_size <= 0:
+        if not seed_data.route_nodes or population_size <= 0:
             return []
 
-        origin = location_list[0]
-        destinations = location_list[1:]
-        vehicle_slots = max(1, vehicle_count)
+        origin = seed_data.route_nodes[0]
+        destinations = seed_data.route_nodes[1:]
+        vehicle_slots = max(1, seed_data.vehicle_count)
         heuristic_population: Population = []
         for seed_index in range(population_size):
             strategy_rng = random.Random(seed_index)
@@ -443,4 +454,20 @@ class HeuristicPopulationGenerator(IPopulationGenerator):
                     rng=strategy_rng,
                 )
             heuristic_population.append(individual)
-        return heuristic_population
+        return [
+            RouteGeneticSolution(individual) for individual in heuristic_population
+        ]
+
+    def inject(
+        self,
+        population: Sequence[RouteGeneticSolution],
+        seed_data: RoutePopulationSeedData,
+        injection_size: int,
+        context=None,
+    ) -> list[RouteGeneticSolution]:
+        """Generate additional heuristic seeds for reseeding."""
+        _ = population
+        _ = context
+        if injection_size <= 0:
+            return []
+        return self.generate(seed_data, injection_size)

@@ -9,11 +9,19 @@ from abc import ABC, abstractmethod
 import random
 from math import floor
 
+from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
+    IGeneticCrossoverStrategy,
+)
 from src.domain.models.genetic_algorithm.individual import Individual
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
 from src.domain.models.geo_graph.route_node import RouteNode
 
 
-class BasePermutationCrossoverStrategy(ABC):
+class BasePermutationCrossoverStrategy(
+    ABC, IGeneticCrossoverStrategy[RouteGeneticSolution]
+):
     """Provide a template method for permutation-based crossover strategies.
 
     Concrete subclasses only need to implement how the child destination
@@ -21,6 +29,11 @@ class BasePermutationCrossoverStrategy(ABC):
     workflow for flattening, choosing the per-vehicle destination distribution,
     and rebuilding the final individual is handled here.
     """
+
+    @property
+    def name(self) -> str:
+        """Return the stable strategy identifier used by the GA runtime."""
+        return self.__class__.__name__
 
     @staticmethod
     def _extract_distribution(individual: Individual) -> list[int]:
@@ -151,9 +164,9 @@ class BasePermutationCrossoverStrategy(ABC):
 
     def crossover(
         self,
-        parent1: Individual,
-        parent2: Individual,
-    ) -> Individual:
+        parent1: RouteGeneticSolution,
+        parent2: RouteGeneticSolution,
+    ) -> RouteGeneticSolution:
         """Build a child individual from two parents.
 
         Args:
@@ -164,19 +177,25 @@ class BasePermutationCrossoverStrategy(ABC):
             A valid child individual preserving the destination set and the
             multi-vehicle route structure.
         """
-        origin = parent1[0][0]
-        parent1_destinations = self._flatten_destinations(parent1)
-        parent2_destinations = self._flatten_destinations(parent2)
+        parent1_individual = parent1.individual
+        parent2_individual = parent2.individual
+        origin = parent1_individual[0][0]
+        parent1_destinations = self._flatten_destinations(parent1_individual)
+        parent2_destinations = self._flatten_destinations(parent2_individual)
         total_destinations = len(parent1_destinations)
         distribution = self._choose_child_distribution(
-            parent1,
-            parent2,
+            parent1_individual,
+            parent2_individual,
             total_destinations,
         )
         if total_destinations == 0:
-            return self._rebuild_individual(origin, [], distribution)
+            return RouteGeneticSolution(
+                self._rebuild_individual(origin, [], distribution)
+            )
         child_destinations = self._build_child_destinations(
             parent1_destinations,
             parent2_destinations,
         )
-        return self._rebuild_individual(origin, child_destinations, distribution)
+        return RouteGeneticSolution(
+            self._rebuild_individual(origin, child_destinations, distribution)
+        )

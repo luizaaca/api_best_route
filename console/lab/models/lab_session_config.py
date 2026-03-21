@@ -40,6 +40,20 @@ class LabSessionConfig(BaseModel):
         Raises:
             ValueError: If the configuration omits required mode-specific data.
         """
+        legacy_operator_quartet = {
+            "population_generator",
+            "selection",
+            "crossover",
+            "mutation",
+        }
+        if legacy_operator_quartet & set(self.problem):
+            raise ValueError(
+                "lab config no longer supports legacy operator quartet keys in problem"
+            )
+        if legacy_operator_quartet & set(self.defaults):
+            raise ValueError(
+                "lab config no longer supports legacy operator quartet keys in defaults"
+            )
         if self.mode == "explicit" and not self.experiments:
             raise ValueError("explicit mode requires a non-empty experiments list")
         if self.mode == "grid" and not self.search_space:

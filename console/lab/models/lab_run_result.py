@@ -2,6 +2,10 @@
 
 from pydantic import BaseModel, Field
 
+from src.domain.models.genetic_algorithm.engine.generation_record import (
+    GenerationRecord,
+)
+
 from .lab_fleet_route_summary import LabFleetRouteSummary
 from .lab_run_config import LabRunConfig
 from .lab_vehicle_route_summary import LabVehicleRouteSummary
@@ -20,6 +24,7 @@ class LabRunResult(BaseModel):
         best_fitness: Best fitness returned by the optimizer.
         population_size: Final population size reported by the optimizer.
         generations_run: Number of executed generations.
+        generation_records: Structured per-generation runtime history for the run.
         resolved_config: Full resolved execution configuration.
         fleet_summary: Fleet-level route metrics when available.
         vehicle_summaries: Per-vehicle route metrics when available.
@@ -35,6 +40,7 @@ class LabRunResult(BaseModel):
     best_fitness: float | None = None
     population_size: int | None = None
     generations_run: int | None = None
+    generation_records: list[GenerationRecord] = Field(default_factory=list)
     resolved_config: LabRunConfig
     fleet_summary: LabFleetRouteSummary | None = None
     vehicle_summaries: list[LabVehicleRouteSummary] = Field(default_factory=list)

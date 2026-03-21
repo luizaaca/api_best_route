@@ -5,12 +5,12 @@ from typing import cast
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.infrastructure.genetic_algorithm.builders import (
-    build_legacy_crossover_strategy,
-    build_legacy_mutation_strategy,
-    build_legacy_population_generator,
-    build_legacy_selection_strategy,
+    build_crossover_strategy,
+    build_mutation_strategy,
+    build_population_generator,
     build_population_distance_strategy,
     build_route_adaptive_state_controller,
+    build_selection_strategy,
     build_specification,
 )
 from src.domain.models.genetic_algorithm.engine.generation_context import (
@@ -73,14 +73,14 @@ def test_build_population_distance_strategy_supports_length_eta_and_fallback():
     )
 
 
-def test_shared_legacy_component_builders_resolve_expected_types():
-    selection = build_legacy_selection_strategy(
+def test_shared_component_builders_resolve_expected_types():
+    selection = build_selection_strategy(
         "tournament",
         params={"tournament_size": 5},
     )
-    crossover = build_legacy_crossover_strategy("order")
-    mutation = build_legacy_mutation_strategy("inversion")
-    generator = build_legacy_population_generator(
+    crossover = build_crossover_strategy("order")
+    mutation = build_mutation_strategy("inversion")
+    generator = build_population_generator(
         "hybrid",
         distance_strategy=DummyHeuristicDistanceStrategy(),
         params={"heuristic_ratio": 0.7},
@@ -100,7 +100,7 @@ def test_shared_legacy_component_builders_resolve_expected_types():
 def test_shared_builders_report_ignored_params_when_requested():
     ignored_params_reports: list[tuple[str, str, dict[str, object]]] = []
 
-    build_legacy_selection_strategy(
+    build_selection_strategy(
         "roulette",
         params={"unused": 1},
         ignored_params_reporter=lambda kind, name, params: ignored_params_reports.append(
@@ -121,10 +121,10 @@ def test_tsp_optimizer_factory_forwards_resolved_collaborators():
             """Store the received constructor kwargs for assertions."""
             captured_kwargs.update(kwargs)
 
-    selection = build_legacy_selection_strategy("roulette")
-    crossover = build_legacy_crossover_strategy("order")
-    mutation = build_legacy_mutation_strategy("inversion")
-    generator = build_legacy_population_generator(
+    selection = build_selection_strategy("roulette")
+    crossover = build_crossover_strategy("order")
+    mutation = build_mutation_strategy("inversion")
+    generator = build_population_generator(
         "random",
         distance_strategy=DummyHeuristicDistanceStrategy(),
     )

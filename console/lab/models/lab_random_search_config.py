@@ -6,23 +6,18 @@ from pydantic import BaseModel, Field, model_validator
 
 from .lab_float_range_policy import LabFloatRangePolicy
 from .lab_int_range_policy import LabIntRangePolicy
+from .lab_state_graph_config import LabStateGraphConfig
 
 LabRangePolicy: TypeAlias = LabIntRangePolicy | LabFloatRangePolicy
 
-_ALLOWED_GENERATORS = {"random", "heuristic", "hybrid"}
-_ALLOWED_SELECTION = {"roulette", "rank", "sus", "tournament"}
-_ALLOWED_CROSSOVER = {"order", "pmx", "cycle", "edge_recombination"}
-_ALLOWED_MUTATION = {"swap_redistribute", "inversion", "insertion", "two_opt"}
 _REQUIRED_RANGE_KEYS = {
     "population_size",
-    "mutation_probability",
     "max_generation",
     "max_processing_time",
     "vehicle_count",
 }
 _RANGE_TYPE_BY_FIELD = {
     "population_size": "int",
-    "mutation_probability": "float",
     "max_generation": "int",
     "max_processing_time": "int",
     "vehicle_count": "int",
@@ -35,48 +30,15 @@ class LabRandomSearchConfig(BaseModel):
     Attributes:
         n: Number of randomly generated runs.
         seed: Optional session seed used to derive reproducible samples.
-        allowed_generators: Allowed population-generator identifiers.
-        allowed_selection: Allowed selection-strategy identifiers.
-        allowed_crossover: Allowed crossover-strategy identifiers.
-        allowed_mutation: Allowed mutation-strategy identifiers.
+        allowed_state_configs: Allowed adaptive state graphs that random search
+            can sample for each generated run.
         ranges: Required scalar policies used to build each resolved run.
     """
 
     n: int
     seed: int | None = None
-    allowed_generators: list[str] = Field(default_factory=list)
-    allowed_selection: list[str] = Field(default_factory=list)
-    allowed_crossover: list[str] = Field(default_factory=list)
-    allowed_mutation: list[str] = Field(default_factory=list)
+    allowed_state_configs: list[LabStateGraphConfig] = Field(default_factory=list)
     ranges: dict[str, LabRangePolicy] = Field(default_factory=dict)
-
-    @staticmethod
-    def _validate_allowed_values(
-        values: list[str],
-        field_name: str,
-        allowed_values: set[str],
-    ) -> None:
-        """Validate one operator allow-list.
-
-        Args:
-            values: Values declared in the configuration.
-            field_name: Field name used in validation messages.
-            allowed_values: Set of supported stable identifiers.
-
-        Raises:
-            ValueError: If the list is empty, duplicated, or contains unknown values.
-        """
-        if not values:
-            raise ValueError(f"random_search.{field_name} must be a non-empty list")
-        if len(set(values)) != len(values):
-            raise ValueError(
-                f"random_search.{field_name} must not contain duplicate values"
-            )
-        unknown_values = sorted(set(values) - allowed_values)
-        if unknown_values:
-            raise ValueError(
-                f"random_search.{field_name} contains unsupported values: {unknown_values}"
-            )
 
     @model_validator(mode="after")
     def validate_schema(self) -> "LabRandomSearchConfig":
@@ -90,27 +52,10 @@ class LabRandomSearchConfig(BaseModel):
         """
         if self.n < 1:
             raise ValueError("random_search.n must be >= 1")
-
-        self._validate_allowed_values(
-            self.allowed_generators,
-            "allowed_generators",
-            _ALLOWED_GENERATORS,
-        )
-        self._validate_allowed_values(
-            self.allowed_selection,
-            "allowed_selection",
-            _ALLOWED_SELECTION,
-        )
-        self._validate_allowed_values(
-            self.allowed_crossover,
-            "allowed_crossover",
-            _ALLOWED_CROSSOVER,
-        )
-        self._validate_allowed_values(
-            self.allowed_mutation,
-            "allowed_mutation",
-            _ALLOWED_MUTATION,
-        )
+        if not self.allowed_state_configs:
+            raise ValueError(
+                "random_search.allowed_state_configs must be a non-empty list"
+            )
 
         range_keys = set(self.ranges)
         missing_keys = sorted(_REQUIRED_RANGE_KEYS - range_keys)
@@ -141,9 +86,4 @@ class LabRandomSearchConfig(BaseModel):
                 and policy.min < 1
             ):
                 raise ValueError(f"random_search.ranges.{key}.min must be >= 1")
-            if key == "mutation_probability":
-                if policy.min < 0 or policy.max > 1:
-                    raise ValueError(
-                        "random_search.ranges.mutation_probability must stay within [0, 1]"
-                    )
         return self

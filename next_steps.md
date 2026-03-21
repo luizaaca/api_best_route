@@ -63,6 +63,8 @@
 
 # 9.4 Implementar GA Adaptativo []
 - implementar um algoritmo genético adaptativo que ajuste dinamicamente os parâmetros de mutação e cruzamento com base no progresso da otimização, para melhorar a eficiência e a qualidade das soluções geradas ao longo do tempo.
+- redesenhar o schema adaptativo de `grid` e `random search` no lab, definindo um contrato final mais claro para composição de estados e removendo as suposições transitórias atuais.
+- endurecer as validações do lab para os modos adaptativos após esse redesign, evitando que formatos intermediários virem contrato permanente.
 
 # 10. Usar abstract factory para criar classes de acordo com tipo de busca
 - implementar uma fabrica abstrata que crie as instancias de otimizadores, plotters e outras dependências de acordo com o modo de operação:

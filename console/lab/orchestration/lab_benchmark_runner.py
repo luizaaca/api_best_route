@@ -207,7 +207,7 @@ class LabBenchmarkRunner:
                 (
                     f"Starting run {index}/{len(resolved_runs)}: '{run_config.label}' "
                     f"(population_size={run_config.population_size}, "
-                    f"mutation_probability={run_config.mutation_probability}, "
+                    f"initial_state={run_config.state_config.initial_state}, "
                     f"max_generation={run_config.max_generation})."
                 )
             )

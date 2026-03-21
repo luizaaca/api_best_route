@@ -15,7 +15,8 @@ from console.lab.models.lab_session_config import LabSessionConfig
 class LabRunConfigExpander:
     """Expand explicit, grid, and random config modes into resolved runs."""
 
-    _REPLACE_WHOLE_KEYS = {
+    _REPLACE_WHOLE_KEYS = {"state_config"}
+    _LEGACY_OPERATOR_QUARTET_KEYS = {
         "population_generator",
         "selection",
         "crossover",
@@ -154,6 +155,12 @@ class LabRunConfigExpander:
             A validated `LabRunConfig` instance.
         """
         payload = copy.deepcopy(resolved_dict)
+        legacy_keys = sorted(cls._LEGACY_OPERATOR_QUARTET_KEYS & set(payload))
+        if legacy_keys:
+            raise ValueError(
+                "lab config no longer supports legacy operator quartet keys: "
+                f"{legacy_keys}"
+            )
         payload.setdefault("label", f"{default_label_prefix}-{index + 1:03d}")
         payload["source_mode"] = mode
         payload["source_index"] = index
@@ -225,22 +232,11 @@ class LabRunConfigExpander:
         resolved_runs: list[LabRunConfig] = []
         for index in range(sample_count):
             payload = copy.deepcopy(base_run)
-            payload["population_generator"] = {
-                "name": rng.choice(session_config.random_search.allowed_generators),
-                "params": {},
-            }
-            payload["selection"] = {
-                "name": rng.choice(session_config.random_search.allowed_selection),
-                "params": {},
-            }
-            payload["crossover"] = {
-                "name": rng.choice(session_config.random_search.allowed_crossover),
-                "params": {},
-            }
-            payload["mutation"] = {
-                "name": rng.choice(session_config.random_search.allowed_mutation),
-                "params": {},
-            }
+            payload["state_config"] = copy.deepcopy(
+                rng.choice(
+                    session_config.random_search.allowed_state_configs
+                ).model_dump(mode="python")
+            )
             for field_name, policy in session_config.random_search.ranges.items():
                 if isinstance(policy, LabIntRangePolicy):
                     payload[field_name] = cls._sample_int_policy(rng, policy)
@@ -281,10 +277,9 @@ class LabRunConfigExpander:
             details = {
                 "n": session_config.random_search.n,
                 "seed": session_config.random_search.seed,
-                "allowed_generators": session_config.random_search.allowed_generators,
-                "allowed_selection": session_config.random_search.allowed_selection,
-                "allowed_crossover": session_config.random_search.allowed_crossover,
-                "allowed_mutation": session_config.random_search.allowed_mutation,
+                "allowed_state_config_count": len(
+                    session_config.random_search.allowed_state_configs
+                ),
                 "ranges": sorted(session_config.random_search.ranges.keys()),
             }
         return LabSearchSummary(

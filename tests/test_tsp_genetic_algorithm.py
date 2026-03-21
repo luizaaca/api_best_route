@@ -8,21 +8,30 @@ import networkx as nx
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
 from src.domain.models.route_optimization.route_segment import RouteSegment
 from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
-from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
-    ICrossoverStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
+    IGeneticCrossoverStrategy,
 )
-from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
-    IMutationStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
+    IGeneticMutationStrategy,
 )
-from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
-    IPopulationGenerator,
+from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
+    IGeneticPopulationGenerator,
 )
-from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
-    ISelectionStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
+    IGeneticSelectionStrategy,
 )
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
+    EvaluatedRouteSolution,
+)
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
 from src.infrastructure.genetic_algorithm import (
     AdjacencyEtaPopulationDistanceStrategy,
     CycleCrossoverStrategy,
@@ -98,46 +107,74 @@ class FakeRouteCalculator(IRouteCalculator):
         return lambda node_id, eta: float(node_id + eta)
 
 
-class StubSelectionStrategy(ISelectionStrategy):
+class StubSelectionStrategy(
+    IGeneticSelectionStrategy[RouteGeneticSolution, EvaluatedRouteSolution]
+):
     def __init__(self):
         self.called = False
 
-    def select_parents(self, population, evaluated_population, fitness_function):
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
+    def select_parents(self, population, evaluated_population):
         self.called = True
-        return population[0], population[-1]
+        return population[0].clone(), population[-1].clone()
 
 
-class StubCrossoverStrategy(ICrossoverStrategy):
+class StubCrossoverStrategy(IGeneticCrossoverStrategy[RouteGeneticSolution]):
     def __init__(self):
         self.called = False
+
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
 
     def crossover(self, parent1, parent2):
         self.called = True
-        return copy.deepcopy(parent1)
+        return parent1.clone()
 
 
-class StubMutationStrategy(IMutationStrategy):
+class StubMutationStrategy(IGeneticMutationStrategy[RouteGeneticSolution]):
     def __init__(self):
         self.called = False
+
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
 
     def mutate(self, solution, mutation_probability):
         self.called = True
-        return copy.deepcopy(solution)
+        return solution.clone()
 
 
-class StubPopulationGenerator(IPopulationGenerator):
+class StubPopulationGenerator(
+    IGeneticPopulationGenerator[RoutePopulationSeedData, RouteGeneticSolution]
+):
     def __init__(self):
         self.called = False
 
-    def generate(self, location_list, population_size, vehicle_count):
+    @property
+    def name(self) -> str:
+        return self.__class__.__name__
+
+    def generate(self, seed_data, population_size):
         self.called = True
-        origin = location_list[0]
-        destinations = location_list[1:]
-        vehicle_slots = max(1, vehicle_count)
+        origin = seed_data.route_nodes[0]
+        destinations = seed_data.route_nodes[1:]
+        vehicle_slots = max(1, seed_data.vehicle_count)
         base_routes = [[origin] for _ in range(vehicle_slots)]
         for index, destination in enumerate(destinations):
             base_routes[index % vehicle_slots].append(destination)
-        return [copy.deepcopy(base_routes) for _ in range(population_size)]
+        return [
+            RouteGeneticSolution(copy.deepcopy(base_routes))
+            for _ in range(population_size)
+        ]
+
+    def inject(self, population, seed_data, injection_size, context=None):
+        _ = population
+        _ = context
+        return self.generate(seed_data, injection_size)
 
 
 def make_nodes(destination_count):
@@ -151,10 +188,14 @@ def make_nodes(destination_count):
 
 
 def flatten_destination_ids(individual):
+    if hasattr(individual, "individual"):
+        individual = individual.individual
     return [node.node_id for route in individual for node in route[1:]]
 
 
 def route_signature(individual):
+    if hasattr(individual, "individual"):
+        individual = individual.individual
     return tuple(tuple(node.node_id for node in route) for route in individual)
 
 
@@ -180,14 +221,13 @@ def test_generate_random_population_allows_empty_vehicles():
     nodes = make_nodes(2)
 
     population = RandomPopulationGenerator().generate(
-        nodes,
+        RoutePopulationSeedData(route_nodes=nodes, vehicle_count=5),
         population_size=1,
-        vehicle_count=5,
     )
 
     assert len(population) == 1
-    assert len(population[0]) == 5
-    assert sum(1 for route in population[0] if len(route) == 1) >= 3
+    assert len(population[0].individual) == 5
+    assert sum(1 for route in population[0].individual if len(route) == 1) >= 3
     assert sorted(flatten_destination_ids(population[0])) == [2, 3]
 
 
@@ -209,51 +249,17 @@ def test_generate_initial_population_returns_hybrid_diverse_population():
         RandomPopulationGenerator(),
         heuristic_generator,
     ).generate(
-        nodes,
+        RoutePopulationSeedData(route_nodes=nodes, vehicle_count=2),
         population_size=5,
-        vehicle_count=2,
     )
 
     assert len(population) == 5
-    assert all(len(individual) == 2 for individual in population)
+    assert all(len(individual.individual) == 2 for individual in population)
     assert all(
         sorted(flatten_destination_ids(individual)) == [2, 3, 4, 5]
         for individual in population
     )
     assert len({route_signature(individual) for individual in population}) >= 2
-
-
-# def test_evaluate_individual_returns_fleet_aggregate_with_empty_vehicle():
-#     calculator = FakeRouteCalculator()
-#     optimizer = build_default_optimizer({})
-#     origin, destination = make_nodes(1)
-#     cost_function = calculator.get_cost_function("priority")
-
-#     adjacency_matrix = {
-#         (origin.node_id, destination.node_id): calculator.compute_segment(
-#             origin,
-#             destination,
-#             cost_function=cost_function,
-#         )
-#     }
-#     individual = [[origin, destination], [origin]]
-
-#     fleet_route = optimizer._evaluate_individual(individual, adjacency_matrix)
-
-#     assert len(fleet_route.routes_by_vehicle) == 2
-#     assert fleet_route.routes_by_vehicle[0].vehicle_id == 1
-#     assert fleet_route.routes_by_vehicle[1].vehicle_id == 2
-#     assert fleet_route.routes_by_vehicle[0].segments[0].start == origin.node_id
-#     assert fleet_route.routes_by_vehicle[0].segments[0].end == origin.node_id
-#     assert fleet_route.routes_by_vehicle[0].segments[0].name == origin.name
-#     assert fleet_route.routes_by_vehicle[1].total_eta == 0
-#     assert fleet_route.routes_by_vehicle[1].total_length == 0
-#     assert fleet_route.routes_by_vehicle[1].total_cost == 0
-#     assert fleet_route.routes_by_vehicle[1].segments[0].start == origin.node_id
-#     assert fleet_route.routes_by_vehicle[1].segments[0].end == origin.node_id
-#     assert fleet_route.total_cost == fleet_route.routes_by_vehicle[0].total_cost
-#     assert fleet_route.min_vehicle_eta == 0
-#     assert fleet_route.max_vehicle_eta == fleet_route.routes_by_vehicle[0].total_eta
 
 
 def test_order_crossover_preserves_all_destinations_and_origins():
@@ -262,10 +268,13 @@ def test_order_crossover_preserves_all_destinations_and_origins():
     parent1 = [[origin, n2, n3], [origin, n4, n5]]
     parent2 = [[origin, n5], [origin, n3, n2, n4]]
 
-    child = OrderCrossoverStrategy().crossover(parent1, parent2)
+    child = OrderCrossoverStrategy().crossover(
+        RouteGeneticSolution(parent1),
+        RouteGeneticSolution(parent2),
+    )
 
-    assert len(child) == 2
-    assert all(route[0].node_id == origin.node_id for route in child)
+    assert len(child.individual) == 2
+    assert all(route[0].node_id == origin.node_id for route in child.individual)
     assert sorted(flatten_destination_ids(child)) == sorted(
         [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
     )
@@ -277,10 +286,13 @@ def test_partially_mapped_crossover_preserves_all_destinations_and_origins():
     parent1 = [[origin, n2, n3, n4], [origin, n5, n6]]
     parent2 = [[origin, n6, n4], [origin, n5, n2, n3]]
 
-    child = PartiallyMappedCrossoverStrategy().crossover(parent1, parent2)
+    child = PartiallyMappedCrossoverStrategy().crossover(
+        RouteGeneticSolution(parent1),
+        RouteGeneticSolution(parent2),
+    )
 
-    assert len(child) == 2
-    assert all(route[0].node_id == origin.node_id for route in child)
+    assert len(child.individual) == 2
+    assert all(route[0].node_id == origin.node_id for route in child.individual)
     assert sorted(flatten_destination_ids(child)) == sorted(
         [n2.node_id, n3.node_id, n4.node_id, n5.node_id, n6.node_id]
     )
@@ -292,10 +304,13 @@ def test_cycle_crossover_preserves_all_destinations_and_origins():
     parent1 = [[origin, n2, n3, n4], [origin, n5, n6]]
     parent2 = [[origin, n4, n6], [origin, n2, n5, n3]]
 
-    child = CycleCrossoverStrategy().crossover(parent1, parent2)
+    child = CycleCrossoverStrategy().crossover(
+        RouteGeneticSolution(parent1),
+        RouteGeneticSolution(parent2),
+    )
 
-    assert len(child) == 2
-    assert all(route[0].node_id == origin.node_id for route in child)
+    assert len(child.individual) == 2
+    assert all(route[0].node_id == origin.node_id for route in child.individual)
     assert sorted(flatten_destination_ids(child)) == sorted(
         [n2.node_id, n3.node_id, n4.node_id, n5.node_id, n6.node_id]
     )
@@ -307,10 +322,13 @@ def test_edge_recombination_crossover_preserves_all_destinations_and_origins():
     parent1 = [[origin, n2, n3, n4], [origin, n5, n6]]
     parent2 = [[origin, n6, n4], [origin, n3, n5, n2]]
 
-    child = EdgeRecombinationCrossoverStrategy().crossover(parent1, parent2)
+    child = EdgeRecombinationCrossoverStrategy().crossover(
+        RouteGeneticSolution(parent1),
+        RouteGeneticSolution(parent2),
+    )
 
-    assert len(child) == 2
-    assert all(route[0].node_id == origin.node_id for route in child)
+    assert len(child.individual) == 2
+    assert all(route[0].node_id == origin.node_id for route in child.individual)
     assert sorted(flatten_destination_ids(child)) == sorted(
         [n2.node_id, n3.node_id, n4.node_id, n5.node_id, n6.node_id]
     )
@@ -322,12 +340,12 @@ def test_mutate_preserves_all_destinations_and_origins():
     individual = [[origin, n2, n3], [origin], [origin, n4, n5]]
 
     mutated = SwapAndRedistributeMutationStrategy().mutate(
-        individual,
+        RouteGeneticSolution(individual),
         mutation_probability=1.0,
     )
 
-    assert len(mutated) == 3
-    assert all(route[0].node_id == origin.node_id for route in mutated)
+    assert len(mutated.individual) == 3
+    assert all(route[0].node_id == origin.node_id for route in mutated.individual)
     assert sorted(flatten_destination_ids(mutated)) == sorted(
         [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
     )
@@ -339,12 +357,12 @@ def test_two_opt_mutation_preserves_all_destinations_and_origins():
     individual = [[origin, n2, n3, n4, n5], [origin]]
 
     mutated = TwoOptMutationStrategy().mutate(
-        individual,
+        RouteGeneticSolution(individual),
         mutation_probability=1.0,
     )
 
-    assert len(mutated) == 2
-    assert all(route[0].node_id == origin.node_id for route in mutated)
+    assert len(mutated.individual) == 2
+    assert all(route[0].node_id == origin.node_id for route in mutated.individual)
     assert sorted(flatten_destination_ids(mutated)) == sorted(
         [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
     )
@@ -356,12 +374,12 @@ def test_inversion_mutation_preserves_all_destinations_and_origins():
     individual = [[origin, n2, n3, n4, n5], [origin]]
 
     mutated = InversionMutationStrategy().mutate(
-        individual,
+        RouteGeneticSolution(individual),
         mutation_probability=1.0,
     )
 
-    assert len(mutated) == 2
-    assert all(route[0].node_id == origin.node_id for route in mutated)
+    assert len(mutated.individual) == 2
+    assert all(route[0].node_id == origin.node_id for route in mutated.individual)
     assert sorted(flatten_destination_ids(mutated)) == sorted(
         [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
     )
@@ -373,7 +391,7 @@ def test_inversion_mutation_respects_zero_probability():
     individual = [[origin, n2, n3, n4], [origin]]
 
     mutated = InversionMutationStrategy().mutate(
-        individual,
+        RouteGeneticSolution(individual),
         mutation_probability=0.0,
     )
 
@@ -386,12 +404,12 @@ def test_insertion_mutation_preserves_all_destinations_and_origins():
     individual = [[origin, n2], [origin, n3, n4, n5]]
 
     mutated = InsertionMutationStrategy().mutate(
-        individual,
+        RouteGeneticSolution(individual),
         mutation_probability=1.0,
     )
 
-    assert len(mutated) == 2
-    assert all(route[0].node_id == origin.node_id for route in mutated)
+    assert len(mutated.individual) == 2
+    assert all(route[0].node_id == origin.node_id for route in mutated.individual)
     assert sorted(flatten_destination_ids(mutated)) == sorted(
         [n2.node_id, n3.node_id, n4.node_id, n5.node_id]
     )
@@ -403,112 +421,11 @@ def test_insertion_mutation_respects_zero_probability():
     individual = [[origin, n2], [origin, n3, n4]]
 
     mutated = InsertionMutationStrategy().mutate(
-        individual,
+        RouteGeneticSolution(individual),
         mutation_probability=0.0,
     )
 
     assert route_signature(mutated) == route_signature(individual)
-
-
-# def test_tournament_selection_returns_population_members():
-#     random.seed(19)
-#     nodes = make_nodes(4)
-#     adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
-#     optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
-#     population = optimizer._population_generator.generate(
-#         nodes,
-#         population_size=4,
-#         vehicle_count=2,
-#     )
-#     evaluated_population = [
-#         optimizer._evaluate_individual(individual, adjacency_matrix)
-#         for individual in population
-#     ]
-
-#     parent1, parent2 = TournamentSelectionStrategy(tournament_size=2).select_parents(
-#         population,
-#         evaluated_population,
-#         optimizer._fitness,
-#     )
-
-#     assert parent1 in population
-#     assert parent2 in population
-
-
-# def test_rank_selection_returns_population_members():
-#     random.seed(47)
-#     nodes = make_nodes(4)
-#     adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
-#     optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
-#     population = optimizer._population_generator.generate(
-#         nodes,
-#         population_size=4,
-#         vehicle_count=2,
-#     )
-#     evaluated_population = [
-#         optimizer._evaluate_individual(individual, adjacency_matrix)
-#         for individual in population
-#     ]
-
-#     parent1, parent2 = RankSelectionStrategy().select_parents(
-#         population,
-#         evaluated_population,
-#         optimizer._fitness,
-#     )
-
-#     assert parent1 in population
-#     assert parent2 in population
-
-
-# def test_sus_selection_returns_population_members():
-#     random.seed(53)
-#     nodes = make_nodes(4)
-#     adjacency_matrix = build_adjacency_matrix(FakeRouteCalculator(), nodes)
-#     optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
-#     population = optimizer._population_generator.generate(
-#         nodes,
-#         population_size=4,
-#         vehicle_count=2,
-#     )
-#     evaluated_population = [
-#         optimizer._evaluate_individual(individual, adjacency_matrix)
-#         for individual in population
-#     ]
-
-#     parent1, parent2 = StochasticUniversalSamplingSelectionStrategy().select_parents(
-#         population,
-#         evaluated_population,
-#         optimizer._fitness,
-#     )
-
-#     assert parent1 in population
-#     assert parent2 in population
-
-
-# def test_sus_selection_handles_identical_fitness_values():
-#     random.seed(59)
-#     nodes = make_nodes(2)
-#     origin, n2, n3 = nodes
-#     individual = [[origin, n2], [origin, n3]]
-#     population = [copy.deepcopy(individual) for _ in range(4)]
-#     evaluated_population = [
-#         RouteSegmentsInfo(
-#             segments=[],
-#             total_eta=10.0,
-#             total_length=100.0,
-#             total_cost=5.0,
-#         )
-#         for _ in range(4)
-#     ]
-
-#     parent1, parent2 = StochasticUniversalSamplingSelectionStrategy().select_parents(
-#         population,
-#         evaluated_population,
-#         lambda info: info.total_eta,
-#     )
-
-#     assert parent1 in population
-#     assert parent2 in population
 
 
 def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():

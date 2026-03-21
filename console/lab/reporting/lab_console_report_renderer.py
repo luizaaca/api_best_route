@@ -17,10 +17,10 @@ class LabConsoleReportRenderer:
         Returns:
             A compact operator-combination string.
         """
-        config = run.resolved_config
+        state_config = run.resolved_config.state_config
         return (
-            f"{config.population_generator.name} | {config.selection.name} | "
-            f"{config.crossover.name} | {config.mutation.name}"
+            f"initial={state_config.initial_state} | "
+            f"states={len(state_config.states)}"
         )
 
     @staticmethod

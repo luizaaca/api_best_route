@@ -6,16 +6,12 @@ the multi-vehicle representation.
 """
 
 import random
-
-from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
-    IMutationStrategy,
-)
 from src.domain.models.genetic_algorithm.individual import Individual
 
 from .base_copying_mutation_strategy import BaseCopyingMutationStrategy
 
 
-class TwoOptMutationStrategy(BaseCopyingMutationStrategy, IMutationStrategy):
+class TwoOptMutationStrategy(BaseCopyingMutationStrategy):
     """Mutate an individual with a 2-opt-style subsequence reversal.
 
     The strategy selects one candidate vehicle route and reverses a contiguous

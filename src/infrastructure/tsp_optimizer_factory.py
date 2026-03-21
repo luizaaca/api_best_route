@@ -8,17 +8,17 @@ from typing import TypeVar
 from src.domain.interfaces.genetic_algorithm.engine.state_controller import (
     IGeneticStateController,
 )
-from src.domain.interfaces.genetic_algorithm.operators.crossover_strategy_legacy import (
-    ICrossoverStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
+    IGeneticCrossoverStrategy,
 )
-from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
-    IMutationStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
+    IGeneticMutationStrategy,
 )
-from src.domain.interfaces.genetic_algorithm.operators.population_generator_legacy import (
-    IPopulationGenerator,
+from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
+    IGeneticPopulationGenerator,
 )
-from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
-    ISelectionStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
+    IGeneticSelectionStrategy,
 )
 from src.domain.interfaces.plotting.plotter import IPlotter
 from src.domain.models.genetic_algorithm.evaluated_route_solution import (
@@ -50,10 +50,18 @@ class TSPOptimizerFactory:
         population_size: int = 10,
         mutation_probability: float = 0.5,
         plotter: IPlotter | None = None,
-        selection_strategy: ISelectionStrategy | None = None,
-        crossover_strategy: ICrossoverStrategy | None = None,
-        mutation_strategy: IMutationStrategy | None = None,
-        population_generator: IPopulationGenerator | None = None,
+        selection_strategy: IGeneticSelectionStrategy[
+            RouteGeneticSolution,
+            EvaluatedRouteSolution,
+        ]
+        | None = None,
+        crossover_strategy: IGeneticCrossoverStrategy[RouteGeneticSolution] | None = None,
+        mutation_strategy: IGeneticMutationStrategy[RouteGeneticSolution] | None = None,
+        population_generator: IGeneticPopulationGenerator[
+            RoutePopulationSeedData,
+            RouteGeneticSolution,
+        ]
+        | None = None,
         state_controller: IGeneticStateController[
             RouteGeneticSolution,
             EvaluatedRouteSolution,

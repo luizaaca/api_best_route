@@ -6,17 +6,22 @@ distribution.
 """
 
 import random
-from collections.abc import Callable
+from collections.abc import Sequence
 
-from src.domain.interfaces.genetic_algorithm.operators.selection_strategy_legacy import (
-    ISelectionStrategy,
+from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
+    IGeneticSelectionStrategy,
 )
-from src.domain.models.genetic_algorithm.individual import Individual
-from src.domain.models.genetic_algorithm.population import Population
-from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
+    EvaluatedRouteSolution,
+)
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
 
 
-class StochasticUniversalSamplingSelectionStrategy(ISelectionStrategy):
+class StochasticUniversalSamplingSelectionStrategy(
+    IGeneticSelectionStrategy[RouteGeneticSolution, EvaluatedRouteSolution]
+):
     """Select parents using stochastic universal sampling.
 
     The strategy converts fitness values into inverse-fitness weights and then
@@ -26,23 +31,26 @@ class StochasticUniversalSamplingSelectionStrategy(ISelectionStrategy):
 
     @staticmethod
     def _build_weights(
-        evaluated_population: list[FleetRouteInfo],
-        fitness_function: Callable[[FleetRouteInfo], float],
+        evaluated_population: Sequence[EvaluatedRouteSolution],
     ) -> list[float]:
         """Build inverse-fitness weights for the evaluated population.
 
         Args:
             evaluated_population: Evaluated population aligned with the current
                 population order.
-            fitness_function: Function used to score evaluated individuals.
 
         Returns:
             A list of positive weights aligned with the population order.
         """
         return [
-            1 / max(fitness_function(individual_info), 1e-9)
+            1 / max(individual_info.fitness, 1e-9)
             for individual_info in evaluated_population
         ]
+
+    @property
+    def name(self) -> str:
+        """Return the stable strategy identifier used by the GA runtime."""
+        return self.__class__.__name__
 
     @staticmethod
     def _select_index(cumulative_weights: list[float], pointer: float) -> int:
@@ -62,25 +70,24 @@ class StochasticUniversalSamplingSelectionStrategy(ISelectionStrategy):
 
     def select_parents(
         self,
-        population: Population,
-        evaluated_population: list[FleetRouteInfo],
-        fitness_function: Callable[[FleetRouteInfo], float],
-    ) -> tuple[Individual, Individual]:
+        population: Sequence[RouteGeneticSolution],
+        evaluated_population: Sequence[EvaluatedRouteSolution],
+    ) -> tuple[RouteGeneticSolution, RouteGeneticSolution]:
         """Return two parents sampled through stochastic universal sampling.
 
         Args:
             population: Current genetic algorithm population.
             evaluated_population: Fitness metadata aligned with ``population``.
-            fitness_function: Function used to score evaluated individuals.
 
         Returns:
             A tuple with two selected parents. When the population is empty,
             returns two empty individuals.
         """
         if not population:
-            return [], []
+            empty_solution = RouteGeneticSolution([])
+            return empty_solution, empty_solution.clone()
 
-        weights = self._build_weights(evaluated_population, fitness_function)
+        weights = self._build_weights(evaluated_population)
         total_weight = sum(weights)
         step = total_weight / 2
         start_pointer = random.uniform(0, step)
@@ -97,4 +104,7 @@ class StochasticUniversalSamplingSelectionStrategy(ISelectionStrategy):
             )
             for pointer_offset in range(2)
         ]
-        return population[parent_indexes[0]], population[parent_indexes[1]]
+        return (
+            population[parent_indexes[0]].clone(),
+            population[parent_indexes[1]].clone(),
+        )

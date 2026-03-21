@@ -6,16 +6,12 @@ vehicle route.
 """
 
 import random
-
-from src.domain.interfaces.genetic_algorithm.operators.mutation_strategy_legacy import (
-    IMutationStrategy,
-)
 from src.domain.models.genetic_algorithm.individual import Individual
 
 from .base_copying_mutation_strategy import BaseCopyingMutationStrategy
 
 
-class InsertionMutationStrategy(BaseCopyingMutationStrategy, IMutationStrategy):
+class InsertionMutationStrategy(BaseCopyingMutationStrategy):
     """Mutate an individual by relocating a destination node."""
 
     def _mutate_in_place(self, solution: Individual) -> None:

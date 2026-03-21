@@ -11,17 +11,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import networkx as nx
 
 from console.lab.config import LabConfigLoader, LabRunConfigExpander
-from console.lab.factories import (
-    CrossoverStrategyFactory,
-    MutationStrategyFactory,
-    PopulationGeneratorFactory,
-    SelectionStrategyFactory,
-)
 from console.lab.orchestration.lab_benchmark_runner import LabBenchmarkRunner
 import console.lab.orchestration.lab_optimizer_builder as lab_optimizer_builder_module
 from console.lab.orchestration.lab_optimizer_builder import LabOptimizerBuilder
 from console.lab.models.lab_run_config import LabRunConfig
 from console.lab.reporting import LabConsoleReportRenderer
+from src.domain.models.genetic_algorithm.engine.generation_record import (
+    GenerationRecord,
+)
 from src.domain.models.geo_graph.graph_context import GraphContext
 from src.domain.models.geo_graph.route_node import RouteNode
 from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
@@ -104,6 +101,24 @@ class DummyHeuristicDistanceStrategy:
 class DummyOptimizer:
     """Provide deterministic optimizer behavior for the lab runner tests."""
 
+    _GENERATION_RECORDS = [
+        GenerationRecord(
+            generation=1,
+            state_name="baseline",
+            transition_label=None,
+            best_fitness=12.5,
+            stale_generations=0,
+            improvement_ratio=0.0,
+            elapsed_time_ms=5.0,
+            selection_name="roulette",
+            crossover_name="order",
+            mutation_name="inversion",
+            mutation_probability=0.6,
+            reseed_applied=False,
+            metrics={"population_size": 10},
+        )
+    ]
+
     def __init__(self, run_label: str):
         """Store the run label that drives the optimizer behavior."""
         self._run_label = run_label
@@ -146,11 +161,12 @@ class DummyOptimizer:
             best_fitness=12.5,
             population_size=10,
             generations_run=5,
+            generation_records=list(self._GENERATION_RECORDS),
         )
 
 
 def test_explicit_lab_config_expands_with_defaults(tmp_path: Path):
-    """Ensure explicit mode merges defaults and produces resolved runs."""
+    """Ensure explicit mode merges stateful defaults and produces runs."""
     config_path = tmp_path / "explicit_lab.json"
     config_path.write_text(
         json.dumps(
@@ -166,19 +182,41 @@ def test_explicit_lab_config_expands_with_defaults(tmp_path: Path):
                 "output": {"plot": False, "verbose": False},
                 "defaults": {
                     "population_size": 20,
-                    "mutation_probability": 0.6,
                     "max_generation": 300,
                     "max_processing_time": 15000,
-                    "population_generator": {"name": "hybrid", "params": {}},
-                    "selection": {"name": "roulette", "params": {}},
-                    "crossover": {"name": "order", "params": {}},
-                    "mutation": {"name": "inversion", "params": {}},
+                    "state_config": {
+                        "initial_state": "baseline",
+                        "states": [
+                            {
+                                "name": "baseline",
+                                "selection": {"name": "roulette", "params": {}},
+                                "crossover": {"name": "order", "params": {}},
+                                "mutation": {"name": "inversion", "params": {}},
+                                "mutation_probability": 0.6,
+                                "population_generator": {
+                                    "name": "hybrid",
+                                    "params": {},
+                                },
+                            }
+                        ],
+                    },
                 },
                 "experiments": [
                     {"label": "baseline"},
                     {
                         "label": "ranked",
-                        "selection": {"name": "rank", "params": {}},
+                        "state_config": {
+                            "initial_state": "ranked",
+                            "states": [
+                                {
+                                    "name": "ranked",
+                                    "selection": {"name": "rank", "params": {}},
+                                    "crossover": {"name": "order", "params": {}},
+                                    "mutation": {"name": "inversion", "params": {}},
+                                    "mutation_probability": 0.4,
+                                }
+                            ],
+                        },
                     },
                 ],
             }
@@ -192,14 +230,15 @@ def test_explicit_lab_config_expands_with_defaults(tmp_path: Path):
     assert len(runs) == 2
     assert runs[0].label == "baseline"
     assert runs[0].population_size == 20
-    assert runs[0].mutation_probability == 0.6
-    assert runs[1].selection.name == "rank"
+    assert runs[0].state_config.states[0].mutation_probability == 0.6
+    assert runs[1].state_config.states[0].selection.name == "rank"
+    assert runs[1].state_config.states[0].population_generator is None
     assert search_summary.mode == "explicit"
     assert search_summary.details["labels"] == ["baseline", "ranked"]
 
 
-def test_explicit_operator_override_replaces_whole_operator_object(tmp_path: Path):
-    """Ensure operator overrides replace the full object instead of deep-merging params."""
+def test_explicit_state_config_override_replaces_whole_object(tmp_path: Path):
+    """Ensure state graph overrides replace the full object instead of merging."""
     config_path = tmp_path / "explicit_override.json"
     config_path.write_text(
         json.dumps(
@@ -211,22 +250,39 @@ def test_explicit_operator_override_replaces_whole_operator_object(tmp_path: Pat
                 },
                 "output": {"plot": False, "verbose": False},
                 "defaults": {
-                    "population_generator": {
-                        "name": "hybrid",
-                        "params": {"heuristic_ratio": 0.4},
+                    "state_config": {
+                        "initial_state": "baseline",
+                        "states": [
+                            {
+                                "name": "baseline",
+                                "population_generator": {
+                                    "name": "hybrid",
+                                    "params": {"heuristic_ratio": 0.4},
+                                },
+                                "selection": {
+                                    "name": "tournament",
+                                    "params": {"tournament_size": 7},
+                                },
+                                "crossover": {"name": "order", "params": {}},
+                                "mutation": {"name": "inversion", "params": {}},
+                            }
+                        ],
                     },
-                    "selection": {
-                        "name": "tournament",
-                        "params": {"tournament_size": 7},
-                    },
-                    "crossover": {"name": "order", "params": {}},
-                    "mutation": {"name": "inversion", "params": {}},
                 },
                 "experiments": [
                     {
                         "label": "override-run",
-                        "population_generator": {"name": "heuristic"},
-                        "selection": {"name": "roulette"},
+                        "state_config": {
+                            "initial_state": "override",
+                            "states": [
+                                {
+                                    "name": "override",
+                                    "selection": {"name": "roulette"},
+                                    "crossover": {"name": "order"},
+                                    "mutation": {"name": "inversion"},
+                                }
+                            ],
+                        },
                     }
                 ],
             }
@@ -237,14 +293,14 @@ def test_explicit_operator_override_replaces_whole_operator_object(tmp_path: Pat
     session_config = LabConfigLoader.load(str(config_path))
     runs, _ = LabRunConfigExpander.expand(session_config)
 
-    assert runs[0].population_generator.name == "heuristic"
-    assert runs[0].population_generator.params == {}
-    assert runs[0].selection.name == "roulette"
-    assert runs[0].selection.params == {}
+    assert runs[0].state_config.initial_state == "override"
+    assert len(runs[0].state_config.states) == 1
+    assert runs[0].state_config.states[0].selection.name == "roulette"
+    assert runs[0].state_config.states[0].selection.params == {}
 
 
 def test_grid_and_random_lab_config_expansion(tmp_path: Path):
-    """Ensure grid and random modes expand into resolved run configs."""
+    """Ensure grid and random modes expand into resolved stateful runs."""
     grid_path = tmp_path / "grid_lab.json"
     grid_path.write_text(
         json.dumps(
@@ -253,19 +309,48 @@ def test_grid_and_random_lab_config_expansion(tmp_path: Path):
                 "problem": {
                     "origin": "Origin",
                     "destinations": [{"location": "Dest A", "priority": 1}],
+                    "state_config": {
+                        "initial_state": "baseline",
+                        "states": [
+                            {
+                                "name": "baseline",
+                                "selection": {"name": "roulette"},
+                                "crossover": {"name": "order"},
+                                "mutation": {"name": "inversion"},
+                            }
+                        ],
+                    },
                 },
                 "output": {"plot": False, "verbose": False},
                 "defaults": {
-                    "population_generator": {"name": "random", "params": {}},
-                    "selection": {"name": "roulette", "params": {}},
-                    "crossover": {"name": "order", "params": {}},
-                    "mutation": {"name": "inversion", "params": {}},
-                    "mutation_probability": 0.4,
+                    "population_size": 10,
                 },
                 "search_space": {
-                    "selection.name": ["roulette", "rank"],
-                    "mutation.name": ["inversion", "two_opt"],
-                    "mutation_probability": [0.2, 0.8],
+                    "state_config": [
+                        {
+                            "initial_state": "roulette-run",
+                            "states": [
+                                {
+                                    "name": "roulette-run",
+                                    "selection": {"name": "roulette"},
+                                    "crossover": {"name": "order"},
+                                    "mutation": {"name": "inversion"},
+                                }
+                            ],
+                        },
+                        {
+                            "initial_state": "rank-run",
+                            "states": [
+                                {
+                                    "name": "rank-run",
+                                    "selection": {"name": "rank"},
+                                    "crossover": {"name": "order"},
+                                    "mutation": {"name": "two_opt"},
+                                }
+                            ],
+                        },
+                    ],
+                    "population_size": [10, 20],
                 },
             }
         ),
@@ -273,11 +358,10 @@ def test_grid_and_random_lab_config_expansion(tmp_path: Path):
     )
     grid_config = LabConfigLoader.load(str(grid_path))
     grid_runs, grid_summary = LabRunConfigExpander.expand(grid_config)
-    assert len(grid_runs) == 8
+    assert len(grid_runs) == 4
     assert grid_summary.details["dimensions"] == {
-        "selection.name": 2,
-        "mutation.name": 2,
-        "mutation_probability": 2,
+        "state_config": 2,
+        "population_size": 2,
     }
 
     random_path = tmp_path / "random_lab.json"
@@ -295,18 +379,32 @@ def test_grid_and_random_lab_config_expansion(tmp_path: Path):
                 "random_search": {
                     "n": 3,
                     "seed": 123,
-                    "allowed_generators": ["random"],
-                    "allowed_selection": ["roulette", "rank"],
-                    "allowed_crossover": ["order"],
-                    "allowed_mutation": ["inversion", "two_opt"],
+                    "allowed_state_configs": [
+                        {
+                            "initial_state": "roulette-run",
+                            "states": [
+                                {
+                                    "name": "roulette-run",
+                                    "selection": {"name": "roulette"},
+                                    "crossover": {"name": "order"},
+                                    "mutation": {"name": "inversion"},
+                                }
+                            ],
+                        },
+                        {
+                            "initial_state": "rank-run",
+                            "states": [
+                                {
+                                    "name": "rank-run",
+                                    "selection": {"name": "rank"},
+                                    "crossover": {"name": "order"},
+                                    "mutation": {"name": "two_opt"},
+                                }
+                            ],
+                        },
+                    ],
                     "ranges": {
                         "population_size": {"type": "int", "min": 5, "max": 7},
-                        "mutation_probability": {
-                            "type": "float",
-                            "min": 0.1,
-                            "max": 0.9,
-                            "round": 3,
-                        },
                         "max_generation": {"type": "int", "min": 50, "max": 50},
                         "max_processing_time": {
                             "type": "int",
@@ -327,9 +425,11 @@ def test_grid_and_random_lab_config_expansion(tmp_path: Path):
     assert random_summary.details["seed"] == 123
     assert all(run.source_mode == "random" for run in random_runs)
     assert [run.seed for run in random_runs] == [123, 124, 125]
-    assert all(0.1 <= run.mutation_probability <= 0.9 for run in random_runs)
-    assert all(run.population_generator.name == "random" for run in random_runs)
-    assert set(random_summary.details["allowed_mutation"]) == {"inversion", "two_opt"}
+    assert all(5 <= run.population_size <= 7 for run in random_runs)
+    assert {run.state_config.initial_state for run in random_runs}.issubset(
+        {"roulette-run", "rank-run"}
+    )
+    assert random_summary.details["allowed_state_config_count"] == 2
 
 
 def test_random_lab_config_rejects_defaults_and_search_space(tmp_path: Path):
@@ -348,17 +448,21 @@ def test_random_lab_config_rejects_defaults_and_search_space(tmp_path: Path):
                 "search_space": {"population_size": [10, 20]},
                 "random_search": {
                     "n": 1,
-                    "allowed_generators": ["random"],
-                    "allowed_selection": ["roulette"],
-                    "allowed_crossover": ["order"],
-                    "allowed_mutation": ["inversion"],
+                    "allowed_state_configs": [
+                        {
+                            "initial_state": "baseline",
+                            "states": [
+                                {
+                                    "name": "baseline",
+                                    "selection": {"name": "roulette"},
+                                    "crossover": {"name": "order"},
+                                    "mutation": {"name": "inversion"},
+                                }
+                            ],
+                        }
+                    ],
                     "ranges": {
                         "population_size": {"type": "int", "min": 10, "max": 10},
-                        "mutation_probability": {
-                            "type": "float",
-                            "min": 0.5,
-                            "max": 0.5,
-                        },
                         "max_generation": {"type": "int", "min": 50, "max": 50},
                         "max_processing_time": {
                             "type": "int",
@@ -381,8 +485,40 @@ def test_random_lab_config_rejects_defaults_and_search_space(tmp_path: Path):
         raise AssertionError("random mode should reject defaults and search_space")
 
 
+def test_legacy_operator_quartet_config_is_rejected(tmp_path: Path):
+    """Ensure legacy quartet-based lab configs fail fast under the new schema."""
+    config_path = tmp_path / "legacy_lab.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "mode": "explicit",
+                "problem": {
+                    "origin": "Origin",
+                    "destinations": [{"location": "Dest A", "priority": 1}],
+                },
+                "output": {"plot": False, "verbose": False},
+                "defaults": {
+                    "population_generator": {"name": "random", "params": {}},
+                    "selection": {"name": "roulette", "params": {}},
+                    "crossover": {"name": "order", "params": {}},
+                    "mutation": {"name": "inversion", "params": {}},
+                },
+                "experiments": [{"label": "legacy-run"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        LabConfigLoader.load(str(config_path))
+    except ValueError as error:
+        assert "legacy operator quartet" in str(error)
+    else:
+        raise AssertionError("legacy lab configs should be rejected")
+
+
 def test_lab_optimizer_builder_passes_mutation_probability(monkeypatch):
-    """Ensure the optimizer builder forwards mutation_probability to the TSP."""
+    """Ensure the builder forwards initial-state mutation_probability to the TSP."""
 
     class CapturingOptimizer:
         """Capture constructor kwargs passed by the lab optimizer builder."""
@@ -391,27 +527,11 @@ def test_lab_optimizer_builder_passes_mutation_probability(monkeypatch):
             """Store received keyword arguments for assertions."""
             self.kwargs = kwargs
 
+    sentinel_state_controller = object()
     monkeypatch.setattr(
-        lab_optimizer_builder_module.SelectionStrategyFactory,
-        "create",
-        staticmethod(lambda name, params=None, logger=None: object()),
-    )
-    monkeypatch.setattr(
-        lab_optimizer_builder_module.CrossoverStrategyFactory,
-        "create",
-        staticmethod(lambda name, params=None, logger=None: object()),
-    )
-    monkeypatch.setattr(
-        lab_optimizer_builder_module.MutationStrategyFactory,
-        "create",
-        staticmethod(lambda name, params=None, logger=None: object()),
-    )
-    monkeypatch.setattr(
-        lab_optimizer_builder_module.PopulationGeneratorFactory,
-        "create",
-        staticmethod(
-            lambda name, distance_strategy, params=None, logger=None: object()
-        ),
+        lab_optimizer_builder_module,
+        "build_route_adaptive_state_controller",
+        lambda adaptive_config, adjacency_matrix, weight_type, cost_type: sentinel_state_controller,
     )
     monkeypatch.setattr(
         lab_optimizer_builder_module,
@@ -425,11 +545,19 @@ def test_lab_optimizer_builder_passes_mutation_probability(monkeypatch):
             "origin": "Origin",
             "destinations": [{"location": "Dest A", "priority": 1}],
             "population_size": 12,
-            "mutation_probability": 0.73,
-            "population_generator": {"name": "random", "params": {}},
-            "selection": {"name": "roulette", "params": {}},
-            "crossover": {"name": "order", "params": {}},
-            "mutation": {"name": "inversion", "params": {}},
+            "state_config": {
+                "initial_state": "baseline",
+                "states": [
+                    {
+                        "name": "baseline",
+                        "selection": {"name": "roulette", "params": {}},
+                        "crossover": {"name": "order", "params": {}},
+                        "mutation": {"name": "inversion", "params": {}},
+                        "mutation_probability": 0.73,
+                        "population_generator": {"name": "random", "params": {}},
+                    }
+                ],
+            },
         }
     )
 
@@ -442,6 +570,7 @@ def test_lab_optimizer_builder_passes_mutation_probability(monkeypatch):
     optimizer_kwargs = cast(Any, optimizer).kwargs
     assert optimizer_kwargs["population_size"] == 12
     assert optimizer_kwargs["mutation_probability"] == 0.73
+    assert optimizer_kwargs["state_controller"] is sentinel_state_controller
 
 
 def test_lab_benchmark_runner_builds_session_report(tmp_path: Path, monkeypatch):
@@ -461,13 +590,19 @@ def test_lab_benchmark_runner_builds_session_report(tmp_path: Path, monkeypatch)
                 "output": {"plot": False, "verbose": False},
                 "defaults": {
                     "population_size": 10,
-                    "mutation_probability": 0.55,
                     "max_generation": 50,
                     "max_processing_time": 1000,
-                    "population_generator": {"name": "random", "params": {}},
-                    "selection": {"name": "roulette", "params": {}},
-                    "crossover": {"name": "order", "params": {}},
-                    "mutation": {"name": "inversion", "params": {}},
+                    "state_config": {
+                        "initial_state": "baseline",
+                        "states": [
+                            {
+                                "name": "baseline",
+                                "selection": {"name": "roulette", "params": {}},
+                                "crossover": {"name": "order", "params": {}},
+                                "mutation": {"name": "inversion", "params": {}},
+                            }
+                        ],
+                    },
                 },
                 "experiments": [
                     {"label": "good-run"},
@@ -501,7 +636,10 @@ def test_lab_benchmark_runner_builds_session_report(tmp_path: Path, monkeypatch)
     assert report.aggregate_stats.failed_runs == 1
     assert report.best_run_id == "run-001"
     assert report.runs[0].status == "success"
+    assert len(report.runs[0].generation_records) == 1
+    assert report.runs[0].generation_records[0].state_name == "baseline"
     assert report.runs[1].status == "failed"
+    assert report.runs[1].generation_records == []
     assert report.output_config.verbose is False
 
 
@@ -518,50 +656,6 @@ def test_graph_generator_treats_coordinate_strings_as_coordinates():
     assert resolved[0][1] == "Reverse result"
     assert geocoder.reverse_geocode_calls == [(-23.5465, -46.6367)]
     assert geocoder.geocode_calls == ["Praça da República, São Paulo"]
-
-
-def test_operator_factories_ignore_unsupported_params_with_verbose_messages():
-    """Ensure known operators ignore unsupported params and emit verbose messages."""
-    messages: list[str] = []
-
-    PopulationGeneratorFactory.create(
-        "random",
-        distance_strategy=DummyHeuristicDistanceStrategy(),
-        params={"heuristic_ratio": 0.9},
-        logger=messages.append,
-    )
-    SelectionStrategyFactory.create(
-        "roulette",
-        params={"unused": 1},
-        logger=messages.append,
-    )
-    CrossoverStrategyFactory.create(
-        "order",
-        params={"window": 3},
-        logger=messages.append,
-    )
-    MutationStrategyFactory.create(
-        "inversion",
-        params={"depth": 2},
-        logger=messages.append,
-    )
-
-    assert any("population generator 'random'" in message for message in messages)
-    assert any("selection strategy 'roulette'" in message for message in messages)
-    assert any("crossover strategy 'order'" in message for message in messages)
-    assert any("mutation strategy 'inversion'" in message for message in messages)
-
-
-def test_operator_factories_ignore_unsupported_params_silently_without_logger():
-    """Ensure ignored params do not require a logger to avoid exceptions."""
-    PopulationGeneratorFactory.create(
-        "heuristic",
-        distance_strategy=DummyHeuristicDistanceStrategy(),
-        params={"heuristic_ratio": 0.9},
-    )
-    SelectionStrategyFactory.create("sus", params={"unused": 1})
-    CrossoverStrategyFactory.create("pmx", params={"window": 3})
-    MutationStrategyFactory.create("two_opt", params={"depth": 2})
 
 
 def test_lab_benchmark_runner_emits_verbose_runtime_messages(
@@ -583,16 +677,23 @@ def test_lab_benchmark_runner_emits_verbose_runtime_messages(
                 "output": {"plot": False, "verbose": True},
                 "defaults": {
                     "population_size": 10,
-                    "mutation_probability": 0.55,
                     "max_generation": 50,
                     "max_processing_time": 1000,
-                    "population_generator": {
-                        "name": "random",
-                        "params": {"heuristic_ratio": 0.4},
+                    "state_config": {
+                        "initial_state": "baseline",
+                        "states": [
+                            {
+                                "name": "baseline",
+                                "selection": {"name": "roulette", "params": {}},
+                                "crossover": {"name": "order", "params": {}},
+                                "mutation": {"name": "inversion", "params": {}},
+                                "population_generator": {
+                                    "name": "random",
+                                    "params": {},
+                                },
+                            }
+                        ],
                     },
-                    "selection": {"name": "roulette", "params": {}},
-                    "crossover": {"name": "order", "params": {}},
-                    "mutation": {"name": "inversion", "params": {}},
                 },
                 "experiments": [{"label": "verbose-run"}],
             }
@@ -643,8 +744,7 @@ def test_lab_benchmark_runner_emits_verbose_runtime_messages(
     assert "Loading lab config" in output
     assert "Resolved 1 run(s)" in output
     assert "Starting run 1/1: 'verbose-run'" in output
-    assert "Building optimizer for run 'verbose-run'" in output
-    assert "Ignoring unsupported params for population generator 'random'" in output
+    assert "Building stateful optimizer for run 'verbose-run'" in output
     assert "Run 'verbose-run' finished successfully" in output
 
 
@@ -668,13 +768,19 @@ def test_lab_console_report_renderer_outputs_expected_sections(
                 },
                 "defaults": {
                     "population_size": 10,
-                    "mutation_probability": 0.45,
                     "max_generation": 50,
                     "max_processing_time": 1000,
-                    "population_generator": {"name": "random", "params": {}},
-                    "selection": {"name": "roulette", "params": {}},
-                    "crossover": {"name": "order", "params": {}},
-                    "mutation": {"name": "inversion", "params": {}},
+                    "state_config": {
+                        "initial_state": "baseline",
+                        "states": [
+                            {
+                                "name": "baseline",
+                                "selection": {"name": "roulette", "params": {}},
+                                "crossover": {"name": "order", "params": {}},
+                                "mutation": {"name": "inversion", "params": {}},
+                            }
+                        ],
+                    },
                 },
                 "experiments": [{"label": "render-run"}],
             }
@@ -725,13 +831,19 @@ def test_lab_console_report_renderer_hides_best_run_details_when_disabled(
                 },
                 "defaults": {
                     "population_size": 10,
-                    "mutation_probability": 0.45,
                     "max_generation": 50,
                     "max_processing_time": 1000,
-                    "population_generator": {"name": "random", "params": {}},
-                    "selection": {"name": "roulette", "params": {}},
-                    "crossover": {"name": "order", "params": {}},
-                    "mutation": {"name": "inversion", "params": {}},
+                    "state_config": {
+                        "initial_state": "baseline",
+                        "states": [
+                            {
+                                "name": "baseline",
+                                "selection": {"name": "roulette", "params": {}},
+                                "crossover": {"name": "order", "params": {}},
+                                "mutation": {"name": "inversion", "params": {}},
+                            }
+                        ],
+                    },
                 },
                 "experiments": [{"label": "compact-render-run"}],
             }
