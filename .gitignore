@@ -20,4 +20,4 @@ venv/
 cache/
 
 # Prompts
-.github/
+.github/instructions/
