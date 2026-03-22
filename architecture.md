@@ -256,13 +256,13 @@ The service does not know how graph caching, adjacency caching, or GA operator c
 
 - cached geocoding;
 - cached adjacency building;
-- heuristic distance strategy selection;
-- hybrid population generation;
-- concrete GA strategies.
+- adaptive GA configuration loading;
+- `AdaptiveRouteGAFamilyFactory`;
+- `TSPOptimizerFactory`.
 
 ### 9.2 Console wiring
 
-`console/main.py` mirrors the API composition while optionally injecting `MatplotlibPlotter`.
+`console/main.py` mirrors the adaptive API composition while optionally injecting `MatplotlibPlotter`.
 
 ## 10. Technology Notes
 

@@ -9,6 +9,7 @@ from importlib import import_module
 __all__ = [
     "IAdjacencyMatrixBuilder",
     "IAdjacencySegmentCache",
+    "IAdaptiveRouteGAFamilyFactory",
     "IEvaluatedGeneticSolution",
     "IGeocodingCache",
     "IGeocodingResolver",
@@ -31,6 +32,7 @@ __all__ = [
 _EXPORT_MAP = {
     "IAdjacencyMatrixBuilder": ".route_optimization.adjacency_matrix_builder",
     "IAdjacencySegmentCache": ".caching.adjacency_segment_cache",
+    "IAdaptiveRouteGAFamilyFactory": ".genetic_algorithm.factories.adaptive_route_ga_family_factory",
     "IEvaluatedGeneticSolution": ".genetic_algorithm.ga_evaluated_solution",
     "IGeocodingCache": ".caching.geocoding_cache",
     "IGeocodingResolver": ".geo_graph.geocoding_resolver",

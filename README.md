@@ -149,33 +149,25 @@ The optimizer itself is orchestration-only. Concrete behavior is injected at com
 The current composition seam is shared across the API and console entry points:
 
 - `TSPOptimizerFactory` centralizes `TSPGeneticAlgorithm` construction;
-- `src/infrastructure/genetic_algorithm/builders/` centralizes reusable GA collaborator builders;
-- the API still owns loading `api/config.json`, but it now delegates adaptive state-controller composition to shared infrastructure builders instead of wiring all adaptive pieces inline.
+- `AdaptiveRouteGAFamilyFactory` centralizes adaptive GA family creation from config;
+- `src/infrastructure/genetic_algorithm/builders/` centralizes reusable low-level GA collaborator builders used by the family factory.
 
 ```mermaid
 classDiagram
     class TSPOptimizerFactory
+    class AdaptiveRouteGAFamilyFactory
     class TSPGeneticAlgorithm {
         +solve(...)
     }
-    class ISelectionStrategy
-    class ICrossoverStrategy
-    class IMutationStrategy
-    class IPopulationGenerator
-    class HybridPopulationGenerator
-    class RandomPopulationGenerator
-    class HeuristicPopulationGenerator
+    class IGeneticStateController
+    class ConfiguredGeneticStateController
     class SharedGABuilders
 
+    AdaptiveRouteGAFamilyFactory --> SharedGABuilders
+    AdaptiveRouteGAFamilyFactory --> TSPOptimizerFactory
     TSPOptimizerFactory --> TSPGeneticAlgorithm
-    SharedGABuilders --> TSPOptimizerFactory
-    TSPGeneticAlgorithm --> ISelectionStrategy
-    TSPGeneticAlgorithm --> ICrossoverStrategy
-    TSPGeneticAlgorithm --> IMutationStrategy
-    TSPGeneticAlgorithm --> IPopulationGenerator
-    HybridPopulationGenerator ..|> IPopulationGenerator
-    HybridPopulationGenerator --> RandomPopulationGenerator
-    HybridPopulationGenerator --> HeuristicPopulationGenerator
+    TSPGeneticAlgorithm --> IGeneticStateController
+    ConfiguredGeneticStateController ..|> IGeneticStateController
 ```
 
 ### Shared composition responsibilities
@@ -185,15 +177,16 @@ The current composition responsibilities are split as follows:
 - `api/dependencies.py`
     - loads the required adaptive GA config from `api/config.json`;
     - builds the adjacency matrix for each optimization request;
-    - delegates adaptive controller creation to shared builders.
+    - delegates adaptive family creation to `AdaptiveRouteGAFamilyFactory`.
 - `console/main.py`
-    - keeps the console-specific defaults and plotting choice;
+    - loads adaptive GA config for the interactive example and keeps the plotting choice;
     - delegates optimizer assembly to `TSPOptimizerFactory`.
 - `console/lab/orchestration/lab_optimizer_builder.py`
-    - keeps lab-run-specific operator resolution and logging;
+    - keeps lab-run-specific logging and resolved run inputs;
+    - delegates adaptive family creation to `AdaptiveRouteGAFamilyFactory`;
     - delegates final optimizer assembly to `TSPOptimizerFactory`.
 - `src/infrastructure/genetic_algorithm/builders/`
-    - contains shared distance-strategy, legacy-component, and adaptive-state-controller builders.
+    - contains shared distance-strategy, operator, and adaptive-state-controller builders.
 
 ### Available GA Operators
 

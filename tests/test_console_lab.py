@@ -165,8 +165,8 @@ class DummyOptimizer:
         )
 
 
-def test_explicit_lab_config_expands_with_defaults(tmp_path: Path):
-    """Ensure explicit mode merges stateful defaults and produces runs."""
+def test_explicit_lab_config_expands_with_numeric_defaults(tmp_path: Path):
+    """Ensure explicit mode merges numeric defaults and keeps state_config per experiment."""
     config_path = tmp_path / "explicit_lab.json"
     config_path.write_text(
         json.dumps(
@@ -184,25 +184,27 @@ def test_explicit_lab_config_expands_with_defaults(tmp_path: Path):
                     "population_size": 20,
                     "max_generation": 300,
                     "max_processing_time": 15000,
-                    "state_config": {
-                        "initial_state": "baseline",
-                        "states": [
-                            {
-                                "name": "baseline",
-                                "selection": {"name": "roulette", "params": {}},
-                                "crossover": {"name": "order", "params": {}},
-                                "mutation": {"name": "inversion", "params": {}},
-                                "mutation_probability": 0.6,
-                                "population_generator": {
-                                    "name": "hybrid",
-                                    "params": {},
-                                },
-                            }
-                        ],
-                    },
                 },
                 "experiments": [
-                    {"label": "baseline"},
+                    {
+                        "label": "baseline",
+                        "state_config": {
+                            "initial_state": "baseline",
+                            "states": [
+                                {
+                                    "name": "baseline",
+                                    "selection": {"name": "roulette", "params": {}},
+                                    "crossover": {"name": "order", "params": {}},
+                                    "mutation": {"name": "inversion", "params": {}},
+                                    "mutation_probability": 0.6,
+                                    "population_generator": {
+                                        "name": "hybrid",
+                                        "params": {},
+                                    },
+                                }
+                            ],
+                        },
+                    },
                     {
                         "label": "ranked",
                         "state_config": {
@@ -237,9 +239,9 @@ def test_explicit_lab_config_expands_with_defaults(tmp_path: Path):
     assert search_summary.details["labels"] == ["baseline", "ranked"]
 
 
-def test_explicit_state_config_override_replaces_whole_object(tmp_path: Path):
-    """Ensure state graph overrides replace the full object instead of merging."""
-    config_path = tmp_path / "explicit_override.json"
+def test_explicit_mode_requires_state_config_in_each_experiment(tmp_path: Path):
+    """Ensure explicit experiments cannot inherit state_config from defaults."""
+    config_path = tmp_path / "explicit_missing_state_config.json"
     config_path.write_text(
         json.dumps(
             {
@@ -250,33 +252,60 @@ def test_explicit_state_config_override_replaces_whole_object(tmp_path: Path):
                 },
                 "output": {"plot": False, "verbose": False},
                 "defaults": {
+                    "population_size": 12,
+                },
+                "experiments": [
+                    {
+                        "label": "invalid-run",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    try:
+        LabConfigLoader.load(str(config_path))
+    except ValueError as error:
+        assert "explicit experiments must define state_config" in str(error)
+    else:
+        raise AssertionError("explicit experiments should require state_config")
+
+
+def test_defaults_reject_state_config_and_non_numeric_fields(tmp_path: Path):
+    """Ensure defaults accepts only numeric run parameters."""
+    config_path = tmp_path / "invalid_defaults.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "mode": "explicit",
+                "problem": {
+                    "origin": "Origin",
+                    "destinations": [{"location": "Dest A", "priority": 1}],
+                },
+                "output": {"plot": False, "verbose": False},
+                "defaults": {
+                    "population_size": 10,
                     "state_config": {
                         "initial_state": "baseline",
                         "states": [
                             {
                                 "name": "baseline",
-                                "population_generator": {
-                                    "name": "hybrid",
-                                    "params": {"heuristic_ratio": 0.4},
-                                },
-                                "selection": {
-                                    "name": "tournament",
-                                    "params": {"tournament_size": 7},
-                                },
-                                "crossover": {"name": "order", "params": {}},
-                                "mutation": {"name": "inversion", "params": {}},
+                                "selection": {"name": "roulette"},
+                                "crossover": {"name": "order"},
+                                "mutation": {"name": "inversion"},
                             }
                         ],
                     },
                 },
                 "experiments": [
                     {
-                        "label": "override-run",
+                        "label": "run-1",
                         "state_config": {
-                            "initial_state": "override",
+                            "initial_state": "baseline",
                             "states": [
                                 {
-                                    "name": "override",
+                                    "name": "baseline",
                                     "selection": {"name": "roulette"},
                                     "crossover": {"name": "order"},
                                     "mutation": {"name": "inversion"},
@@ -290,13 +319,12 @@ def test_explicit_state_config_override_replaces_whole_object(tmp_path: Path):
         encoding="utf-8",
     )
 
-    session_config = LabConfigLoader.load(str(config_path))
-    runs, _ = LabRunConfigExpander.expand(session_config)
-
-    assert runs[0].state_config.initial_state == "override"
-    assert len(runs[0].state_config.states) == 1
-    assert runs[0].state_config.states[0].selection.name == "roulette"
-    assert runs[0].state_config.states[0].selection.params == {}
+    try:
+        LabConfigLoader.load(str(config_path))
+    except ValueError as error:
+        assert "defaults accepts only numeric run parameters" in str(error)
+    else:
+        raise AssertionError("defaults should reject state_config")
 
 
 def test_grid_and_random_lab_config_expansion(tmp_path: Path):
@@ -433,7 +461,7 @@ def test_grid_and_random_lab_config_expansion(tmp_path: Path):
 
 
 def test_random_lab_config_rejects_defaults_and_search_space(tmp_path: Path):
-    """Ensure random mode stays policy-only and rejects legacy fallback sections."""
+    """Ensure random mode stays policy-only and rejects unsupported sections."""
     config_path = tmp_path / "invalid_random_lab.json"
     config_path.write_text(
         json.dumps(
@@ -485,9 +513,9 @@ def test_random_lab_config_rejects_defaults_and_search_space(tmp_path: Path):
         raise AssertionError("random mode should reject defaults and search_space")
 
 
-def test_legacy_operator_quartet_config_is_rejected(tmp_path: Path):
-    """Ensure legacy quartet-based lab configs fail fast under the new schema."""
-    config_path = tmp_path / "legacy_lab.json"
+def test_top_level_operator_keys_are_rejected(tmp_path: Path):
+    """Ensure top-level operator keys fail fast under the adaptive-only schema."""
+    config_path = tmp_path / "invalid_operator_shape.json"
     config_path.write_text(
         json.dumps(
             {
@@ -503,7 +531,7 @@ def test_legacy_operator_quartet_config_is_rejected(tmp_path: Path):
                     "crossover": {"name": "order", "params": {}},
                     "mutation": {"name": "inversion", "params": {}},
                 },
-                "experiments": [{"label": "legacy-run"}],
+                "experiments": [{"label": "invalid-operator-run"}],
             }
         ),
         encoding="utf-8",
@@ -512,13 +540,13 @@ def test_legacy_operator_quartet_config_is_rejected(tmp_path: Path):
     try:
         LabConfigLoader.load(str(config_path))
     except ValueError as error:
-        assert "legacy operator quartet" in str(error)
+        assert "unsupported top-level operator keys in defaults" in str(error)
     else:
-        raise AssertionError("legacy lab configs should be rejected")
+        raise AssertionError("top-level operator keys should be rejected")
 
 
-def test_lab_optimizer_builder_passes_mutation_probability(monkeypatch):
-    """Ensure the builder forwards initial-state mutation_probability to the TSP."""
+def test_lab_optimizer_builder_passes_adaptive_family(monkeypatch):
+    """Ensure the builder forwards the adaptive family controller to the TSP."""
 
     class CapturingOptimizer:
         """Capture constructor kwargs passed by the lab optimizer builder."""
@@ -528,10 +556,26 @@ def test_lab_optimizer_builder_passes_mutation_probability(monkeypatch):
             self.kwargs = kwargs
 
     sentinel_state_controller = object()
+    sentinel_family = type(
+        "SentinelFamily",
+        (),
+        {
+            "state_controller": sentinel_state_controller,
+            "initial_state_name": "baseline",
+        },
+    )()
     monkeypatch.setattr(
         lab_optimizer_builder_module,
-        "build_route_adaptive_state_controller",
-        lambda adaptive_config, adjacency_matrix, weight_type, cost_type: sentinel_state_controller,
+        "AdaptiveRouteGAFamilyFactory",
+        lambda: type(
+            "FactoryStub",
+            (),
+            {
+                "create": staticmethod(
+                    lambda adaptive_config, adjacency_matrix, weight_type, cost_type: sentinel_family
+                )
+            },
+        )(),
     )
     monkeypatch.setattr(
         lab_optimizer_builder_module,
@@ -569,7 +613,6 @@ def test_lab_optimizer_builder_passes_mutation_probability(monkeypatch):
 
     optimizer_kwargs = cast(Any, optimizer).kwargs
     assert optimizer_kwargs["population_size"] == 12
-    assert optimizer_kwargs["mutation_probability"] == 0.73
     assert optimizer_kwargs["state_controller"] is sentinel_state_controller
 
 
@@ -592,21 +635,36 @@ def test_lab_benchmark_runner_builds_session_report(tmp_path: Path, monkeypatch)
                     "population_size": 10,
                     "max_generation": 50,
                     "max_processing_time": 1000,
-                    "state_config": {
-                        "initial_state": "baseline",
-                        "states": [
-                            {
-                                "name": "baseline",
-                                "selection": {"name": "roulette", "params": {}},
-                                "crossover": {"name": "order", "params": {}},
-                                "mutation": {"name": "inversion", "params": {}},
-                            }
-                        ],
-                    },
                 },
                 "experiments": [
-                    {"label": "good-run"},
-                    {"label": "broken-run"},
+                    {
+                        "label": "good-run",
+                        "state_config": {
+                            "initial_state": "baseline",
+                            "states": [
+                                {
+                                    "name": "baseline",
+                                    "selection": {"name": "roulette", "params": {}},
+                                    "crossover": {"name": "order", "params": {}},
+                                    "mutation": {"name": "inversion", "params": {}},
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "label": "broken-run",
+                        "state_config": {
+                            "initial_state": "baseline",
+                            "states": [
+                                {
+                                    "name": "baseline",
+                                    "selection": {"name": "roulette", "params": {}},
+                                    "crossover": {"name": "order", "params": {}},
+                                    "mutation": {"name": "inversion", "params": {}},
+                                }
+                            ],
+                        },
+                    },
                 ],
             }
         ),
@@ -679,23 +737,27 @@ def test_lab_benchmark_runner_emits_verbose_runtime_messages(
                     "population_size": 10,
                     "max_generation": 50,
                     "max_processing_time": 1000,
-                    "state_config": {
-                        "initial_state": "baseline",
-                        "states": [
-                            {
-                                "name": "baseline",
-                                "selection": {"name": "roulette", "params": {}},
-                                "crossover": {"name": "order", "params": {}},
-                                "mutation": {"name": "inversion", "params": {}},
-                                "population_generator": {
-                                    "name": "random",
-                                    "params": {},
-                                },
-                            }
-                        ],
-                    },
                 },
-                "experiments": [{"label": "verbose-run"}],
+                "experiments": [
+                    {
+                        "label": "verbose-run",
+                        "state_config": {
+                            "initial_state": "baseline",
+                            "states": [
+                                {
+                                    "name": "baseline",
+                                    "selection": {"name": "roulette", "params": {}},
+                                    "crossover": {"name": "order", "params": {}},
+                                    "mutation": {"name": "inversion", "params": {}},
+                                    "population_generator": {
+                                        "name": "random",
+                                        "params": {},
+                                    },
+                                }
+                            ],
+                        },
+                    }
+                ],
             }
         ),
         encoding="utf-8",
@@ -744,7 +806,7 @@ def test_lab_benchmark_runner_emits_verbose_runtime_messages(
     assert "Loading lab config" in output
     assert "Resolved 1 run(s)" in output
     assert "Starting run 1/1: 'verbose-run'" in output
-    assert "Building stateful optimizer for run 'verbose-run'" in output
+    assert "Building adaptive optimizer for run 'verbose-run'" in output
     assert "Run 'verbose-run' finished successfully" in output
 
 
@@ -770,19 +832,23 @@ def test_lab_console_report_renderer_outputs_expected_sections(
                     "population_size": 10,
                     "max_generation": 50,
                     "max_processing_time": 1000,
-                    "state_config": {
-                        "initial_state": "baseline",
-                        "states": [
-                            {
-                                "name": "baseline",
-                                "selection": {"name": "roulette", "params": {}},
-                                "crossover": {"name": "order", "params": {}},
-                                "mutation": {"name": "inversion", "params": {}},
-                            }
-                        ],
-                    },
                 },
-                "experiments": [{"label": "render-run"}],
+                "experiments": [
+                    {
+                        "label": "render-run",
+                        "state_config": {
+                            "initial_state": "baseline",
+                            "states": [
+                                {
+                                    "name": "baseline",
+                                    "selection": {"name": "roulette", "params": {}},
+                                    "crossover": {"name": "order", "params": {}},
+                                    "mutation": {"name": "inversion", "params": {}},
+                                }
+                            ],
+                        },
+                    }
+                ],
             }
         ),
         encoding="utf-8",
@@ -833,19 +899,23 @@ def test_lab_console_report_renderer_hides_best_run_details_when_disabled(
                     "population_size": 10,
                     "max_generation": 50,
                     "max_processing_time": 1000,
-                    "state_config": {
-                        "initial_state": "baseline",
-                        "states": [
-                            {
-                                "name": "baseline",
-                                "selection": {"name": "roulette", "params": {}},
-                                "crossover": {"name": "order", "params": {}},
-                                "mutation": {"name": "inversion", "params": {}},
-                            }
-                        ],
-                    },
                 },
-                "experiments": [{"label": "compact-render-run"}],
+                "experiments": [
+                    {
+                        "label": "compact-render-run",
+                        "state_config": {
+                            "initial_state": "baseline",
+                            "states": [
+                                {
+                                    "name": "baseline",
+                                    "selection": {"name": "roulette", "params": {}},
+                                    "crossover": {"name": "order", "params": {}},
+                                    "mutation": {"name": "inversion", "params": {}},
+                                }
+                            ],
+                        },
+                    }
+                ],
             }
         ),
         encoding="utf-8",

@@ -41,13 +41,14 @@ from .specifications import (
 )
 from .state_controllers import (
     ConfiguredGeneticStateController,
-    FixedGeneticStateController,
 )
+from .factories import AdaptiveRouteGAFamilyFactory
 
 __all__ = [
     "AdjacencyCostPopulationDistanceStrategy",
     "AdjacencyEtaPopulationDistanceStrategy",
     "AdjacencyLengthPopulationDistanceStrategy",
+    "AdaptiveRouteGAFamilyFactory",
     "EuclideanPopulationDistanceStrategy",
     "CycleCrossoverStrategy",
     "EdgeRecombinationCrossoverStrategy",
@@ -62,7 +63,6 @@ __all__ = [
     "RoulleteSelectionStrategy",
     "StochasticUniversalSamplingSelectionStrategy",
     "ConfiguredGeneticStateController",
-    "FixedGeneticStateController",
     "ImprovementBelowSpecification",
     "ProgressAtLeastSpecification",
     "SwapAndRedistributeMutationStrategy",

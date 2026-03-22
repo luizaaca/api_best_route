@@ -13,6 +13,10 @@ from src.domain.models.geo_graph.route_population_seed_data import (
 )
 from src.domain.models.route_optimization.route_segment import RouteSegment
 from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
+from src.domain.models.genetic_algorithm.engine.configured_state import ConfiguredState
+from src.domain.models.genetic_algorithm.engine.generation_operators import (
+    GenerationOperators,
+)
 from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
     IGeneticCrossoverStrategy,
 )
@@ -35,6 +39,7 @@ from src.domain.models.genetic_algorithm.route_genetic_solution import (
 from src.infrastructure.genetic_algorithm import (
     AdjacencyEtaPopulationDistanceStrategy,
     CycleCrossoverStrategy,
+    ConfiguredGeneticStateController,
     EdgeRecombinationCrossoverStrategy,
     HeuristicPopulationGenerator,
     HybridPopulationGenerator,
@@ -199,20 +204,58 @@ def route_signature(individual):
     return tuple(tuple(node.node_id for node in route) for route in individual)
 
 
-def build_default_optimizer(adjacency_matrix, population_size=10):
+def build_single_state_adaptive_optimizer(adjacency_matrix, population_size=10):
+    """Create one optimizer using a single-state adaptive controller."""
     heuristic_generator = HeuristicPopulationGenerator(
         AdjacencyEtaPopulationDistanceStrategy(adjacency_matrix)
+    )
+    state_controller = ConfiguredGeneticStateController(
+        initial_state="baseline",
+        states=[
+            ConfiguredState(
+                name="baseline",
+                operators=GenerationOperators(
+                    selection=RoulleteSelectionStrategy(),
+                    crossover=OrderCrossoverStrategy(),
+                    mutation=SwapAndRedistributeMutationStrategy(),
+                    mutation_probability=0.5,
+                    population_generator=HybridPopulationGenerator(
+                        RandomPopulationGenerator(),
+                        heuristic_generator,
+                    ),
+                ),
+            )
+        ],
     )
     return TSPGeneticAlgorithm(
         adjacency_matrix,
         population_size=population_size,
-        selection_strategy=RoulleteSelectionStrategy(),
-        crossover_strategy=OrderCrossoverStrategy(),
-        mutation_strategy=SwapAndRedistributeMutationStrategy(),
-        population_generator=HybridPopulationGenerator(
-            RandomPopulationGenerator(),
-            heuristic_generator,
-        ),
+        state_controller=state_controller,
+    )
+
+
+def build_stub_state_controller(
+    selection_strategy,
+    crossover_strategy,
+    mutation_strategy,
+    population_generator,
+    mutation_probability=0.5,
+):
+    """Build one single-state adaptive controller for test doubles."""
+    return ConfiguredGeneticStateController(
+        initial_state="baseline",
+        states=[
+            ConfiguredState(
+                name="baseline",
+                operators=GenerationOperators(
+                    selection=selection_strategy,
+                    crossover=crossover_strategy,
+                    mutation=mutation_strategy,
+                    mutation_probability=mutation_probability,
+                    population_generator=population_generator,
+                ),
+            )
+        ],
     )
 
 
@@ -433,7 +476,10 @@ def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
     calculator = FakeRouteCalculator()
     nodes = make_nodes(2)
     adjacency_matrix = build_adjacency_matrix(calculator, nodes)
-    optimizer = build_default_optimizer(adjacency_matrix, population_size=4)
+    optimizer = build_single_state_adaptive_optimizer(
+        adjacency_matrix,
+        population_size=4,
+    )
 
     result = optimizer.solve(
         route_nodes=nodes,
@@ -481,13 +527,16 @@ def test_solve_uses_injected_ga_components():
     crossover_strategy = StubCrossoverStrategy()
     mutation_strategy = StubMutationStrategy()
     population_generator = StubPopulationGenerator()
+    state_controller = build_stub_state_controller(
+        selection_strategy,
+        crossover_strategy,
+        mutation_strategy,
+        population_generator,
+    )
     optimizer = TSPGeneticAlgorithm(
         adjacency_matrix,
         population_size=2,
-        selection_strategy=selection_strategy,
-        crossover_strategy=crossover_strategy,
-        mutation_strategy=mutation_strategy,
-        population_generator=population_generator,
+        state_controller=state_controller,
     )
 
     result = optimizer.solve(
@@ -502,3 +551,13 @@ def test_solve_uses_injected_ga_components():
     assert crossover_strategy.called is True
     assert mutation_strategy.called is True
     assert len(result.best_route.routes_by_vehicle) == 2
+
+
+def test_optimizer_requires_adaptive_state_controller():
+    """Ensure the optimizer fails fast when no adaptive controller is provided."""
+    try:
+        TSPGeneticAlgorithm(adjacency_matrix={})
+    except ValueError as error:
+        assert "state_controller is required" in str(error)
+    else:
+        raise AssertionError("optimizer should require an adaptive state controller")

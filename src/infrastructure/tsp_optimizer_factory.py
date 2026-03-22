@@ -5,20 +5,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeVar
 
+from src.domain.models.genetic_algorithm.engine.adaptive_ga_family import (
+    AdaptiveGAFamily,
+)
 from src.domain.interfaces.genetic_algorithm.engine.state_controller import (
     IGeneticStateController,
-)
-from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
-    IGeneticCrossoverStrategy,
-)
-from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
-    IGeneticMutationStrategy,
-)
-from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
-    IGeneticPopulationGenerator,
-)
-from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
-    IGeneticSelectionStrategy,
 )
 from src.domain.interfaces.plotting.plotter import IPlotter
 from src.domain.models.genetic_algorithm.evaluated_route_solution import (
@@ -48,26 +39,13 @@ class TSPOptimizerFactory:
     def create(
         adjacency_matrix: AdjacencyMatrix,
         population_size: int = 10,
-        mutation_probability: float = 0.5,
+        ga_family: AdaptiveGAFamily[
+            RouteGeneticSolution,
+            EvaluatedRouteSolution,
+            RoutePopulationSeedData,
+        ]
+        | None = None,
         plotter: IPlotter | None = None,
-        selection_strategy: IGeneticSelectionStrategy[
-            RouteGeneticSolution,
-            EvaluatedRouteSolution,
-        ]
-        | None = None,
-        crossover_strategy: IGeneticCrossoverStrategy[RouteGeneticSolution] | None = None,
-        mutation_strategy: IGeneticMutationStrategy[RouteGeneticSolution] | None = None,
-        population_generator: IGeneticPopulationGenerator[
-            RoutePopulationSeedData,
-            RouteGeneticSolution,
-        ]
-        | None = None,
-        state_controller: IGeneticStateController[
-            RouteGeneticSolution,
-            EvaluatedRouteSolution,
-            RoutePopulationSeedData,
-        ]
-        | None = None,
         logger: Callable[[str], None] | None = None,
         optimizer_type: Callable[..., TOptimizer] = TSPGeneticAlgorithm,
     ) -> TOptimizer:
@@ -76,13 +54,8 @@ class TSPOptimizerFactory:
         Args:
             adjacency_matrix: Precomputed adjacency matrix for route evaluation.
             population_size: Number of candidate solutions per generation.
-            mutation_probability: Probability of mutating one offspring.
+            ga_family: Adaptive route GA family resolved from configuration.
             plotter: Optional runtime plotter.
-            selection_strategy: Parent-selection strategy.
-            crossover_strategy: Parent-crossover strategy.
-            mutation_strategy: Offspring-mutation strategy.
-            population_generator: Initial population generator.
-            state_controller: Optional adaptive state controller.
             logger: Optional runtime logger.
             optimizer_type: Concrete optimizer class used for construction.
 
@@ -90,15 +63,12 @@ class TSPOptimizerFactory:
             A configured `TSPGeneticAlgorithm` instance or compatible object
             built by the provided constructor.
         """
+        if ga_family is None:
+            raise ValueError("ga_family is required")
         return optimizer_type(
             adjacency_matrix=adjacency_matrix,
             plotter=plotter,
             population_size=population_size,
-            mutation_probability=mutation_probability,
-            selection_strategy=selection_strategy,
-            crossover_strategy=crossover_strategy,
-            mutation_strategy=mutation_strategy,
-            population_generator=population_generator,
-            state_controller=state_controller,
+            state_controller=ga_family.state_controller,
             logger=logger,
         )

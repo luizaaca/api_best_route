@@ -16,7 +16,7 @@ class LabRunConfigExpander:
     """Expand explicit, grid, and random config modes into resolved runs."""
 
     _REPLACE_WHOLE_KEYS = {"state_config"}
-    _LEGACY_OPERATOR_QUARTET_KEYS = {
+    _UNSUPPORTED_TOP_LEVEL_OPERATOR_KEYS = {
         "population_generator",
         "selection",
         "crossover",
@@ -155,11 +155,13 @@ class LabRunConfigExpander:
             A validated `LabRunConfig` instance.
         """
         payload = copy.deepcopy(resolved_dict)
-        legacy_keys = sorted(cls._LEGACY_OPERATOR_QUARTET_KEYS & set(payload))
-        if legacy_keys:
+        unsupported_keys = sorted(
+            cls._UNSUPPORTED_TOP_LEVEL_OPERATOR_KEYS & set(payload)
+        )
+        if unsupported_keys:
             raise ValueError(
-                "lab config no longer supports legacy operator quartet keys: "
-                f"{legacy_keys}"
+                "lab config requires operators inside state_config; unsupported top-level operator keys: "
+                f"{unsupported_keys}"
             )
         payload.setdefault("label", f"{default_label_prefix}-{index + 1:03d}")
         payload["source_mode"] = mode

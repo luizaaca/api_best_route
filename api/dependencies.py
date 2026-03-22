@@ -1,7 +1,7 @@
 """FastAPI dependency definitions for creating optimizer components.
 
 This module provides cached factory functions used by the API to wire up the
-route optimization service with default infrastructure implementations.
+route optimization service with adaptive GA infrastructure implementations.
 """
 
 from collections.abc import Mapping
@@ -17,19 +17,7 @@ from src.infrastructure.caching import (
     SQLiteAdjacencySegmentCache,
     SQLiteGeocodingCache,
 )
-from src.infrastructure.genetic_algorithm import (
-    ConfiguredGeneticStateController,
-    HeuristicPopulationGenerator,
-    HybridPopulationGenerator,
-    OrderCrossoverStrategy,
-    RandomPopulationGenerator,
-    RoulleteSelectionStrategy,
-    SwapAndRedistributeMutationStrategy,
-)
-from src.infrastructure.genetic_algorithm.builders import (
-    build_population_distance_strategy,
-    build_route_adaptive_state_controller,
-)
+from src.infrastructure.genetic_algorithm.factories import AdaptiveRouteGAFamilyFactory
 from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
 from src.infrastructure.route_calculator import RouteCalculator
 from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
@@ -80,7 +68,7 @@ def get_adaptive_ga_config() -> dict[str, Any]:
     return load_adaptive_ga_config()
 
 
-def _build_default_optimizer(
+def _build_adaptive_optimizer(
     calc,
     route_nodes,
     weight_type,
@@ -89,10 +77,7 @@ def _build_default_optimizer(
     population_size,
     adaptive_config: Mapping[str, Any] | None = None,
 ) -> TSPGeneticAlgorithm:
-    """Create a GA optimizer with default concrete collaborators.
-
-    This function constructs the optimizer with a cached adjacency matrix
-    builder, heuristic population generator, and default genetic operators.
+    """Create a GA optimizer backed by adaptive configuration.
 
     Args:
         calc: The route calculator to use for segment computation.
@@ -101,41 +86,33 @@ def _build_default_optimizer(
         cost_type: Optional cost strategy for segment computation.
         plotter: Optional plotter for visualization.
         population_size: The number of individuals in the genetic population.
-        adaptive_config: Optional adaptive GA state-graph configuration.
+        adaptive_config: Adaptive GA state-graph configuration.
 
     Returns:
         A configured TSPGeneticAlgorithm instance.
+
+    Raises:
+        ValueError: If the adaptive configuration is not provided.
     """
+    if adaptive_config is None:
+        raise ValueError("adaptive_config is required")
     adjacency_matrix = get_adjacency_matrix_builder().build(
         route_calculator=calc,
         route_nodes=route_nodes,
         weight_type=weight_type,
         cost_type=cost_type,
     )
-    heuristic_generator = HeuristicPopulationGenerator(
-        build_population_distance_strategy(adjacency_matrix, weight_type, cost_type)
+    ga_family = AdaptiveRouteGAFamilyFactory().create(
+        adaptive_config=adaptive_config,
+        adjacency_matrix=adjacency_matrix,
+        weight_type=weight_type,
+        cost_type=cost_type,
     )
     return TSPOptimizerFactory.create(
         adjacency_matrix=adjacency_matrix,
         plotter=plotter,
         population_size=population_size,
-        selection_strategy=RoulleteSelectionStrategy(),
-        crossover_strategy=OrderCrossoverStrategy(),
-        mutation_strategy=SwapAndRedistributeMutationStrategy(),
-        population_generator=HybridPopulationGenerator(
-            RandomPopulationGenerator(),
-            heuristic_generator,
-        ),
-        state_controller=(
-            build_route_adaptive_state_controller(
-                adaptive_config,
-                adjacency_matrix,
-                weight_type,
-                cost_type,
-            )
-            if adaptive_config is not None
-            else None
-        ),
+        ga_family=ga_family,
     )
 
 
@@ -171,7 +148,7 @@ def get_route_optimization_service() -> RouteOptimizationService:
             adaptive_config if adaptive_config is not None else api_adaptive_config
         )
 
-        return _build_default_optimizer(
+        return _build_adaptive_optimizer(
             calc=calc,
             route_nodes=route_nodes,
             weight_type=weight_type,

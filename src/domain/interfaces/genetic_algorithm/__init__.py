@@ -3,6 +3,7 @@
 from importlib import import_module
 
 __all__ = [
+    "IAdaptiveRouteGAFamilyFactory",
     "IEvaluatedGeneticSolution",
     "IGeneticProblem",
     "IGeneticSolution",
@@ -11,6 +12,7 @@ __all__ = [
 ]
 
 _EXPORT_MAP = {
+    "IAdaptiveRouteGAFamilyFactory": ".factories.adaptive_route_ga_family_factory",
     "IEvaluatedGeneticSolution": ".ga_evaluated_solution",
     "IGeneticProblem": ".ga_problem",
     "IGeneticSolution": ".ga_solution",

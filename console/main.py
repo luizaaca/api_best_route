@@ -7,6 +7,7 @@ standalone script.
 
 import argparse
 
+from api.config import load_adaptive_ga_config
 from console.lab.config import LabConfigLoader
 from console.lab.orchestration import LabBenchmarkRunner
 from console.lab.reporting import LabConsoleReportRenderer
@@ -19,17 +20,7 @@ from src.infrastructure.caching import (
     SQLiteAdjacencySegmentCache,
     SQLiteGeocodingCache,
 )
-from src.infrastructure.genetic_algorithm import (
-    HeuristicPopulationGenerator,
-    HybridPopulationGenerator,
-    OrderCrossoverStrategy,
-    RandomPopulationGenerator,
-    RoulleteSelectionStrategy,
-    SwapAndRedistributeMutationStrategy,
-)
-from src.infrastructure.genetic_algorithm.builders.distance_strategy_builder import (
-    build_population_distance_strategy,
-)
+from src.infrastructure.genetic_algorithm.factories import AdaptiveRouteGAFamilyFactory
 from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
 from src.infrastructure.route_calculator import RouteCalculator
 from src.infrastructure.matplotlib_plotter import MatplotlibPlotter
@@ -63,15 +54,16 @@ def _build_adjacency_matrix_builder() -> CachedAdjacencyMatrixBuilder:
     )
 
 
-def _build_default_optimizer(
+def _build_adaptive_optimizer(
     calc,
     route_nodes,
     weight_type,
     cost_type,
     plotter,
     population_size,
+    adaptive_config=None,
 ) -> TSPGeneticAlgorithm:
-    """Create a GA optimizer configured with console defaults.
+    """Create a GA optimizer configured from adaptive config.
 
     Args:
         calc: The route calculator to use.
@@ -80,10 +72,16 @@ def _build_default_optimizer(
         cost_type: Optional cost strategy.
         plotter: Plotter used to visualize progress.
         population_size: Number of individuals in the population.
+        adaptive_config: Adaptive GA state-graph configuration.
 
     Returns:
         A configured TSPGeneticAlgorithm instance.
+
+    Raises:
+        ValueError: If the adaptive configuration is not provided.
     """
+    if adaptive_config is None:
+        raise ValueError("adaptive_config is required")
     adjacency_matrix = CachedAdjacencyMatrixBuilder(
         SQLiteAdjacencySegmentCache("cache/adjacency_segments.db")
     ).build(
@@ -92,20 +90,17 @@ def _build_default_optimizer(
         weight_type=weight_type,
         cost_type=cost_type,
     )
-    heuristic_generator = HeuristicPopulationGenerator(
-        build_population_distance_strategy(adjacency_matrix, weight_type, cost_type)
+    ga_family = AdaptiveRouteGAFamilyFactory().create(
+        adaptive_config=adaptive_config,
+        adjacency_matrix=adjacency_matrix,
+        weight_type=weight_type,
+        cost_type=cost_type,
     )
     return TSPOptimizerFactory.create(
         adjacency_matrix=adjacency_matrix,
         plotter=plotter,
         population_size=population_size,
-        selection_strategy=RoulleteSelectionStrategy(),
-        crossover_strategy=OrderCrossoverStrategy(),
-        mutation_strategy=SwapAndRedistributeMutationStrategy(),
-        population_generator=HybridPopulationGenerator(
-            RandomPopulationGenerator(),
-            heuristic_generator,
-        ),
+        ga_family=ga_family,
     )
 
 
@@ -115,10 +110,11 @@ def run_console_example():
     This function is intended as a quick demo for running the optimizer from the
     command line, using hard-coded locations and parameters.
     """
+    adaptive_config = load_adaptive_ga_config()
     service = RouteOptimizationService(
         graph_generator=_build_graph_generator(),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=_build_default_optimizer,
+        optimizer_factory=_build_adaptive_optimizer,
         plotter_factory=MatplotlibPlotter,
     )
 
@@ -148,8 +144,9 @@ def run_console_example():
         population_size=10,
         weight_type=weight_type,
         cost_type=cost_type,
+        adaptive_config=adaptive_config,
     )
-    # resultado formatado para exibição no console
+    # Format the result for console display.
     print("\nResumo da otimização:")
     for vehicle_route in result.best_route.routes_by_vehicle:
         print(
@@ -197,7 +194,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Console entrypoint for route optimization. Run the legacy "
+            "Console entrypoint for route optimization. Run the adaptive "
             "interactive example or execute lab-mode benchmark sessions "
             "from JSON configuration files."
         )
@@ -223,8 +220,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 def main() -> None:
     """Dispatch the requested console command.
 
-    When no subcommand is provided, the legacy demo flow is executed to preserve
-    backwards compatibility with the original console example.
+    When no subcommand is provided, the adaptive console example is executed.
     """
     parser = _build_argument_parser()
     args = parser.parse_args()

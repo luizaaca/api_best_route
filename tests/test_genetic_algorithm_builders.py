@@ -13,6 +13,7 @@ from src.infrastructure.genetic_algorithm.builders import (
     build_selection_strategy,
     build_specification,
 )
+from src.infrastructure.genetic_algorithm.factories import AdaptiveRouteGAFamilyFactory
 from src.domain.models.genetic_algorithm.engine.generation_context import (
     GenerationContext,
 )
@@ -121,34 +122,67 @@ def test_tsp_optimizer_factory_forwards_resolved_collaborators():
             """Store the received constructor kwargs for assertions."""
             captured_kwargs.update(kwargs)
 
-    selection = build_selection_strategy("roulette")
-    crossover = build_crossover_strategy("order")
-    mutation = build_mutation_strategy("inversion")
-    generator = build_population_generator(
-        "random",
-        distance_strategy=DummyHeuristicDistanceStrategy(),
+    ga_family = AdaptiveRouteGAFamilyFactory().create(
+        adaptive_config={
+            "initial_state": "baseline",
+            "states": [
+                {
+                    "name": "baseline",
+                    "selection": {"name": "roulette"},
+                    "crossover": {"name": "order"},
+                    "mutation": {"name": "inversion"},
+                    "population_generator": {"name": "random"},
+                    "mutation_probability": 0.33,
+                }
+            ],
+        },
+        adjacency_matrix={},
+        weight_type="eta",
+        cost_type=None,
     )
 
     optimizer = TSPOptimizerFactory.create(
         adjacency_matrix={},
         population_size=14,
-        mutation_probability=0.33,
+        ga_family=ga_family,
         plotter=None,
-        selection_strategy=selection,
-        crossover_strategy=crossover,
-        mutation_strategy=mutation,
-        population_generator=generator,
         logger=None,
         optimizer_type=CapturingOptimizer,
     )
 
     assert optimizer is not None
     assert captured_kwargs["population_size"] == 14
-    assert captured_kwargs["mutation_probability"] == 0.33
-    assert captured_kwargs["selection_strategy"] is selection
-    assert captured_kwargs["crossover_strategy"] is crossover
-    assert captured_kwargs["mutation_strategy"] is mutation
-    assert captured_kwargs["population_generator"] is generator
+    assert captured_kwargs["state_controller"] is ga_family.state_controller
+
+
+def test_adaptive_route_ga_family_factory_builds_initial_family_from_config():
+    """Ensure the adaptive family factory exposes the initial state collaborators."""
+    family = AdaptiveRouteGAFamilyFactory().create(
+        adaptive_config={
+            "initial_state": "baseline",
+            "states": [
+                {
+                    "name": "baseline",
+                    "selection": {"name": "tournament", "params": {"tournament_size": 4}},
+                    "crossover": {"name": "order"},
+                    "mutation": {"name": "two_opt"},
+                    "population_generator": {"name": "hybrid", "params": {"heuristic_ratio": 0.6}},
+                    "mutation_probability": 0.21,
+                }
+            ],
+        },
+        adjacency_matrix={},
+        weight_type="eta",
+        cost_type=None,
+    )
+
+    assert family.initial_state_name == "baseline"
+    assert family.initial_operators.selection.name == "TournamentSelectionStrategy"
+    assert family.initial_operators.crossover.name == "OrderCrossoverStrategy"
+    assert family.initial_operators.mutation.name == "TwoOptMutationStrategy"
+    assert family.initial_operators.population_generator is not None
+    assert family.initial_operators.population_generator.name == "HybridPopulationGenerator"
+    assert family.initial_operators.mutation_probability == 0.21
 
 
 def test_route_adaptive_state_controller_builder_applies_transition_rules():

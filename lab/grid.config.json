@@ -18,16 +18,38 @@
   "defaults": {
     "vehicle_count": 2,
     "max_generation": 80,
-    "max_processing_time": 12000,
-    "population_generator": {"name": "hybrid", "params": {"heuristic_ratio": 0.4}},
-    "selection": {"name": "roulette", "params": {}},
-    "crossover": {"name": "order", "params": {}},
-    "mutation": {"name": "inversion", "params": {}}
+    "max_processing_time": 12000
   },
   "search_space": {
+    "state_config": [
+      {
+        "initial_state": "roulette-inversion",
+        "states": [
+          {
+            "name": "roulette-inversion",
+            "selection": {"name": "roulette", "params": {}},
+            "crossover": {"name": "order", "params": {}},
+            "mutation": {"name": "inversion", "params": {}},
+            "mutation_probability": 0.3,
+            "population_generator": {"name": "hybrid", "params": {"heuristic_ratio": 0.4}}
+          }
+        ]
+      },
+      {
+        "initial_state": "rank-two-opt",
+        "states": [
+          {
+            "name": "rank-two-opt",
+            "selection": {"name": "rank", "params": {}},
+            "crossover": {"name": "order", "params": {}},
+            "mutation": {"name": "two_opt", "params": {}},
+            "mutation_probability": 0.7,
+            "population_generator": {"name": "hybrid", "params": {"heuristic_ratio": 0.4}}
+          }
+        ]
+      }
+    ],
     "population_size": [12, 24],
-    "mutation_probability": [0.3, 0.5, 0.7],
-    "selection.name": ["roulette", "rank"],
-    "mutation.name": ["inversion", "two_opt"]
+    "vehicle_count": [1, 2]
   }
 }

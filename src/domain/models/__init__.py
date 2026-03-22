@@ -6,6 +6,7 @@ The root package resolves model symbols lazily so importing one lightweight mode
 from importlib import import_module
 
 __all__ = [
+    "AdaptiveGAFamily",
     "FleetRouteInfo",
     "AdjacencyMatrixMap",
     "EvaluatedRouteSolution",
@@ -29,6 +30,7 @@ __all__ = [
 ]
 
 _EXPORT_MAP = {
+    "AdaptiveGAFamily": ".genetic_algorithm.engine.adaptive_ga_family",
     "AdjacencyMatrixMap": ".route_optimization.adjacency_matrix_map",
     "EvaluatedRouteSolution": ".genetic_algorithm.evaluated_route_solution",
     "FleetRouteInfo": ".route_optimization.fleet_route_info",

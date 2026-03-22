@@ -6,26 +6,11 @@ generic GA execution loop to the problem-agnostic `GeneticAlgorithm` engine.
 
 from collections.abc import Callable
 
-from src.domain.interfaces.genetic_algorithm.operators.ga_crossover_strategy import (
-    IGeneticCrossoverStrategy,
-)
-from src.domain.interfaces.genetic_algorithm.operators.ga_mutation_strategy import (
-    IGeneticMutationStrategy,
-)
-from src.domain.interfaces.genetic_algorithm.operators.ga_population_generator import (
-    IGeneticPopulationGenerator,
-)
-from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy import (
-    IGeneticSelectionStrategy,
-)
 from src.domain.interfaces.genetic_algorithm.engine.state_controller import (
     IGeneticStateController,
 )
 from src.domain.interfaces.plotting.plotter import IPlotter
 from src.domain.interfaces.route_optimization.route_optimizer import IRouteOptimizer
-from src.domain.models.genetic_algorithm.engine.generation_operators import (
-    GenerationOperators,
-)
 from src.domain.models.genetic_algorithm.engine.generation_record import (
     GenerationRecord,
 )
@@ -44,9 +29,6 @@ from src.domain.models.route_optimization.optimization_result import Optimizatio
 from src.domain.models.route_optimization.route_segment import RouteSegment
 from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
 from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
-from src.infrastructure.genetic_algorithm.state_controllers.fixed_state_controller import (
-    FixedGeneticStateController,
-)
 from src.infrastructure.genetic_algorithm_engine import GeneticAlgorithm
 from src.infrastructure.route_calculator import AdjacencyMatrix
 from src.infrastructure.tsp_genetic_problem import TSPGeneticProblem
@@ -59,26 +41,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         self,
         adjacency_matrix: AdjacencyMatrix,
         population_size=10,
-        mutation_probability=0.5,
         plotter: IPlotter | None = None,
-        selection_strategy: (
-            IGeneticSelectionStrategy[
-                RouteGeneticSolution,
-                EvaluatedRouteSolution,
-            ]
-            | None
-        ) = None,
-        crossover_strategy: (
-            IGeneticCrossoverStrategy[RouteGeneticSolution] | None
-        ) = None,
-        mutation_strategy: IGeneticMutationStrategy[RouteGeneticSolution] | None = None,
-        population_generator: (
-            IGeneticPopulationGenerator[
-                RoutePopulationSeedData,
-                RouteGeneticSolution,
-            ]
-            | None
-        ) = None,
         state_controller: (
             IGeneticStateController[
                 RouteGeneticSolution,
@@ -94,36 +57,18 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         Args:
             adjacency_matrix: A precomputed adjacency matrix mapping node pairs to segments.
             population_size: Number of candidate solutions maintained per generation.
-            mutation_probability: Probability of applying mutation to offspring.
             plotter: Optional plotter used to visualize optimization progress.
-            selection_strategy: Strategy for selecting parents in each generation.
-            crossover_strategy: Strategy for combining parents to create offspring.
-            mutation_strategy: Strategy for mutating offspring solutions.
-            population_generator: Generator for the initial population.
-            state_controller: Optional adaptive state controller. When omitted,
-                the optimizer uses the legacy fixed operator bundle.
+            state_controller: Adaptive state controller resolved from configuration.
             logger: Optional callable used to emit runtime messages.
 
         Raises:
-            ValueError: If any required strategy dependency is not provided.
+            ValueError: If the adaptive state controller is not provided.
         """
-        if selection_strategy is None:
-            raise ValueError("selection_strategy is required")
-        if crossover_strategy is None:
-            raise ValueError("crossover_strategy is required")
-        if mutation_strategy is None:
-            raise ValueError("mutation_strategy is required")
-        if population_generator is None:
-            raise ValueError("population_generator is required")
+        if state_controller is None:
+            raise ValueError("state_controller is required")
         self._problem = TSPGeneticProblem(adjacency_matrix)
-        self._adjacency_matrix = adjacency_matrix
         self.population_size = population_size
-        self.mutation_probability = mutation_probability
         self._plotter = plotter
-        self._selection_strategy = selection_strategy
-        self._crossover_strategy = crossover_strategy
-        self._mutation_strategy = mutation_strategy
-        self._population_generator = population_generator
         self._state_controller = state_controller
         self._logger = logger
 
@@ -131,22 +76,6 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
         """Emit one runtime message when a logger is configured."""
         if self._logger is not None:
             self._logger(message)
-
-    def _build_fixed_generation_operators(
-        self,
-    ) -> GenerationOperators[
-        RouteGeneticSolution,
-        EvaluatedRouteSolution,
-        RoutePopulationSeedData,
-    ]:
-        """Build the fixed operator bundle used by the non-adaptive route optimizer."""
-        return GenerationOperators(
-            selection=self._selection_strategy,
-            crossover=self._crossover_strategy,
-            mutation=self._mutation_strategy,
-            mutation_probability=self.mutation_probability,
-            population_generator=self._population_generator,
-        )
 
     def _handle_generation(
         self,
@@ -210,14 +139,7 @@ class TSPGeneticAlgorithm(IRouteOptimizer):
             OptimizationResult,
         ](
             problem=self._problem,
-            state_controller=(
-                self._state_controller
-                if self._state_controller is not None
-                else FixedGeneticStateController(
-                    state_name="fixed-route-ga",
-                    operators=self._build_fixed_generation_operators(),
-                )
-            ),
+            state_controller=self._state_controller,
             logger=self._logger,
             on_generation=generation_records.append,
             on_generation_evaluated=self._handle_generation,

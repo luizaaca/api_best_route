@@ -35,7 +35,7 @@ All lab configuration files are JSON objects with this top-level structure:
   - `experiments` for `explicit`
   - `search_space` for `grid`
   - `random_search` for `random`
-- `defaults` — optional, allowed only for `explicit` and `grid`
+- `defaults` — optional, allowed only for numeric run parameters in `explicit` and `grid`
 
 ## Shared `problem` Block
 
@@ -98,7 +98,7 @@ Required fields:
 
 Optional fields:
 
-- `defaults` — shared run values merged into every experiment before per-run overrides are applied
+- `defaults` — shared numeric run values merged into every experiment before per-run overrides are applied
 
 ### Override precedence in explicit mode
 
@@ -110,14 +110,15 @@ The effective precedence is:
 
 Scalar fields are overridden normally.
 
-Operator blocks are treated as whole objects:
+`state_config` must be declared inside each experiment. It is not allowed inside `defaults`.
 
-- `population_generator`
-- `selection`
-- `crossover`
-- `mutation`
+`defaults` accepts only numeric run parameters such as:
 
-If an experiment overrides one of those blocks, the entire block replaces the value inherited from `defaults`. The runner does **not** deep-merge operator `params`.
+- `vehicle_count`
+- `population_size`
+- `max_generation`
+- `max_processing_time`
+- `seed`
 
 For example, this override:
 
@@ -129,18 +130,14 @@ For example, this override:
 
 produces an operator config with an empty `params` object, even if `defaults.population_generator.params` was previously defined.
 
-Typical per-run fields:
+Typical per-experiment fields:
 
 - `label`
 - `population_size`
-- `mutation_probability`
 - `max_generation`
 - `max_processing_time`
 - `vehicle_count`
-- `population_generator`
-- `selection`
-- `crossover`
-- `mutation`
+- `state_config`
 
 ## Grid Mode
 
@@ -152,7 +149,7 @@ Required fields:
 
 Optional fields:
 
-- `defaults` — shared run values applied before the grid values are expanded
+- `defaults` — shared numeric run values applied before the grid values are expanded
 
 Example dotted paths:
 
