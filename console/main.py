@@ -6,8 +6,9 @@ standalone script.
 """
 
 import argparse
+from pathlib import Path
+from typing import Any
 
-from api.config import load_adaptive_ga_config
 from console.lab.config import LabConfigLoader
 from console.lab.orchestration import LabBenchmarkRunner
 from console.lab.reporting import LabConsoleReportRenderer
@@ -21,11 +22,29 @@ from src.infrastructure.caching import (
     SQLiteGeocodingCache,
 )
 from src.infrastructure.genetic_algorithm.factories import AdaptiveRouteGAFamilyFactory
+from src.infrastructure.config import (
+    get_sibling_config_path,
+    load_adaptive_ga_config,
+)
+from src.infrastructure.genetic_algorithm_execution_runner import (
+    GeneticAlgorithmExecutionRunner,
+)
 from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
 from src.infrastructure.route_calculator import RouteCalculator
 from src.infrastructure.matplotlib_plotter import MatplotlibPlotter
-from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
 from src.infrastructure.tsp_optimizer_factory import TSPOptimizerFactory
+from src.domain.models.route_optimization.route_ga_execution_bundle import (
+    RouteGAExecutionBundle,
+)
+
+
+def get_console_adaptive_ga_config_path() -> Path:
+    """Return the fixed adaptive GA config path used by the console example.
+
+    Returns:
+        The absolute path to the console-owned adaptive GA config file.
+    """
+    return get_sibling_config_path(__file__, "example.config.json")
 
 
 def _build_graph_generator(logger=None) -> OSMnxGraphGenerator:
@@ -54,37 +73,35 @@ def _build_adjacency_matrix_builder() -> CachedAdjacencyMatrixBuilder:
     )
 
 
-def _build_adaptive_optimizer(
+def _build_adaptive_execution_bundle(
     calc,
     route_nodes,
     weight_type,
     cost_type,
-    plotter,
     population_size,
-    adaptive_config=None,
-) -> TSPGeneticAlgorithm:
-    """Create a GA optimizer configured from adaptive config.
+    vehicle_count,
+    adaptive_config: dict[str, Any] | None = None,
+) -> RouteGAExecutionBundle:
+    """Create one route execution bundle configured from adaptive config.
 
     Args:
         calc: The route calculator to use.
         route_nodes: The list of route nodes for optimization.
         weight_type: Weighting strategy for segment evaluation.
         cost_type: Optional cost strategy.
-        plotter: Plotter used to visualize progress.
         population_size: Number of individuals in the population.
+        vehicle_count: Number of vehicles available for the current run.
         adaptive_config: Adaptive GA state-graph configuration.
 
     Returns:
-        A configured TSPGeneticAlgorithm instance.
+        A configured route execution bundle.
 
     Raises:
         ValueError: If the adaptive configuration is not provided.
     """
     if adaptive_config is None:
         raise ValueError("adaptive_config is required")
-    adjacency_matrix = CachedAdjacencyMatrixBuilder(
-        SQLiteAdjacencySegmentCache("cache/adjacency_segments.db")
-    ).build(
+    adjacency_matrix = _build_adjacency_matrix_builder().build(
         route_calculator=calc,
         route_nodes=route_nodes,
         weight_type=weight_type,
@@ -96,26 +113,27 @@ def _build_adaptive_optimizer(
         weight_type=weight_type,
         cost_type=cost_type,
     )
-    return TSPOptimizerFactory.create(
+    return TSPOptimizerFactory.create_execution_bundle(
         adjacency_matrix=adjacency_matrix,
-        plotter=plotter,
+        route_nodes=route_nodes,
+        vehicle_count=vehicle_count,
         population_size=population_size,
         ga_family=ga_family,
     )
 
 
-def run_console_example():
-    """Run a console example optimization and print the results.
+def run_console_example(verbose: bool = False):
+    """Run a console example optimization and print the results."""
+    adaptive_config = load_adaptive_ga_config(get_console_adaptive_ga_config_path())
+    logger = build_runtime_logger(verbose)
 
-    This function is intended as a quick demo for running the optimizer from the
-    command line, using hard-coded locations and parameters.
-    """
-    adaptive_config = load_adaptive_ga_config()
     service = RouteOptimizationService(
-        graph_generator=_build_graph_generator(),
+        graph_generator=_build_graph_generator(logger=logger),
         route_calculator_factory=RouteCalculator,
-        optimizer_factory=_build_adaptive_optimizer,
+        execution_bundle_factory=_build_adaptive_execution_bundle,
+        execution_runner=GeneticAlgorithmExecutionRunner(),
         plotter_factory=MatplotlibPlotter,
+        logger=logger,
     )
 
     origin: str | tuple[float, float] = "Praça da Sé, São Paulo"
@@ -199,6 +217,12 @@ def _build_argument_parser() -> argparse.ArgumentParser:
             "from JSON configuration files."
         )
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose console output for the interactive example.",
+    )
+
     subparsers = parser.add_subparsers(dest="command")
 
     lab_parser = subparsers.add_parser(
@@ -227,7 +251,7 @@ def main() -> None:
     if args.command == "lab":
         run_lab_benchmark(args.config)
         return
-    run_console_example()
+    run_console_example(verbose=args.verbose)
 
 
 if __name__ == "__main__":

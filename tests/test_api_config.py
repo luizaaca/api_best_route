@@ -8,12 +8,31 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from api.config import get_adaptive_ga_config_path, load_adaptive_ga_config
+from console.main import get_console_adaptive_ga_config_path
+from src.infrastructure.config import get_sibling_config_path
 
 
 def test_get_adaptive_ga_config_path_points_to_api_root() -> None:
     expected = Path(__file__).resolve().parent.parent / "api" / "config.json"
 
     assert get_adaptive_ga_config_path() == expected
+
+
+def test_get_console_adaptive_ga_config_path_points_to_console_root() -> None:
+  expected = (
+    Path(__file__).resolve().parent.parent / "console" / "example.config.json"
+  )
+
+  assert get_console_adaptive_ga_config_path() == expected
+
+
+def test_get_sibling_config_path_uses_anchor_directory(tmp_path: Path) -> None:
+    anchor_file = tmp_path / "module.py"
+    anchor_file.write_text("# anchor", encoding="utf-8")
+
+    resolved = get_sibling_config_path(anchor_file, "example.config.json")
+
+    assert resolved == tmp_path / "example.config.json"
 
 
 def test_load_adaptive_ga_config_reads_valid_file(tmp_path: Path) -> None:

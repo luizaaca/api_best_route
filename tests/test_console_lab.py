@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 from typing import Any, cast
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -26,6 +27,10 @@ from src.domain.models.route_optimization.optimization_result import Optimizatio
 from src.domain.models.route_optimization.route_segment import RouteSegment
 from src.domain.models.route_optimization.route_segments_info import RouteSegmentsInfo
 from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
+from src.domain.models.route_optimization.route_ga_execution_bundle import (
+    RouteGAExecutionBundle,
+)
+from src.infrastructure.tsp_genetic_problem import TSPGeneticProblem
 from src.infrastructure.osmnx_graph_generator import OSMnxGraphGenerator
 
 
@@ -163,6 +168,34 @@ class DummyOptimizer:
             generations_run=5,
             generation_records=list(self._GENERATION_RECORDS),
         )
+
+
+class DummyBundleExecutionRunner:
+    """Run one fake execution bundle by delegating to `DummyOptimizer`."""
+
+    def run(
+        self,
+        problem,
+        seed_data,
+        state_controller,
+        population_size,
+        max_generations,
+        max_processing_time,
+        logger=None,
+        on_generation=None,
+        on_generation_evaluated=None,
+    ):
+        """Return one deterministic optimization result for bundle-based tests."""
+        _ = seed_data
+        _ = state_controller
+        _ = population_size
+        _ = max_generations
+        _ = max_processing_time
+        _ = logger
+        _ = on_generation_evaluated
+        if on_generation is not None:
+            on_generation(DummyOptimizer._GENERATION_RECORDS[0])
+        return DummyOptimizer(problem).solve([], 1, 1, 1)
 
 
 def test_explicit_lab_config_expands_with_numeric_defaults(tmp_path: Path):
@@ -546,14 +579,9 @@ def test_top_level_operator_keys_are_rejected(tmp_path: Path):
 
 
 def test_lab_optimizer_builder_passes_adaptive_family(monkeypatch):
-    """Ensure the builder forwards the adaptive family controller to the TSP."""
+    """Ensure the builder forwards the adaptive family controller to the bundle."""
 
-    class CapturingOptimizer:
-        """Capture constructor kwargs passed by the lab optimizer builder."""
-
-        def __init__(self, **kwargs):
-            """Store received keyword arguments for assertions."""
-            self.kwargs = kwargs
+    captured_kwargs: dict[str, object] = {}
 
     sentinel_state_controller = object()
     sentinel_family = type(
@@ -578,9 +606,11 @@ def test_lab_optimizer_builder_passes_adaptive_family(monkeypatch):
         )(),
     )
     monkeypatch.setattr(
-        lab_optimizer_builder_module,
-        "TSPGeneticAlgorithm",
-        CapturingOptimizer,
+        lab_optimizer_builder_module.TSPOptimizerFactory,
+        "create_execution_bundle",
+        staticmethod(
+            lambda **kwargs: captured_kwargs.update(kwargs) or SimpleNamespace()
+        ),
     )
 
     run_config = LabRunConfig.model_validate(
@@ -605,15 +635,15 @@ def test_lab_optimizer_builder_passes_adaptive_family(monkeypatch):
         }
     )
 
-    optimizer = LabOptimizerBuilder.build(
+    bundle = LabOptimizerBuilder.build(
         run_config=run_config,
         adjacency_matrix={},
-        plotter=None,
+        route_nodes=[RouteNode("Origin", 1, (0.0, 0.0))],
     )
 
-    optimizer_kwargs = cast(Any, optimizer).kwargs
-    assert optimizer_kwargs["population_size"] == 12
-    assert optimizer_kwargs["state_controller"] is sentinel_state_controller
+    assert bundle is not None
+    assert captured_kwargs["population_size"] == 12
+    assert captured_kwargs["ga_family"] is sentinel_family
 
 
 def test_lab_benchmark_runner_builds_session_report(tmp_path: Path, monkeypatch):
@@ -671,8 +701,16 @@ def test_lab_benchmark_runner_builds_session_report(tmp_path: Path, monkeypatch)
         encoding="utf-8",
     )
 
-    def fake_build(run_config, adjacency_matrix, plotter=None, logger=None):
-        return DummyOptimizer(run_config.label)
+    def fake_build(run_config, adjacency_matrix, route_nodes, logger=None):
+        _ = adjacency_matrix
+        _ = route_nodes
+        _ = logger
+        return RouteGAExecutionBundle(
+            problem=run_config.label,
+            seed_data=cast(Any, "seed-data"),
+            state_controller=cast(Any, "state-controller"),
+            population_size=run_config.population_size,
+        )
 
     monkeypatch.setattr(LabOptimizerBuilder, "build", staticmethod(fake_build))
 
@@ -683,6 +721,7 @@ def test_lab_benchmark_runner_builds_session_report(tmp_path: Path, monkeypatch)
         route_calculator_factory=DummyRouteCalculator,
         adjacency_matrix_builder=adjacency_builder,
         plotter_factory=None,
+        execution_runner=cast(Any, DummyBundleExecutionRunner()),
     )
 
     report = runner.run(str(config_path))
@@ -770,34 +809,71 @@ def test_lab_benchmark_runner_emits_verbose_runtime_messages(
         logger=print,
     )
 
-    class CapturingRuntimeOptimizer:
-        """Provide a lightweight optimizer while preserving builder-side logging."""
-
-        def __init__(self, **kwargs):
-            """Store constructor kwargs and preserve the runtime logger."""
-            self._logger = kwargs.get("logger")
-
-        def solve(
-            self,
-            route_nodes,
-            max_generation,
-            max_processing_time,
-            vehicle_count,
-        ):
-            """Return a deterministic optimization result for verbose-flow tests."""
-            if self._logger is not None:
-                self._logger(f"Running optimizer with vehicle_count={vehicle_count}")
-            return DummyOptimizer("verbose-run").solve(
-                route_nodes,
-                max_generation,
-                max_processing_time,
-                vehicle_count,
+    def fake_verbose_build(run_config, adjacency_matrix, route_nodes, logger=None):
+        _ = adjacency_matrix
+        if logger is not None:
+            logger(
+                (
+                    f"Building adaptive execution bundle for run '{run_config.label}' "
+                    f"with initial state '{run_config.state_config.initial_state}' and "
+                    f"{len(run_config.state_config.states)} configured state(s)."
+                )
             )
+        return RouteGAExecutionBundle(
+            problem=TSPGeneticProblem({}),
+            seed_data=cast(
+                Any,
+                SimpleNamespace(
+                    route_nodes=route_nodes,
+                    vehicle_count=run_config.vehicle_count,
+                ),
+            ),
+            state_controller=cast(
+                Any,
+                SimpleNamespace(get_initial_resolution=lambda: None),
+            ),
+            population_size=run_config.population_size,
+        )
 
     monkeypatch.setattr(
-        lab_optimizer_builder_module,
-        "TSPGeneticAlgorithm",
-        CapturingRuntimeOptimizer,
+        LabOptimizerBuilder,
+        "build",
+        staticmethod(fake_verbose_build),
+    )
+
+    class VerboseExecutionRunner(DummyBundleExecutionRunner):
+        def run(
+            self,
+            problem,
+            seed_data,
+            state_controller,
+            population_size,
+            max_generations,
+            max_processing_time,
+            logger=None,
+            on_generation=None,
+            on_generation_evaluated=None,
+        ):
+            if logger is not None:
+                logger("Running optimizer with vehicle_count=1")
+            return super().run(
+                problem=problem,
+                seed_data=seed_data,
+                state_controller=state_controller,
+                population_size=population_size,
+                max_generations=max_generations,
+                max_processing_time=max_processing_time,
+                logger=logger,
+                on_generation=on_generation,
+                on_generation_evaluated=on_generation_evaluated,
+            )
+
+    runner = LabBenchmarkRunner(
+        graph_generator=DummyGraphGenerator(),
+        route_calculator_factory=DummyRouteCalculator,
+        adjacency_matrix_builder=DummyAdjacencyMatrixBuilder(),
+        logger=print,
+        execution_runner=cast(Any, VerboseExecutionRunner()),
     )
 
     runner.run(str(config_path))
@@ -806,7 +882,7 @@ def test_lab_benchmark_runner_emits_verbose_runtime_messages(
     assert "Loading lab config" in output
     assert "Resolved 1 run(s)" in output
     assert "Starting run 1/1: 'verbose-run'" in output
-    assert "Building adaptive optimizer for run 'verbose-run'" in output
+    assert "Building adaptive execution bundle for run 'verbose-run'" in output
     assert "Run 'verbose-run' finished successfully" in output
 
 
@@ -854,8 +930,16 @@ def test_lab_console_report_renderer_outputs_expected_sections(
         encoding="utf-8",
     )
 
-    def fake_build(run_config, adjacency_matrix, plotter=None, logger=None):
-        return DummyOptimizer(run_config.label)
+    def fake_build(run_config, adjacency_matrix, route_nodes, logger=None):
+        _ = adjacency_matrix
+        _ = route_nodes
+        _ = logger
+        return RouteGAExecutionBundle(
+            problem=run_config.label,
+            seed_data=cast(Any, "seed-data"),
+            state_controller=cast(Any, "state-controller"),
+            population_size=run_config.population_size,
+        )
 
     monkeypatch.setattr(LabOptimizerBuilder, "build", staticmethod(fake_build))
 
@@ -863,6 +947,7 @@ def test_lab_console_report_renderer_outputs_expected_sections(
         graph_generator=DummyGraphGenerator(),
         route_calculator_factory=DummyRouteCalculator,
         adjacency_matrix_builder=DummyAdjacencyMatrixBuilder(),
+        execution_runner=cast(Any, DummyBundleExecutionRunner()),
     ).run(str(config_path))
 
     rendered = LabConsoleReportRenderer.render(report)
@@ -921,8 +1006,16 @@ def test_lab_console_report_renderer_hides_best_run_details_when_disabled(
         encoding="utf-8",
     )
 
-    def fake_build(run_config, adjacency_matrix, plotter=None, logger=None):
-        return DummyOptimizer(run_config.label)
+    def fake_build(run_config, adjacency_matrix, route_nodes, logger=None):
+        _ = adjacency_matrix
+        _ = route_nodes
+        _ = logger
+        return RouteGAExecutionBundle(
+            problem=run_config.label,
+            seed_data=cast(Any, "seed-data"),
+            state_controller=cast(Any, "state-controller"),
+            population_size=run_config.population_size,
+        )
 
     monkeypatch.setattr(LabOptimizerBuilder, "build", staticmethod(fake_build))
 
@@ -930,6 +1023,7 @@ def test_lab_console_report_renderer_hides_best_run_details_when_disabled(
         graph_generator=DummyGraphGenerator(),
         route_calculator_factory=DummyRouteCalculator,
         adjacency_matrix_builder=DummyAdjacencyMatrixBuilder(),
+        execution_runner=cast(Any, DummyBundleExecutionRunner()),
     ).run(str(config_path))
 
     rendered = LabConsoleReportRenderer.render(report)

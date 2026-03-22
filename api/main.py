@@ -4,7 +4,7 @@ This application serves a single endpoint that accepts origins and
 destinations and returns an optimized route plan using a genetic algorithm.
 """
 
-from typing import cast
+from typing import Any, cast
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -50,6 +50,7 @@ async def validate_adaptive_ga_config() -> None:
 async def optimize_route(
     request: OptimizeRouteRequest,
     service: RouteOptimizationService = Depends(get_route_optimization_service),
+    adaptive_config: dict[str, Any] = Depends(get_adaptive_ga_config),
 ):
     """Handle route optimization requests.
 
@@ -59,6 +60,7 @@ async def optimize_route(
     Args:
         request: The optimized route request payload.
         service: The injected route optimization service.
+        adaptive_config: Cached adaptive GA state-graph configuration.
 
     Returns:
         An OptimizeRouteResponse containing routes per vehicle and totals.
@@ -91,6 +93,7 @@ async def optimize_route(
             population_size=request.population_size,
             weight_type=request.weight_type,
             cost_type=request.cost_type,
+            adaptive_config=adaptive_config,
         )
 
         routes_by_vehicle = []

@@ -3,6 +3,8 @@ import random
 import sys
 import copy
 import networkx as nx
+import pytest
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
 
 # ensure src directory is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -56,8 +58,16 @@ from src.infrastructure.genetic_algorithm import (
     TwoOptMutationStrategy,
 )
 from src.infrastructure.route_calculator import build_adjacency_matrix
-from src.infrastructure.tsp_genetic_algorithm import TSPGeneticAlgorithm
+from src.infrastructure.genetic_algorithm.factories import AdaptiveRouteGAFamilyFactory
+from src.infrastructure.genetic_algorithm_execution_runner import (
+    GeneticAlgorithmExecutionRunner,
+)
 from src.infrastructure.tsp_genetic_problem import TSPGeneticProblem
+from src.infrastructure.tsp_optimizer_factory import TSPOptimizerFactory
+from src.domain.models.route_optimization.route_ga_execution_bundle import (
+    RouteGAExecutionBundle,
+)
+from src.infrastructure.genetic_algorithm.factories import AdaptiveRouteGAFamilyFactory
 
 
 class FakeRouteCalculator(IRouteCalculator):
@@ -204,8 +214,13 @@ def route_signature(individual):
     return tuple(tuple(node.node_id for node in route) for route in individual)
 
 
-def build_single_state_adaptive_optimizer(adjacency_matrix, population_size=10):
-    """Create one optimizer using a single-state adaptive controller."""
+def build_single_state_execution_bundle(
+    adjacency_matrix,
+    route_nodes,
+    population_size=10,
+    vehicle_count=1,
+):
+    """Create one route execution bundle using a single-state adaptive controller."""
     heuristic_generator = HeuristicPopulationGenerator(
         AdjacencyEtaPopulationDistanceStrategy(adjacency_matrix)
     )
@@ -227,10 +242,12 @@ def build_single_state_adaptive_optimizer(adjacency_matrix, population_size=10):
             )
         ],
     )
-    return TSPGeneticAlgorithm(
-        adjacency_matrix,
-        population_size=population_size,
+    problem = TSPGeneticProblem(adjacency_matrix)
+    return RouteGAExecutionBundle(
+        problem=problem,
+        seed_data=problem.build_seed_data(route_nodes, vehicle_count),
         state_controller=state_controller,
+        population_size=population_size,
     )
 
 
@@ -476,16 +493,25 @@ def test_solve_keeps_requested_vehicle_count_even_with_empty_routes():
     calculator = FakeRouteCalculator()
     nodes = make_nodes(2)
     adjacency_matrix = build_adjacency_matrix(calculator, nodes)
-    optimizer = build_single_state_adaptive_optimizer(
+    bundle = build_single_state_execution_bundle(
         adjacency_matrix,
+        nodes,
         population_size=4,
+        vehicle_count=5,
     )
 
-    result = optimizer.solve(
-        route_nodes=nodes,
-        max_generation=1,
+    result = GeneticAlgorithmExecutionRunner[
+        RouteGeneticSolution,
+        EvaluatedRouteSolution,
+        RoutePopulationSeedData,
+        OptimizationResult,
+    ]().run(
+        problem=bundle.problem,
+        seed_data=bundle.seed_data,
+        state_controller=bundle.state_controller,
+        population_size=bundle.population_size,
+        max_generations=1,
         max_processing_time=1000,
-        vehicle_count=5,
     )
 
     assert len(result.best_route.routes_by_vehicle) == 5
@@ -533,17 +559,26 @@ def test_solve_uses_injected_ga_components():
         mutation_strategy,
         population_generator,
     )
-    optimizer = TSPGeneticAlgorithm(
-        adjacency_matrix,
-        population_size=2,
+    problem = TSPGeneticProblem(adjacency_matrix)
+    bundle = RouteGAExecutionBundle(
+        problem=problem,
+        seed_data=problem.build_seed_data(nodes, 2),
         state_controller=state_controller,
+        population_size=2,
     )
 
-    result = optimizer.solve(
-        route_nodes=nodes,
-        max_generation=1,
+    result = GeneticAlgorithmExecutionRunner[
+        RouteGeneticSolution,
+        EvaluatedRouteSolution,
+        RoutePopulationSeedData,
+        OptimizationResult,
+    ]().run(
+        problem=bundle.problem,
+        seed_data=bundle.seed_data,
+        state_controller=bundle.state_controller,
+        population_size=bundle.population_size,
+        max_generations=1,
         max_processing_time=1000,
-        vehicle_count=2,
     )
 
     assert population_generator.called is True
@@ -553,11 +588,95 @@ def test_solve_uses_injected_ga_components():
     assert len(result.best_route.routes_by_vehicle) == 2
 
 
-def test_optimizer_requires_adaptive_state_controller():
-    """Ensure the optimizer fails fast when no adaptive controller is provided."""
-    try:
-        TSPGeneticAlgorithm(adjacency_matrix={})
-    except ValueError as error:
-        assert "state_controller is required" in str(error)
-    else:
-        raise AssertionError("optimizer should require an adaptive state controller")
+def test_route_execution_bundle_factory_requires_adaptive_family():
+    """Ensure bundle construction fails fast when no adaptive family is provided."""
+    with pytest.raises(ValueError, match="ga_family is required"):
+        TSPOptimizerFactory.create_execution_bundle(
+            adjacency_matrix={},
+            route_nodes=make_nodes(2),
+            vehicle_count=2,
+            population_size=2,
+            ga_family=None,
+        )
+
+
+def test_generic_execution_runner_executes_route_bundle():
+    random.seed(13)
+    calculator = FakeRouteCalculator()
+    nodes = make_nodes(2)
+    adjacency_matrix = build_adjacency_matrix(calculator, nodes)
+    bundle = build_single_state_execution_bundle(
+        adjacency_matrix,
+        nodes,
+        population_size=3,
+        vehicle_count=2,
+    )
+
+    result = GeneticAlgorithmExecutionRunner[
+        RouteGeneticSolution,
+        EvaluatedRouteSolution,
+        RoutePopulationSeedData,
+        OptimizationResult,
+    ]().run(
+        problem=bundle.problem,
+        seed_data=bundle.seed_data,
+        state_controller=bundle.state_controller,
+        population_size=bundle.population_size,
+        max_generations=1,
+        max_processing_time=1000,
+    )
+
+    assert result is not None
+    assert result.population_size == 3
+    assert len(result.best_route.routes_by_vehicle) == 2
+
+
+def test_optimizer_accepts_prebuilt_execution_bundle():
+    random.seed(19)
+    calculator = FakeRouteCalculator()
+    nodes = make_nodes(2)
+    adjacency_matrix = build_adjacency_matrix(calculator, nodes)
+    ga_family = AdaptiveRouteGAFamilyFactory().create(
+        adaptive_config={
+            "initial_state": "baseline",
+            "states": [
+                {
+                    "name": "baseline",
+                    "selection": {"name": "roulette"},
+                    "crossover": {"name": "order"},
+                    "mutation": {"name": "swap_redistribute"},
+                    "population_generator": {
+                        "name": "hybrid",
+                        "params": {"heuristic_ratio": 0.4},
+                    },
+                    "mutation_probability": 0.5,
+                }
+            ],
+        },
+        adjacency_matrix=adjacency_matrix,
+        weight_type="eta",
+        cost_type=None,
+    )
+    bundle = TSPOptimizerFactory.create_execution_bundle(
+        adjacency_matrix=adjacency_matrix,
+        route_nodes=nodes,
+        vehicle_count=2,
+        population_size=4,
+        ga_family=ga_family,
+    )
+    result = GeneticAlgorithmExecutionRunner[
+        RouteGeneticSolution,
+        EvaluatedRouteSolution,
+        RoutePopulationSeedData,
+        OptimizationResult,
+    ]().run(
+        problem=bundle.problem,
+        seed_data=bundle.seed_data,
+        state_controller=bundle.state_controller,
+        population_size=bundle.population_size,
+        max_generations=1,
+        max_processing_time=1000,
+    )
+
+    assert len(result.best_route.routes_by_vehicle) == 2
+    assert result.population_size == 4

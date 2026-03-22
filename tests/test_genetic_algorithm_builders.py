@@ -1,6 +1,7 @@
 import os
 import sys
 from typing import cast
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -33,6 +34,7 @@ from src.infrastructure.genetic_algorithm.specifications import (
     ImprovementBelowSpecification,
 )
 from src.infrastructure.tsp_optimizer_factory import TSPOptimizerFactory
+from src.domain.models.geo_graph.route_node import RouteNode
 
 
 class DummyHeuristicDistanceStrategy:
@@ -112,16 +114,7 @@ def test_shared_builders_report_ignored_params_when_requested():
     assert ignored_params_reports == [("selection strategy", "roulette", {"unused": 1})]
 
 
-def test_tsp_optimizer_factory_forwards_resolved_collaborators():
-    captured_kwargs: dict[str, object] = {}
-
-    class CapturingOptimizer:
-        """Capture constructor kwargs passed through the shared TSP factory."""
-
-        def __init__(self, **kwargs):
-            """Store the received constructor kwargs for assertions."""
-            captured_kwargs.update(kwargs)
-
+def test_tsp_optimizer_factory_builds_route_execution_bundle() -> None:
     ga_family = AdaptiveRouteGAFamilyFactory().create(
         adaptive_config={
             "initial_state": "baseline",
@@ -141,18 +134,34 @@ def test_tsp_optimizer_factory_forwards_resolved_collaborators():
         cost_type=None,
     )
 
-    optimizer = TSPOptimizerFactory.create(
+    nodes = [
+        RouteNode("Origin", 1, (0.0, 0.0)),
+        RouteNode("Node 2", 2, (1.0, 1.0)),
+    ]
+    bundle = TSPOptimizerFactory.create_execution_bundle(
         adjacency_matrix={},
-        population_size=14,
+        route_nodes=nodes,
+        vehicle_count=3,
+        population_size=12,
         ga_family=ga_family,
-        plotter=None,
-        logger=None,
-        optimizer_type=CapturingOptimizer,
     )
 
-    assert optimizer is not None
-    assert captured_kwargs["population_size"] == 14
-    assert captured_kwargs["state_controller"] is ga_family.state_controller
+    assert bundle.problem is not None
+    assert bundle.seed_data.route_nodes == nodes
+    assert bundle.seed_data.vehicle_count == 3
+    assert bundle.population_size == 12
+    assert bundle.state_controller is ga_family.state_controller
+
+
+def test_tsp_optimizer_factory_requires_adaptive_family() -> None:
+    with pytest.raises(ValueError, match="ga_family is required"):
+        TSPOptimizerFactory.create_execution_bundle(
+            adjacency_matrix={},
+            route_nodes=[RouteNode("Origin", 1, (0.0, 0.0))],
+            vehicle_count=1,
+            population_size=10,
+            ga_family=None,
+        )
 
 
 def test_adaptive_route_ga_family_factory_builds_initial_family_from_config():
@@ -163,10 +172,16 @@ def test_adaptive_route_ga_family_factory_builds_initial_family_from_config():
             "states": [
                 {
                     "name": "baseline",
-                    "selection": {"name": "tournament", "params": {"tournament_size": 4}},
+                    "selection": {
+                        "name": "tournament",
+                        "params": {"tournament_size": 4},
+                    },
                     "crossover": {"name": "order"},
                     "mutation": {"name": "two_opt"},
-                    "population_generator": {"name": "hybrid", "params": {"heuristic_ratio": 0.6}},
+                    "population_generator": {
+                        "name": "hybrid",
+                        "params": {"heuristic_ratio": 0.6},
+                    },
                     "mutation_probability": 0.21,
                 }
             ],
@@ -181,7 +196,10 @@ def test_adaptive_route_ga_family_factory_builds_initial_family_from_config():
     assert family.initial_operators.crossover.name == "OrderCrossoverStrategy"
     assert family.initial_operators.mutation.name == "TwoOptMutationStrategy"
     assert family.initial_operators.population_generator is not None
-    assert family.initial_operators.population_generator.name == "HybridPopulationGenerator"
+    assert (
+        family.initial_operators.population_generator.name
+        == "HybridPopulationGenerator"
+    )
     assert family.initial_operators.mutation_probability == 0.21
 
 
@@ -210,7 +228,10 @@ def test_route_adaptive_state_controller_builder_applies_transition_rules():
                 },
                 {
                     "name": "intensify",
-                    "selection": {"name": "tournament", "params": {"tournament_size": 4}},
+                    "selection": {
+                        "name": "tournament",
+                        "params": {"tournament_size": 4},
+                    },
                     "crossover": {"name": "order"},
                     "mutation": {"name": "two_opt"},
                 },

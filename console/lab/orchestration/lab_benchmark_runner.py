@@ -15,6 +15,22 @@ from console.lab.models.lab_session_config import LabSessionConfig
 from console.lab.orchestration.lab_optimizer_builder import LabOptimizerBuilder
 from console.lab.reporting.lab_report_builder import LabReportBuilder
 from console.lab.runtime_logging import emit_runtime_message
+from src.domain.models.genetic_algorithm.engine.generation_record import (
+    GenerationRecord,
+)
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
+    EvaluatedRouteSolution,
+)
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
+from src.domain.models.route_optimization.optimization_result import OptimizationResult
+from src.infrastructure.genetic_algorithm_execution_runner import (
+    GeneticAlgorithmExecutionRunner,
+)
 from src.infrastructure.route_calculator import AdjacencyMatrix
 
 
@@ -28,6 +44,13 @@ class LabBenchmarkRunner:
         adjacency_matrix_builder,
         plotter_factory=None,
         logger: Callable[[str], None] | None = None,
+        execution_runner: GeneticAlgorithmExecutionRunner[
+            RouteGeneticSolution,
+            EvaluatedRouteSolution,
+            RoutePopulationSeedData,
+            OptimizationResult,
+        ]
+        | None = None,
     ):
         """Initialize the benchmark runner dependencies.
 
@@ -37,6 +60,7 @@ class LabBenchmarkRunner:
             adjacency_matrix_builder: Builder used to compute the shared adjacency matrix.
             plotter_factory: Optional factory for creating plotters.
             logger: Optional verbose logger used for runtime messages.
+            execution_runner: Optional generic runner used to execute prepared bundles.
         """
         self._graph_generator = graph_generator
         self._route_calculator_factory = route_calculator_factory
@@ -44,10 +68,27 @@ class LabBenchmarkRunner:
         self._plotter_factory = plotter_factory
         self._report_builder = LabReportBuilder()
         self._logger = logger
+        self._execution_runner = execution_runner or GeneticAlgorithmExecutionRunner()
 
     def _log(self, message: str) -> None:
         """Emit one runtime message when verbose logging is enabled."""
         emit_runtime_message(self._logger, message)
+
+    def _handle_generation(
+        self,
+        record: GenerationRecord,
+        evaluated_solution: EvaluatedRouteSolution,
+        plotter,
+    ) -> None:
+        """Handle one evaluated generation emitted by the generic runner."""
+        self._log(
+            (
+                f"Generation {record.generation}: Best fitness = {record.best_fitness} "
+                f"- Elapsed time: {record.elapsed_time_ms:.2f} ms"
+            )
+        )
+        if plotter is not None:
+            plotter.plot(evaluated_solution._route_info)
 
     @staticmethod
     def _normalize_destinations(
@@ -218,21 +259,35 @@ class LabBenchmarkRunner:
             previous_random_state, previous_numpy_state, seed_was_applied = (
                 self._apply_run_seed(run_config)
             )
-            self._log(f"Building optimizer for run '{run_config.label}'.")
-            optimizer = LabOptimizerBuilder.build(
+            self._log(f"Building execution bundle for run '{run_config.label}'.")
+            execution_bundle = LabOptimizerBuilder.build(
                 run_config=run_config,
                 adjacency_matrix=adjacency_matrix,
-                plotter=plotter,
+                route_nodes=route_nodes,
                 logger=self._logger,
             )
             started_run = perf_counter()
             try:
-                optimization_result = optimizer.solve(
-                    route_nodes=route_nodes,
-                    max_generation=run_config.max_generation,
-                    max_processing_time=run_config.max_processing_time,
-                    vehicle_count=run_config.vehicle_count,
+                self._log(
+                    f"Running optimizer with vehicle_count={run_config.vehicle_count}"
                 )
+                generation_records: list[GenerationRecord] = []
+                optimization_result = self._execution_runner.run(
+                    problem=execution_bundle.problem,
+                    seed_data=execution_bundle.seed_data,
+                    state_controller=execution_bundle.state_controller,
+                    population_size=execution_bundle.population_size,
+                    max_generations=run_config.max_generation,
+                    max_processing_time=run_config.max_processing_time,
+                    logger=self._logger,
+                    on_generation=generation_records.append,
+                    on_generation_evaluated=lambda record, evaluated_solution: self._handle_generation(
+                        record,
+                        evaluated_solution,
+                        plotter,
+                    ),
+                )
+                optimization_result.generation_records = generation_records
                 elapsed_ms = (perf_counter() - started_run) * 1000
                 self._log(
                     (

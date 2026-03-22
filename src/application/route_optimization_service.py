@@ -1,18 +1,34 @@
 """Application service that orchestrates route optimization workflows."""
 
 from collections.abc import Callable
-from inspect import Parameter, signature
 from typing import Any
 
 from src.domain.interfaces.geo_graph.graph_generator import IGraphGenerator
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
 from src.domain.interfaces.plotting.plotter import IPlotter
-from src.domain.interfaces.route_optimization.route_optimizer import IRouteOptimizer
+from src.domain.models.genetic_algorithm.engine.generation_record import (
+    GenerationRecord,
+)
+from src.domain.models.genetic_algorithm.evaluated_route_solution import (
+    EvaluatedRouteSolution,
+)
+from src.domain.models.genetic_algorithm.route_genetic_solution import (
+    RouteGeneticSolution,
+)
 from src.domain.models.geo_graph.route_node import RouteNode
+from src.domain.models.geo_graph.route_population_seed_data import (
+    RoutePopulationSeedData,
+)
 from src.domain.models.route_optimization.fleet_route_info import FleetRouteInfo
+from src.domain.models.route_optimization.route_ga_execution_bundle import (
+    RouteGAExecutionBundle,
+)
 from src.domain.models.route_optimization.optimization_result import OptimizationResult
 from src.domain.models.route_optimization.route_segment import RouteSegment
 from src.domain.models.route_optimization.vehicle_route_info import VehicleRouteInfo
+from src.infrastructure.genetic_algorithm_execution_runner import (
+    GeneticAlgorithmExecutionRunner,
+)
 
 
 class RouteOptimizationService:
@@ -22,37 +38,63 @@ class RouteOptimizationService:
         self,
         graph_generator: IGraphGenerator,
         route_calculator_factory: Callable[..., IRouteCalculator],
-        optimizer_factory: Callable[..., IRouteOptimizer],
+        execution_bundle_factory: Callable[..., RouteGAExecutionBundle],
+        execution_runner: GeneticAlgorithmExecutionRunner[
+            RouteGeneticSolution,
+            EvaluatedRouteSolution,
+            RoutePopulationSeedData,
+            OptimizationResult,
+        ],
         plotter_factory: Callable[..., IPlotter] | None = None,
+        logger: Callable[[str], None] | None = None,
     ):
         """Initialize the service with its dependencies.
 
         Args:
             graph_generator: Responsible for building the graph and route nodes.
             route_calculator_factory: Factory callable for route calculators.
-            optimizer_factory: Factory callable for route optimizers.
+            execution_bundle_factory: Factory callable for route execution bundles.
+            execution_runner: Generic runner used to execute one prepared bundle.
             plotter_factory: Optional factory for creating a plotter.
+            logger: Optional runtime logger.
         """
         self._graph_generator: IGraphGenerator = graph_generator
         self._route_calculator_factory: Callable[..., IRouteCalculator] = (
             route_calculator_factory
         )
-        self._optimizer_factory: Callable[..., IRouteOptimizer] = optimizer_factory
-        self._plotter_factory: Callable[..., IPlotter] | None = plotter_factory
-
-    def _optimizer_supports_adaptive_config(self) -> bool:
-        """Return whether the configured optimizer factory accepts adaptive config.
-
-        Returns:
-            `True` when the factory declares an `adaptive_config` parameter or a
-            catch-all keyword parameter.
-        """
-        parameters = signature(self._optimizer_factory).parameters.values()
-        return any(
-            parameter.name == "adaptive_config"
-            or parameter.kind == Parameter.VAR_KEYWORD
-            for parameter in parameters
+        self._execution_bundle_factory: Callable[..., RouteGAExecutionBundle] = (
+            execution_bundle_factory
         )
+        self._execution_runner = execution_runner
+        self._plotter_factory: Callable[..., IPlotter] | None = plotter_factory
+        self._logger = logger
+
+    def _log(self, message: str) -> None:
+        """Emit one runtime message when a logger is configured."""
+        if self._logger is not None:
+            self._logger(message)
+
+    def _handle_generation(
+        self,
+        record: GenerationRecord,
+        evaluated_solution: EvaluatedRouteSolution,
+        plotter: IPlotter | None,
+    ) -> None:
+        """Handle one evaluated generation emitted by the generic runner.
+
+        Args:
+            record: Structured runtime record for the generation.
+            evaluated_solution: Best evaluated route solution of the generation.
+            plotter: Optional plotter used to visualize progress.
+        """
+        self._log(
+            (
+                f"Generation {record.generation}: Best fitness = {record.best_fitness} "
+                f"- Elapsed time: {record.elapsed_time_ms:.2f} ms"
+            )
+        )
+        if plotter is not None:
+            plotter.plot(evaluated_solution._route_info)
 
     def optimize(
         self,
@@ -80,11 +122,17 @@ class RouteOptimizationService:
             population_size: Size of the genetic algorithm population.
             weight_type: Weighting strategy for route calculation (e.g., "eta").
             cost_type: Optional cost adjustment strategy.
-            adaptive_config: Optional adaptive GA state-graph configuration.
+            adaptive_config: Adaptive GA state-graph configuration.
 
         Returns:
             An OptimizationResult containing the best found routes and metrics.
+
+        Raises:
+            ValueError: If the adaptive GA configuration is not provided.
         """
+        if adaptive_config is None:
+            raise ValueError("adaptive_config is required")
+
         print("Initializing graph and route nodes...")
         context = self._graph_generator.initialize(origin, destinations)
 
@@ -96,37 +144,44 @@ class RouteOptimizationService:
             print("Creating plotter...")
             plotter = self._plotter_factory(context)
 
-        print("Creating optimizer with route calculator...")
-        if self._optimizer_supports_adaptive_config():
-            optimizer = self._optimizer_factory(
-                route_calculator,
-                context.route_nodes,
-                weight_type,
-                cost_type,
-                plotter,
-                population_size,
-                adaptive_config=adaptive_config,
-            )
-        else:
-            optimizer = self._optimizer_factory(
-                route_calculator,
-                context.route_nodes,
-                weight_type,
-                cost_type,
-                plotter,
-                population_size,
-            )
+        print("Creating execution bundle with route calculator...")
+        execution_bundle = self._execution_bundle_factory(
+            route_calculator,
+            context.route_nodes,
+            weight_type,
+            cost_type,
+            population_size,
+            vehicle_count,
+            adaptive_config=adaptive_config,
+        )
 
         print("Creating coordinate converter...")
         coordinate_converter = self._graph_generator.build_coordinate_converter(context)
 
         print("Running optimization...")
-        result = optimizer.solve(
-            route_nodes=context.route_nodes,
-            max_generation=max_generation,
+        self._log(f"Running optimizer with vehicle_count={vehicle_count}")
+        generation_records: list[GenerationRecord] = []
+        result = self._execution_runner.run(
+            problem=execution_bundle.problem,
+            seed_data=execution_bundle.seed_data,
+            state_controller=execution_bundle.state_controller,
+            population_size=execution_bundle.population_size,
+            max_generations=max_generation,
             max_processing_time=max_processing_time,
-            vehicle_count=vehicle_count,
+            logger=self._logger,
+            on_generation=generation_records.append,
+            on_generation_evaluated=lambda record, evaluated_solution: self._handle_generation(
+                record,
+                evaluated_solution,
+                plotter,
+            ),
         )
+        result.generation_records = generation_records
+        self._log("Best routes by vehicle:")
+        for info in result.best_route.routes_by_vehicle:
+            nodes = " -> ".join([seg.name for seg in info.segments])
+            self._log(f"  Vehicle {info.vehicle_id}: {nodes}")
+        self._log(f"Total aggregated cost: {result.best_route.total_cost or 0.0}")
 
         print("Converting optimized route coordinates back to lat/lon...")
         converted_route = self._convert_fleet_route_coordinates(

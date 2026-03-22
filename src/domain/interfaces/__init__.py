@@ -26,7 +26,6 @@ __all__ = [
     "IHeuristicDistanceStrategy",
     "IPlotter",
     "IRouteCalculator",
-    "IRouteOptimizer",
 ]
 
 _EXPORT_MAP = {
@@ -49,7 +48,6 @@ _EXPORT_MAP = {
     "IHeuristicDistanceStrategy": ".geo_graph.heuristic_distance",
     "IPlotter": ".plotting.plotter",
     "IRouteCalculator": ".geo_graph.route_calculator",
-    "IRouteOptimizer": ".route_optimization.route_optimizer",
 }
 
 
