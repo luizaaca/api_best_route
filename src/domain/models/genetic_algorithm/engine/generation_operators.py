@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generic, TypeVar
 
 from src.domain.interfaces.genetic_algorithm.engine.seed_data import (
@@ -25,8 +25,6 @@ from src.domain.interfaces.genetic_algorithm.operators.ga_selection_strategy imp
     IGeneticSelectionStrategy,
 )
 
-OperatorMetadataValue = str | int | float | bool | None
-
 TSolution = TypeVar("TSolution", bound=IGeneticSolution)
 TEvaluated = TypeVar("TEvaluated", bound=IEvaluatedGeneticSolution)
 TSeedData = TypeVar("TSeedData", bound=IGeneticSeedData)
@@ -43,4 +41,4 @@ class GenerationOperators(Generic[TSolution, TEvaluated, TSeedData]):
     population_generator: IGeneticPopulationGenerator[TSeedData, TSolution] | None = (
         None
     )
-    metadata: dict[str, OperatorMetadataValue] = field(default_factory=dict)
+    injection_size: int = 0

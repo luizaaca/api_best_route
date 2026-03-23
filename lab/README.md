@@ -141,7 +141,7 @@ Typical per-experiment fields:
 
 ## Grid Mode
 
-Use `mode: "grid"` when you want to exhaustively evaluate a Cartesian product.
+Use `mode: "grid"` when you want to exhaustively evaluate a Cartesian product. **This mode is currently beta and may exhibit unstable behavior for complex search spaces.**
 
 Required fields:
 
@@ -162,7 +162,7 @@ Each search-space array contributes one dimension to the final Cartesian product
 
 ## Random Mode
 
-Use `mode: "random"` when you want the runner to sample valid runs from an explicit policy contract.
+Use `mode: "random"` when you want the runner to sample valid runs from an explicit policy contract. **This mode is currently beta and may exhibit unstable behavior for high-volume or edge-case policies.**
 
 Important constraints:
 

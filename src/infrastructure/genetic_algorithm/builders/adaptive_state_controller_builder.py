@@ -112,6 +112,7 @@ def build_route_generation_operators(
         ),
         mutation_probability=float(state_config.get("mutation_probability", 0.5)),
         population_generator=resolved_population_generator,
+        injection_size=int(state_config.get("injection_size", 0)),
     )
 
 

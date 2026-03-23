@@ -12,14 +12,14 @@
                 "params": {}
             },
             "mutation": {
-                "name": "inversion",
+                "name": "swap_redistribute",
                 "params": {}
             },
-            "mutation_probability": 0.55,
+            "mutation_probability": 0.75,
             "population_generator": {
                 "name": "hybrid",
                 "params": {
-                    "heuristic_ratio": 0.6
+                    "heuristic_ratio": 0.2
                 }
             },
             "transition_rules": [
@@ -28,9 +28,10 @@
                     "target_state": "balance",
                     "specifications": [
                         {
-                            "name": "state_improvement_at_least",
+                            "name": "window_improvement_below",
                             "params": {
-                                "threshold": 0.38
+                                "threshold": 0.2,
+                                "window_size": 15
                             }
                         }
                     ]
@@ -42,7 +43,7 @@
                         {
                             "name": "no_improvement_for_generations",
                             "params": {
-                                "threshold": 30
+                                "threshold": 20
                             }
                         }
                     ]
@@ -63,7 +64,7 @@
                 "name": "two_opt",
                 "params": {}
             },
-            "mutation_probability": 0.3,
+            "mutation_probability": 0.4,
             "population_generator": {
                 "name": "heuristic"
             },
@@ -75,7 +76,7 @@
                         {
                             "name": "state_improvement_at_least",
                             "params": {
-                                "threshold": 0.2
+                                "threshold": 0.15
                             }
                         }
                     ]
@@ -87,7 +88,7 @@
                         {
                             "name": "window_improvement_below",
                             "params": {
-                                "threshold": 0.12,
+                                "threshold": 0.1,
                                 "window_size": 30
                             }
                         }
@@ -102,16 +103,16 @@
                 "params": {}
             },
             "crossover": {
-                "name": "cycle",
+                "name": "edge_recombination",
                 "params": {}
             },
             "mutation": {
                 "name": "two_opt",
                 "params": {}
             },
-            "mutation_probability": 0.16,
+            "mutation_probability": 0.1,
             "population_generator": {
-                "name": "random"
+                "name": "heuristic"
             },
             "transition_rules": [
                 {
@@ -121,7 +122,7 @@
                         {
                             "name": "no_improvement_for_generations",
                             "params": {
-                                "threshold": 30
+                                "threshold": 50
                             }
                         }
                     ]
@@ -150,20 +151,18 @@
                 }
             },
             "crossover": {
-                "name": "order",
+                "name": "pmx",
                 "params": {}
             },
             "mutation": {
                 "name": "insertion",
                 "params": {}
             },
-            "mutation_probability": 0.75,
+            "mutation_probability": 0.8,
             "population_generator": {
-                "name": "hybrid",
-                "params": {
-                    "heuristic_ratio": 0.25
-                }
+                "name": "heuristic"
             },
+            "injection_size": 6,
             "transition_rules": [
                 {
                     "label": "recover-to-balance-on-state-improvement",

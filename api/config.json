@@ -1,25 +1,157 @@
 {
-  "initial_state": "baseline",
-  "states": [
-    {
-      "name": "baseline",
-      "selection": {
-        "name": "roulette"
-      },
-      "crossover": {
-        "name": "order"
-      },
-      "mutation": {
-        "name": "swap_redistribute"
-      },
-      "mutation_probability": 0.5,
-      "population_generator": {
-        "name": "hybrid",
-        "params": {
-          "heuristic_ratio": 0.4
+    "initial_state": "explore",
+    "states": [
+        {
+            "name": "explore",
+            "selection": {
+                "name": "roulette",
+                "params": {}
+            },
+            "crossover": {
+                "name": "order",
+                "params": {}
+            },
+            "mutation": {
+                "name": "inversion",
+                "params": {}
+            },
+            "mutation_probability": 0.55,
+            "population_generator": {
+                "name": "hybrid",
+                "params": {
+                    "heuristic_ratio": 0.6
+                }
+            },
+            "transition_rules": [
+                {
+                    "label": "move-to-balance-on-state-improvement",
+                    "target_state": "balance",
+                    "specifications": [
+                        {
+                            "name": "state_improvement_at_least",
+                            "params": {
+                                "threshold": 0.38
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "balance",
+            "selection": {
+                "name": "rank",
+                "params": {}
+            },
+            "crossover": {
+                "name": "pmx",
+                "params": {}
+            },
+            "mutation": {
+                "name": "two_opt",
+                "params": {}
+            },
+            "mutation_probability": 0.3,
+            "population_generator": {
+                "name": "heuristic"
+            },
+            "transition_rules": [
+                {
+                    "label": "move-to-refine-on-state-improvement",
+                    "target_state": "refine",
+                    "specifications": [
+                        {
+                            "name": "state_improvement_at_least",
+                            "params": {
+                                "threshold": 0.2
+                            }
+                        }
+                    ]
+                },
+                {
+                    "label": "move-to-refine-on-low-window-improvement",
+                    "target_state": "refine",
+                    "specifications": [
+                        {
+                            "name": "window_improvement_below",
+                            "params": {
+                                "threshold": 0.12,
+                                "window_size": 30
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "refine",
+            "selection": {
+                "name": "rank",
+                "params": {}
+            },
+            "crossover": {
+                "name": "cycle",
+                "params": {}
+            },
+            "mutation": {
+                "name": "two_opt",
+                "params": {}
+            },
+            "mutation_probability": 0.16,
+            "population_generator": {
+                "name": "random"
+            },
+            "transition_rules": [
+                {
+                    "label": "move-to-rescue-on-low-window-improvement",
+                    "target_state": "rescue",
+                    "specifications": [
+                        {
+                            "name": "window_improvement_below",
+                            "params": {
+                                "threshold": 0.02,
+                                "window_size": 30
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "rescue",
+            "selection": {
+                "name": "tournament",
+                "params": {
+                    "tournament_size": 3
+                }
+            },
+            "crossover": {
+                "name": "order",
+                "params": {}
+            },
+            "mutation": {
+                "name": "insertion",
+                "params": {}
+            },
+            "mutation_probability": 0.75,
+            "population_generator": {
+                "name": "heuristic"
+            },
+            "injection_size": 5,
+            "transition_rules": [
+                {
+                    "label": "recover-to-balance-on-state-improvement",
+                    "target_state": "balance",
+                    "specifications": [
+                        {
+                            "name": "state_improvement_at_least",
+                            "params": {
+                                "threshold": 0.02
+                            }
+                        }
+                    ]
+                }
+            ]
         }
-      },
-      "transition_rules": []
-    }
-  ]
+    ]
 }

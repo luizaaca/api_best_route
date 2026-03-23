@@ -70,14 +70,83 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
         if self._logger is not None:
             self._logger(message)
 
-    @staticmethod
-    def _coerce_int_metric(value: object, default: int = 0) -> int:
-        """Return one metadata value as an integer when possible."""
-        if isinstance(value, bool):
-            return int(value)
-        if isinstance(value, int):
-            return value
-        return default
+    def _append_offspring_until_size(
+        self,
+        population: list[TSolution],
+        evaluated_population: list[TEvaluated],
+        operators,
+        new_population: list[TSolution],
+        target_size: int,
+    ) -> None:
+        """Append offspring until the requested target size is reached.
+
+        Args:
+            population: Ranked source population.
+            evaluated_population: Ranked evaluated population aligned with ``population``.
+            operators: Active generation operators.
+            new_population: Mutable destination population under construction.
+            target_size: Desired population size after offspring generation.
+        """
+        while len(new_population) < target_size:
+            parent1, parent2 = operators.selection.select_parents(
+                population,
+                evaluated_population,
+            )
+            child = operators.crossover.crossover(parent1, parent2)
+            child = operators.mutation.mutate(
+                child,
+                operators.mutation_probability,
+            )
+            new_population.append(child)
+
+    def _resolve_injection_size(
+        self,
+        configured_injection_size: int,
+        population_size: int,
+        generation: int,
+        state_name: str,
+        population_generator_name: str | None,
+    ) -> int:
+        """Return the effective reseed size allowed for one generation.
+
+        Args:
+            configured_injection_size: Requested reseed size from the active state.
+            population_size: Current fixed population size of the run.
+            generation: Current generation number.
+            state_name: Active resolved state name for the generation.
+            population_generator_name: Population generator name used for reseeding.
+
+        Returns:
+            The effective reseed size, clamped to the allowed maximum when needed.
+        """
+        if configured_injection_size <= 0:
+            return 0
+
+        max_injection_size = population_size // 2
+        generator_name = population_generator_name or "unknown"
+
+        if max_injection_size <= 0:
+            self._log(
+                (
+                    f"Generation {generation}: ignoring reseed in state "
+                    f"'{state_name}' because population_size={population_size} "
+                    "does not allow replacing non-elite individuals."
+                )
+            )
+            return 0
+
+        if configured_injection_size > max_injection_size:
+            self._log(
+                (
+                    f"Generation {generation}: clamping reseed in state "
+                    f"'{state_name}' from injection_size={configured_injection_size} "
+                    f"to {max_injection_size} for population_size={population_size} "
+                    f"using {generator_name}."
+                )
+            )
+            return max_injection_size
+
+        return configured_injection_size
 
     def _build_generation_record(
         self,
@@ -109,6 +178,26 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
             mutation_probability=mutation_probability,
             reseed_applied=reseed_applied,
             metrics=dict(context.metrics),
+        )
+
+    def _should_apply_reseed_on_state_entry(
+        self,
+        context: GenerationContext,
+        resolved_state_name: str,
+    ) -> bool:
+        """Return whether reseed should run only once on state entry.
+
+        Args:
+            context: Generation context built before state resolution.
+            resolved_state_name: State that will provide operators for this generation.
+
+        Returns:
+            ``True`` when the generation corresponds to the entry of the active state.
+        """
+        return (
+            context.state_name == resolved_state_name
+            and context.state_elapsed_generations == 1
+            and context.generation != 1
         )
 
     def solve(
@@ -206,40 +295,84 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
             )
             resolution = self._state_controller.resolve(context)
             operators = resolution.operators
+            resolved_state_name = resolution.target_state_name
+
+            should_apply_reseed = self._should_apply_reseed_on_state_entry(
+                context=context,
+                resolved_state_name=resolved_state_name,
+            )
+
+            effective_injection_size = 0
+            if should_apply_reseed:
+                effective_injection_size = self._resolve_injection_size(
+                    configured_injection_size=operators.injection_size,
+                    population_size=population_size,
+                    generation=generations_run,
+                    state_name=resolved_state_name,
+                    population_generator_name=(
+                        operators.population_generator.name
+                        if operators.population_generator is not None
+                        else None
+                    ),
+                )
+
+            offspring_target_size = population_size - effective_injection_size
 
             elite_solution = cast(TSolution, population[0].clone())
             new_population: list[TSolution] = [elite_solution]
-            while len(new_population) < population_size:
-                parent1, parent2 = operators.selection.select_parents(
-                    population,
-                    evaluated_population,
-                )
-                child = operators.crossover.crossover(parent1, parent2)
-                child = operators.mutation.mutate(
-                    child,
-                    operators.mutation_probability,
-                )
-                new_population.append(child)
+            self._append_offspring_until_size(
+                population,
+                evaluated_population,
+                operators,
+                new_population,
+                offspring_target_size,
+            )
 
             reseed_applied = False
-            injection_size = self._coerce_int_metric(
-                operators.metadata.get("injection_size"),
-                default=0,
-            )
-            if (
+            if effective_injection_size > 0 and operators.population_generator is None:
+                self._log(
+                    (
+                        f"Generation {generations_run}: ignoring reseed in state "
+                        f"'{resolved_state_name}' because no population generator "
+                        "is available."
+                    )
+                )
+            elif (
                 operators.population_generator is not None
-                and injection_size > 0
-                and len(new_population) < population_size + injection_size
+                and effective_injection_size > 0
             ):
+                self._log(
+                    (
+                        f"Generation {generations_run}: applying reseed with size "
+                        f"{effective_injection_size} using "
+                        f"{operators.population_generator.name} in state "
+                        f"'{resolved_state_name}'."
+                    )
+                )
                 injected = operators.population_generator.inject(
                     new_population,
                     seed_data,
-                    injection_size,
+                    effective_injection_size,
                     context,
-                )
+                )[:effective_injection_size]
                 if injected:
                     new_population.extend(injected)
                     reseed_applied = True
+                else:
+                    self._log(
+                        (
+                            f"Generation {generations_run}: reseed in state "
+                            f"'{resolved_state_name}' produced no injected individuals."
+                        )
+                    )
+
+            self._append_offspring_until_size(
+                population,
+                evaluated_population,
+                operators,
+                new_population,
+                population_size,
+            )
 
             population = new_population[:population_size]
 

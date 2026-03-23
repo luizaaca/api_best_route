@@ -1,6 +1,6 @@
 # API Best Route
 
-[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg)](changelog/v0.4.1.md)
+[![Version](https://img.shields.io/badge/version-0.4.2-blue.svg)](changelog/v0.4.2.md)
 [![Build](https://github.com/luizaaca/api_best_route/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luizaaca/api_best_route/actions/workflows/ci.yml)
 
 `API Best Route` is a route-optimization service built around a multi-vehicle Genetic Algorithm over OpenStreetMap street-network data. It resolves locations, builds a projected road graph, computes an adjacency matrix of route segments, and optimizes visit order across one or more vehicles.
@@ -34,9 +34,16 @@ The interactive API documentation is available at `/docs`.
 
 ```bash
 python -m console.main
+python -m console.main --max-generation 500 --max-processing-time 300000
 ```
 
-The console example uses `console/example.config.json` and the same route-optimization composition as the API. Add `--verbose` to print runtime progress messages.
+The console example uses `console/example.config.json` and the same route-optimization composition as the API.
+
+Arguments:
+
+- `--verbose`: Enable verbose console output for the interactive example.
+- `--max-generation`: Maximum number of generations for the interactive example (default: 500).
+- `--max-processing-time`: Maximum processing time in milliseconds for the interactive example (default: 300000).
 
 ## Run Lab Mode
 

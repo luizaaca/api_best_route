@@ -2,7 +2,7 @@
 
 import os
 import sys
-from typing import Any
+from typing import Any, Sequence
 
 # ensure src directory is in path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -31,6 +31,7 @@ from src.domain.models.genetic_algorithm.engine.generation_operators import (
     GenerationOperators,
 )
 from src.domain.models.genetic_algorithm.engine.transition_rule import TransitionRule
+from src.infrastructure.genetic_algorithm_engine import GeneticAlgorithm
 from src.infrastructure.genetic_algorithm.specifications import (
     NoImprovementForGenerationsSpecification,
     StateImprovementAtLeastSpecification,
@@ -130,7 +131,148 @@ class FakePopulationGenerator(IGeneticPopulationGenerator[object, FakeSolution])
         return [FakeSolution() for _ in range(injection_size)]
 
 
-def build_operators(mutation_probability: float = 0.5):
+class DummySeedData:
+    """Minimal seed-data payload used by generic engine tests."""
+
+
+class NumericSolution(IGeneticSolution):
+    """Small numeric solution double used to validate reseed behavior."""
+
+    def __init__(self, value: int):
+        """Store the numeric payload used as the fitness score."""
+        self.value = value
+
+    def clone(self):
+        """Return a detached copy of the numeric solution."""
+        return NumericSolution(self.value)
+
+
+class NumericEvaluatedSolution(IEvaluatedGeneticSolution):
+    """Evaluated numeric solution whose fitness matches the stored value."""
+
+    def __init__(self, solution: NumericSolution):
+        """Bind the evaluated wrapper to one numeric solution."""
+        self._solution = solution
+
+    @property
+    def solution(self):
+        """Return the associated raw numeric solution."""
+        return self._solution
+
+    @property
+    def fitness(self):
+        """Return the minimization-oriented numeric fitness."""
+        return float(self._solution.value)
+
+    def metric(self, name: str, default: Any = None):
+        """Return the default value because no extra metrics are exposed."""
+        return default
+
+
+class NumericProblem:
+    """Minimal problem adapter used to assert engine reseed semantics."""
+
+    def evaluate_solution(self, solution: NumericSolution) -> NumericEvaluatedSolution:
+        """Evaluate one numeric solution using its raw value."""
+        return NumericEvaluatedSolution(solution)
+
+    def evaluate_population(
+        self,
+        population: Sequence[NumericSolution],
+    ) -> list[NumericEvaluatedSolution]:
+        """Evaluate a full numeric population."""
+        return [self.evaluate_solution(solution) for solution in population]
+
+    def build_empty_result(self) -> dict[str, Any]:
+        """Return one empty result model for defensive completeness."""
+        return {
+            "best_fitness": None,
+            "population_size": 0,
+            "generations_run": 0,
+        }
+
+    def build_result(
+        self,
+        best_evaluated_solution: NumericEvaluatedSolution,
+        population_size: int,
+        generations_run: int,
+    ) -> dict[str, Any]:
+        """Return the summarized numeric optimization result."""
+        return {
+            "best_fitness": best_evaluated_solution.fitness,
+            "population_size": population_size,
+            "generations_run": generations_run,
+        }
+
+
+class NumericSelectionStrategy(
+    IGeneticSelectionStrategy[NumericSolution, NumericEvaluatedSolution]
+):
+    """Selection double that always reuses the best current parents."""
+
+    @property
+    def name(self) -> str:
+        """Return the deterministic test strategy name."""
+        return "numeric-selection"
+
+    def select_parents(self, population, evaluated_population):
+        """Return the first ranked solution as both parents."""
+        _ = evaluated_population
+        return population[0], population[0]
+
+
+class NumericCrossoverStrategy(IGeneticCrossoverStrategy[NumericSolution]):
+    """Crossover double that preserves the first parent exactly."""
+
+    @property
+    def name(self) -> str:
+        """Return the deterministic test strategy name."""
+        return "numeric-crossover"
+
+    def crossover(self, parent1, parent2):
+        """Return a clone of the first parent."""
+        _ = parent2
+        return parent1.clone()
+
+
+class NumericMutationStrategy(IGeneticMutationStrategy[NumericSolution]):
+    """Mutation double that keeps offspring values unchanged."""
+
+    @property
+    def name(self) -> str:
+        """Return the deterministic test strategy name."""
+        return "numeric-mutation"
+
+    def mutate(self, solution, mutation_probability):
+        """Return the original value as a clone regardless of probability."""
+        _ = mutation_probability
+        return solution.clone()
+
+
+class ReseedingNumericPopulationGenerator(
+    IGeneticPopulationGenerator[DummySeedData, NumericSolution]
+):
+    """Population generator that exposes clearly better injected individuals."""
+
+    @property
+    def name(self) -> str:
+        """Return the deterministic test strategy name."""
+        return "numeric-population"
+
+    def generate(self, seed_data, population_size):
+        """Return a homogeneous low-quality initial population."""
+        _ = seed_data
+        return [NumericSolution(10) for _ in range(population_size)]
+
+    def inject(self, population, seed_data, injection_size, context=None):
+        """Return strictly better individuals so reseed effects are observable."""
+        _ = population
+        _ = seed_data
+        _ = context
+        return [NumericSolution(1) for _ in range(injection_size)]
+
+
+def build_operators(mutation_probability: float = 0.5, injection_size: int = 0):
     """Create one deterministic operator bundle for controller tests."""
 
     return GenerationOperators(
@@ -139,6 +281,20 @@ def build_operators(mutation_probability: float = 0.5):
         mutation=FakeMutationStrategy(),
         mutation_probability=mutation_probability,
         population_generator=FakePopulationGenerator(),
+        injection_size=injection_size,
+    )
+
+
+def build_numeric_operators(injection_size: int) -> GenerationOperators:
+    """Create one numeric operator bundle used by engine reseed tests."""
+
+    return GenerationOperators(
+        selection=NumericSelectionStrategy(),
+        crossover=NumericCrossoverStrategy(),
+        mutation=NumericMutationStrategy(),
+        mutation_probability=0.0,
+        population_generator=ReseedingNumericPopulationGenerator(),
+        injection_size=injection_size,
     )
 
 
@@ -374,3 +530,83 @@ def test_configured_controller_raises_for_unknown_target_state():
         assert "Unknown target state 'missing'" in str(error)
     else:
         raise AssertionError("Expected ValueError for an unknown target state")
+
+
+def test_genetic_algorithm_reseed_survives_into_next_generation():
+    """Injected individuals must survive into the next generation when valid."""
+
+    controller = ConfiguredGeneticStateController(
+        initial_state="refine",
+        states=[
+            ConfiguredState(
+                name="refine",
+                operators=build_numeric_operators(0),
+                transition_rules=[
+                    TransitionRule(
+                        label="to-rescue",
+                        target_state="rescue",
+                        specifications=[StateImprovementAtLeastSpecification(0.0)],
+                    )
+                ],
+            ),
+            ConfiguredState(name="rescue", operators=build_numeric_operators(2)),
+        ],
+    )
+    logger_messages: list[str] = []
+
+    result = GeneticAlgorithm(
+        problem=NumericProblem(),
+        state_controller=controller,
+        logger=logger_messages.append,
+    ).solve(
+        seed_data=DummySeedData(),
+        population_size=4,
+        max_generations=3,
+        max_processing_time=1000,
+    )
+
+    assert result["best_fitness"] == 1.0
+    assert any(
+        "clamping reseed" in message or "applying reseed" in message
+        for message in logger_messages
+    )
+
+
+def test_genetic_algorithm_ignores_reseed_above_half_population():
+    """Oversized reseed requests must be clamped and applied with a warning."""
+
+    controller = ConfiguredGeneticStateController(
+        initial_state="refine",
+        states=[
+            ConfiguredState(
+                name="refine",
+                operators=build_numeric_operators(0),
+                transition_rules=[
+                    TransitionRule(
+                        label="to-rescue",
+                        target_state="rescue",
+                        specifications=[StateImprovementAtLeastSpecification(0.0)],
+                    )
+                ],
+            ),
+            ConfiguredState(name="rescue", operators=build_numeric_operators(3)),
+        ],
+    )
+    logger_messages: list[str] = []
+
+    result = GeneticAlgorithm(
+        problem=NumericProblem(),
+        state_controller=controller,
+        logger=logger_messages.append,
+    ).solve(
+        seed_data=DummySeedData(),
+        population_size=4,
+        max_generations=3,
+        max_processing_time=1000,
+    )
+
+    assert result["best_fitness"] == 1.0
+    assert any(
+        "clamping reseed" in message and "injection_size=3" in message
+        for message in logger_messages
+    )

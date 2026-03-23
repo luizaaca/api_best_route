@@ -186,6 +186,7 @@ def test_adaptive_route_ga_family_factory_builds_initial_family_from_config():
                         "params": {"heuristic_ratio": 0.6},
                     },
                     "mutation_probability": 0.21,
+                    "injection_size": 2,
                 }
             ],
         },
@@ -204,6 +205,7 @@ def test_adaptive_route_ga_family_factory_builds_initial_family_from_config():
         == "HybridPopulationGenerator"
     )
     assert family.initial_operators.mutation_probability == 0.21
+    assert family.initial_operators.injection_size == 2
 
 
 def test_route_adaptive_state_controller_builder_applies_transition_rules():
@@ -216,6 +218,7 @@ def test_route_adaptive_state_controller_builder_applies_transition_rules():
                     "selection": {"name": "roulette"},
                     "crossover": {"name": "order"},
                     "mutation": {"name": "inversion"},
+                    "injection_size": 1,
                     "transition_rules": [
                         {
                             "label": "late-search",
@@ -237,6 +240,7 @@ def test_route_adaptive_state_controller_builder_applies_transition_rules():
                     },
                     "crossover": {"name": "order"},
                     "mutation": {"name": "two_opt"},
+                    "injection_size": 2,
                 },
             ],
         },
@@ -249,6 +253,7 @@ def test_route_adaptive_state_controller_builder_applies_transition_rules():
     assert initial_resolution.source_state_name == "baseline"
     assert initial_resolution.target_state_name == "baseline"
     assert initial_resolution.operators.selection.name == "RoulleteSelectionStrategy"
+    assert initial_resolution.operators.injection_size == 1
 
     transitioned = controller.resolve(
         GenerationContext(
@@ -270,3 +275,4 @@ def test_route_adaptive_state_controller_builder_applies_transition_rules():
     assert transitioned.target_state_name == "intensify"
     assert transitioned.transition_label == "late-search"
     assert transitioned.operators.selection.name == "TournamentSelectionStrategy"
+    assert transitioned.operators.injection_size == 2
