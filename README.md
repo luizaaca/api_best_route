@@ -1,6 +1,6 @@
 # API Best Route
 
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](changelog/v0.4.0.md)
+[![Version](https://img.shields.io/badge/version-0.4.1-blue.svg)](changelog/v0.4.1.md)
 [![Build](https://github.com/luizaaca/api_best_route/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luizaaca/api_best_route/actions/workflows/ci.yml)
 
 `API Best Route` is a route-optimization service built around a multi-vehicle Genetic Algorithm over OpenStreetMap street-network data. It resolves locations, builds a projected road graph, computes an adjacency matrix of route segments, and optimizes visit order across one or more vehicles.
