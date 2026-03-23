@@ -4,6 +4,8 @@ This implementation checks a persistent segment cache before computing a
 segment and stores newly computed segments for future reuse.
 """
 
+from collections.abc import Callable
+
 from src.domain.interfaces.caching.adjacency_segment_cache import IAdjacencySegmentCache
 from src.domain.interfaces.geo_graph.route_calculator import IRouteCalculator
 from src.domain.interfaces.route_optimization.adjacency_matrix_builder import (
@@ -16,9 +18,24 @@ from src.domain.models.route_optimization.route_segment import RouteSegment
 class CachedAdjacencyMatrixBuilder(IAdjacencyMatrixBuilder):
     """Build adjacency matrices while reusing cached segments when available."""
 
-    def __init__(self, segment_cache: IAdjacencySegmentCache):
-        """Store the segment cache used across matrix builds."""
+    def __init__(
+        self,
+        segment_cache: IAdjacencySegmentCache,
+        logger: Callable[[str], None] | None = None,
+    ):
+        """Store the segment cache and optional runtime logger used across builds.
+
+        Args:
+            segment_cache: Persistent cache used to store route segments.
+            logger: Optional callable used to emit verbose runtime messages.
+        """
         self._segment_cache = segment_cache
+        self._logger = logger
+
+    def _log(self, message: str) -> None:
+        """Emit one runtime message when a logger is configured."""
+        if self._logger is not None:
+            self._logger(message)
 
     def build(
         self,
@@ -58,9 +75,24 @@ class CachedAdjacencyMatrixBuilder(IAdjacencyMatrixBuilder):
                     cost_type,
                 )
                 if cached_segment is not None:
+                    self._log(
+                        (
+                            "Adjacency segment cache hit for graph "
+                            f"'{graph_key}' ({from_node.node_id} -> {to_node.node_id}, "
+                            f"weight='{weight_type}', cost='{cost_type}')."
+                        )
+                    )
                     matrix[(from_node.node_id, to_node.node_id)] = cached_segment
                     continue
 
+                self._log(
+                    (
+                        "Adjacency segment cache miss for graph "
+                        f"'{graph_key}' ({from_node.node_id} -> {to_node.node_id}, "
+                        f"weight='{weight_type}', cost='{cost_type}'); "
+                        "computing segment with route calculator."
+                    )
+                )
                 segment = route_calculator.compute_segment(
                     start_node=from_node,
                     end_node=to_node,

@@ -57,19 +57,21 @@ def _build_graph_generator(logger=None) -> OSMnxGraphGenerator:
         geocoder=CachedGeocodingResolver(
             cache=SQLiteGeocodingCache("cache/geocoding.db"),
             fallback_resolver=PhotonGeocodingResolver(),
+            logger=logger,
         ),
         logger=logger,
     )
 
 
-def _build_adjacency_matrix_builder() -> CachedAdjacencyMatrixBuilder:
+def _build_adjacency_matrix_builder(logger=None) -> CachedAdjacencyMatrixBuilder:
     """Create the shared adjacency-matrix builder used by console flows.
 
     Returns:
         A configured adjacency-matrix builder with persistent SQLite cache.
     """
     return CachedAdjacencyMatrixBuilder(
-        SQLiteAdjacencySegmentCache("cache/adjacency_segments.db")
+        SQLiteAdjacencySegmentCache("cache/adjacency_segments.db"),
+        logger=logger,
     )
 
 
@@ -122,7 +124,11 @@ def _build_adaptive_execution_bundle(
     )
 
 
-def run_console_example(verbose: bool = False):
+def run_console_example(
+    verbose: bool = False,
+    max_generation: int = 500,
+    max_processing_time: int = 300000,
+):
     """Run a console example optimization and print the results."""
     adaptive_config = load_adaptive_ga_config(get_console_adaptive_ga_config_path())
     logger = build_runtime_logger(verbose)
@@ -148,8 +154,6 @@ def run_console_example(verbose: bool = False):
         ((-23.531978, -46.634383), 1),
     ]
 
-    max_generation = 50
-    max_processing_time = 30000
     weight_type = "eta"
     cost_type = "priority"
 
@@ -196,7 +200,7 @@ def run_lab_benchmark(config_file: str) -> None:
     runner = LabBenchmarkRunner(
         graph_generator=_build_graph_generator(logger=logger),
         route_calculator_factory=RouteCalculator,
-        adjacency_matrix_builder=_build_adjacency_matrix_builder(),
+        adjacency_matrix_builder=_build_adjacency_matrix_builder(logger=logger),
         plotter_factory=MatplotlibPlotter,
         logger=logger,
     )
@@ -221,6 +225,18 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Enable verbose console output for the interactive example.",
+    )
+    parser.add_argument(
+        "--max-generation",
+        type=int,
+        default=500,
+        help="Maximum number of generations for the interactive example.",
+    )
+    parser.add_argument(
+        "--max-processing-time",
+        type=int,
+        default=300000,
+        help="Maximum processing time in milliseconds for the interactive example.",
     )
 
     subparsers = parser.add_subparsers(dest="command")
@@ -251,7 +267,11 @@ def main() -> None:
     if args.command == "lab":
         run_lab_benchmark(args.config)
         return
-    run_console_example(verbose=args.verbose)
+    run_console_example(
+        verbose=args.verbose,
+        max_generation=args.max_generation,
+        max_processing_time=args.max_processing_time,
+    )
 
 
 if __name__ == "__main__":

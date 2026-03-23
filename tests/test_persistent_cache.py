@@ -32,6 +32,14 @@ class StubGeocodingResolver:
         return f"reverse:{coords[0]:.1f},{coords[1]:.1f}"
 
 
+class RecordingLogger:
+    def __init__(self):
+        self.messages = []
+
+    def __call__(self, message: str):
+        self.messages.append(message)
+
+
 def make_nodes(destination_count):
     nodes = [RouteNode("Origin", 1, (0.0, 0.0))]
     for index in range(destination_count):
@@ -76,6 +84,35 @@ def test_cached_geocoding_resolver_uses_cache_after_first_lookup():
         assert fallback.reverse_calls == 1
 
 
+def test_cached_geocoding_resolver_logs_cache_hits_and_fallbacks():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        cache = SQLiteGeocodingCache(os.path.join(temp_dir, "geocoding.db"))
+        fallback = StubGeocodingResolver()
+        logger = RecordingLogger()
+        resolver = CachedGeocodingResolver(cache, fallback, logger=logger)
+
+        resolver.geocode("Praça da Sé")
+        resolver.geocode("Praça da Sé")
+        resolver.reverse_geocode((-23.0, -46.0))
+        resolver.reverse_geocode((-23.0, -46.0))
+
+        assert any("Geocoding cache miss" in message for message in logger.messages)
+        assert any("Geocoding cache hit" in message for message in logger.messages)
+        assert any(
+            "Geocoding fallback resolved" in message for message in logger.messages
+        )
+        assert any(
+            "Reverse geocoding cache miss" in message for message in logger.messages
+        )
+        assert any(
+            "Reverse geocoding cache hit" in message for message in logger.messages
+        )
+        assert any(
+            "Reverse geocoding fallback resolved" in message
+            for message in logger.messages
+        )
+
+
 def test_cached_adjacency_matrix_builder_reuses_persisted_segments():
     with tempfile.TemporaryDirectory() as temp_dir:
         cache = SQLiteAdjacencySegmentCache(os.path.join(temp_dir, "adjacency.db"))
@@ -103,3 +140,25 @@ def test_cached_adjacency_matrix_builder_reuses_persisted_segments():
         finally:
             connection.close()
         assert count == 6
+
+
+def test_cached_adjacency_matrix_builder_logs_cache_hits_and_computation():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        cache = SQLiteAdjacencySegmentCache(os.path.join(temp_dir, "adjacency.db"))
+        logger = RecordingLogger()
+        builder = CachedAdjacencyMatrixBuilder(cache, logger=logger)
+        calculator = FakeRouteCalculator()
+        calculator.graph = nx.MultiDiGraph()
+        calculator.graph.graph["crs"] = "EPSG:3857"
+        calculator.graph.graph["graph_id"] = "persistent-test-graph"
+        nodes = make_nodes(2)
+
+        builder.build(calculator, nodes, weight_type="eta", cost_type="priority")
+        builder.build(calculator, nodes, weight_type="eta", cost_type="priority")
+
+        assert any(
+            "Adjacency segment cache miss" in message for message in logger.messages
+        )
+        assert any(
+            "Adjacency segment cache hit" in message for message in logger.messages
+        )

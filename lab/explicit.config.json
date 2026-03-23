@@ -48,24 +48,24 @@
         "cost_type": "priority"
     },
     "output": {
-        "plot": false,
-        "verbose": false,
+        "plot": true,
+        "verbose": true,
         "show_best_run_details": true
     },
     "defaults": {
         "vehicle_count": 2,
         "max_processing_time": 30000,
         "population_size": 12,
-        "max_generation": 60
+        "max_generation": 100
     },
     "experiments": [
         {
-            "label": "baseline-hybrid",
+            "label": "two-state-explore-refine",
             "state_config": {
-                "initial_state": "baseline",
+                "initial_state": "explore",
                 "states": [
                     {
-                        "name": "baseline",
+                        "name": "explore",
                         "selection": {
                             "name": "roulette",
                             "params": {}
@@ -78,26 +78,39 @@
                             "name": "inversion",
                             "params": {}
                         },
-                        "mutation_probability": 0.35,
+                        "mutation_probability": 0.45,
                         "population_generator": {
-                            "name": "hybrid",
-                            "params": {
-                                "heuristic_ratio": 0.4
+                            "name": "random"
+                        },
+                        "transition_rules": [
+                            {
+                                "label": "switch-to-refine-after-progress",
+                                "target_state": "refine",
+                                "specifications": [
+                                    {
+                                        "name": "progress_at_least",
+                                        "params": {
+                                            "threshold": 0.28
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "label": "switch-to-refine-after-stall",
+                                "target_state": "refine",
+                                "specifications": [
+                                    {
+                                        "name": "stale_at_least",
+                                        "params": {
+                                            "threshold": 40
+                                        }
+                                    }
+                                ]
                             }
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "label": "ranked-pmx-two-opt",
-            "population_size": 18,
-            "max_generation": 90,
-            "state_config": {
-                "initial_state": "ranked",
-                "states": [
+                        ]
+                    },
                     {
-                        "name": "ranked",
+                        "name": "refine",
                         "selection": {
                             "name": "rank",
                             "params": {}
@@ -110,23 +123,123 @@
                             "name": "two_opt",
                             "params": {}
                         },
-                        "mutation_probability": 0.55,
+                        "mutation_probability": 0.18,
                         "population_generator": {
-                            "name": "random"
+                            "name": "heuristic"
                         }
                     }
                 ]
             }
         },
         {
-            "label": "tournament-cycle-insertion",
-            "population_size": 24,
-            "max_generation": 120,
+            "label": "three-state-explore-balance-polish",
             "state_config": {
-                "initial_state": "tournament-cycle",
+                "initial_state": "explore",
                 "states": [
                     {
-                        "name": "tournament-cycle",
+                        "name": "explore",
+                        "selection": {
+                            "name": "roulette",
+                            "params": {}
+                        },
+                        "crossover": {
+                            "name": "order",
+                            "params": {}
+                        },
+                        "mutation": {
+                            "name": "inversion",
+                            "params": {}
+                        },
+                        "mutation_probability": 0.5,
+                        "population_generator": {
+                            "name": "random"
+                        },
+                        "transition_rules": [
+                            {
+                                "label": "move-to-balance-after-progress",
+                                "target_state": "balance",
+                                "specifications": [
+                                    {
+                                        "name": "progress_at_least",
+                                        "params": {
+                                            "threshold": 0.22
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "label": "move-to-balance-after-stall",
+                                "target_state": "balance",
+                                "specifications": [
+                                    {
+                                        "name": "stale_at_least",
+                                        "params": {
+                                            "threshold": 30
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "balance",
+                        "selection": {
+                            "name": "rank",
+                            "params": {}
+                        },
+                        "crossover": {
+                            "name": "pmx",
+                            "params": {}
+                        },
+                        "mutation": {
+                            "name": "two_opt",
+                            "params": {}
+                        },
+                        "mutation_probability": 0.28,
+                        "population_generator": {
+                            "name": "heuristic"
+                        },
+                        "transition_rules": [
+                            {
+                                "label": "move-to-polish-after-progress",
+                                "target_state": "polish",
+                                "specifications": [
+                                    {
+                                        "name": "progress_at_least",
+                                        "params": {
+                                            "threshold": 0.6
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "label": "move-to-polish-after-stall",
+                                "target_state": "polish",
+                                "specifications": [
+                                    {
+                                        "name": "stale_at_least",
+                                        "params": {
+                                            "threshold": 50
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "label": "move-to-polish-on-low-improvement",
+                                "target_state": "polish",
+                                "specifications": [
+                                    {
+                                        "name": "improvement_below",
+                                        "params": {
+                                            "threshold": 0.015
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "polish",
                         "selection": {
                             "name": "tournament",
                             "params": {
@@ -138,13 +251,210 @@
                             "params": {}
                         },
                         "mutation": {
+                            "name": "two_opt",
+                            "params": {}
+                        },
+                        "mutation_probability": 0.12,
+                        "population_generator": {
+                            "name": "random"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "label": "four-state-explore-balance-refine-rescue",
+            "state_config": {
+                "initial_state": "explore",
+                "states": [
+                    {
+                        "name": "explore",
+                        "selection": {
+                            "name": "roulette",
+                            "params": {
+                            }
+                        },
+                        "crossover": {
+                            "name": "order",
+                            "params": {}
+                        },
+                        "mutation": {
+                            "name": "inversion",
+                            "params": {}
+                        },
+                        "mutation_probability": 0.55,
+                        "population_generator": {
+                            "name": "hybrid",
+                            "params": {
+                                "heuristic_ratio": 0.6
+                            }
+                        },
+                        "transition_rules": [
+                            {
+                                "label": "move-to-balance-after-progress",
+                                "target_state": "balance",
+                                "specifications": [
+                                    {
+                                        "name": "progress_at_least",
+                                        "params": {
+                                            "threshold": 0.18
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "label": "move-to-balance-after-stall",
+                                "target_state": "balance",
+                                "specifications": [
+                                    {
+                                        "name": "stale_at_least",
+                                        "params": {
+                                            "threshold": 30
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "balance",
+                        "selection": {
+                            "name": "rank",
+                            "params": {}
+                        },
+                        "crossover": {
+                            "name": "pmx",
+                            "params": {}
+                        },
+                        "mutation": {
+                            "name": "two_opt",
+                            "params": {}
+                        },
+                        "mutation_probability": 0.3,
+                        "population_generator": {
+                            "name": "heuristic"
+                        },
+                        "transition_rules": [
+                            {
+                                "label": "move-to-refine-after-progress",
+                                "target_state": "refine",
+                                "specifications": [
+                                    {
+                                        "name": "progress_at_least",
+                                        "params": {
+                                            "threshold": 0.48
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "label": "move-to-refine-on-low-improvement",
+                                "target_state": "refine",
+                                "specifications": [
+                                    {
+                                        "name": "improvement_below",
+                                        "params": {
+                                            "threshold": 0.02
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "refine",
+                        "selection": {
+                            "name": "rank",
+                            "params": {}
+                        },
+                        "crossover": {
+                            "name": "cycle",
+                            "params": {}
+                        },
+                        "mutation": {
+                            "name": "two_opt",
+                            "params": {}
+                        },
+                        "mutation_probability": 0.16,
+                        "population_generator": {
+                            "name": "random"
+                        },
+                        "transition_rules": [
+                            {
+                                "label": "move-to-rescue-after-stall",
+                                "target_state": "rescue",
+                                "specifications": [
+                                    {
+                                        "name": "stale_at_least",
+                                        "params": {
+                                            "threshold": 60
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "label": "move-to-rescue-on-low-improvement",
+                                "target_state": "rescue",
+                                "specifications": [
+                                    {
+                                        "name": "improvement_below",
+                                        "params": {
+                                            "threshold": 0.008
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "rescue",
+                        "selection": {
+                            "name": "tournament",
+                            "params": {
+                                "tournament_size": 3
+                            }
+                        },
+                        "crossover": {
+                            "name": "order",
+                            "params": {}
+                        },
+                        "mutation": {
                             "name": "insertion",
                             "params": {}
                         },
-                        "mutation_probability": 0.7,
+                        "mutation_probability": 0.75,
                         "population_generator": {
-                            "name": "heuristic"
-                        }
+                            "name": "hybrid",
+                            "params": {
+                                "heuristic_ratio": 0.25
+                            }
+                        },
+                        "transition_rules": [
+                            {
+                                "label": "recover-to-balance-on-progress",
+                                "target_state": "balance",
+                                "specifications": [
+                                    {
+                                        "name": "progress_at_least",
+                                        "params": {
+                                            "threshold": 0.85
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "label": "recover-to-balance-after-stall",
+                                "target_state": "balance",
+                                "specifications": [
+                                    {
+                                        "name": "stale_at_least",
+                                        "params": {
+                                            "threshold": 20
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }
