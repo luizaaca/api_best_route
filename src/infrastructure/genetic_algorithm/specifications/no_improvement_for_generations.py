@@ -1,4 +1,4 @@
-"""Stale-generation specification for adaptive GA transitions."""
+"""Absolute no-improvement count specification for adaptive GA transitions."""
 
 from __future__ import annotations
 
@@ -13,22 +13,25 @@ from src.domain.models.genetic_algorithm.engine.generation_context import (
 
 
 @dataclass(slots=True)
-class StaleAtLeastSpecification(IGeneticSpecification):
-    """Match once the best fitness stayed stale for long enough."""
+class NoImprovementForGenerationsSpecification(IGeneticSpecification):
+    """Match once the current state stayed without improvement long enough."""
 
-    _name: str = "stale_at_least"
+    _name: str = "no_improvement_for_generations"
 
     def __init__(self, threshold: int) -> None:
         """Initialize the specification.
 
         Args:
-            threshold: Minimum number of stale generations to match.
+            threshold: Minimum number of consecutive state-local generations
+                without improvement.
 
         Raises:
             ValueError: When the threshold is negative.
         """
         if threshold < 0:
-            raise ValueError("StaleAtLeastSpecification threshold must be non-negative")
+            raise ValueError(
+                "NoImprovementForGenerationsSpecification threshold must be non-negative"
+            )
         self._threshold = threshold
 
     @property
@@ -37,5 +40,5 @@ class StaleAtLeastSpecification(IGeneticSpecification):
         return self._name
 
     def matches(self, context: GenerationContext) -> bool:
-        """Return whether stale generations reached the configured threshold."""
-        return context.stale_generations >= self._threshold
+        """Return whether the state-local no-improvement count reached the threshold."""
+        return context.no_improvement_generations >= self._threshold

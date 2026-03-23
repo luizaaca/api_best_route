@@ -1,11 +1,11 @@
 """Concrete adaptive GA specifications."""
 
-from .improvement_below import ImprovementBelowSpecification
-from .progress_at_least import ProgressAtLeastSpecification
-from .stale_at_least import StaleAtLeastSpecification
+from .no_improvement_for_generations import NoImprovementForGenerationsSpecification
+from .state_improvement_at_least import StateImprovementAtLeastSpecification
+from .window_improvement_below import WindowImprovementBelowSpecification
 
 __all__ = [
-    "ImprovementBelowSpecification",
-    "ProgressAtLeastSpecification",
-    "StaleAtLeastSpecification",
+    "NoImprovementForGenerationsSpecification",
+    "StateImprovementAtLeastSpecification",
+    "WindowImprovementBelowSpecification",
 ]

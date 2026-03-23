@@ -69,7 +69,7 @@ class AdaptiveRouteGAFamilyFactory(IAdaptiveRouteGAFamilyFactory):
             EvaluatedRouteSolution,
             RoutePopulationSeedData,
         ](
-            initial_state_name=initial_resolution.state_name,
+            initial_state_name=initial_resolution.target_state_name,
             initial_operators=initial_resolution.operators,
             state_controller=state_controller,
         )

@@ -77,7 +77,8 @@ class ConfiguredGeneticStateController(
         """Return the initial state resolution used before the first generation."""
         state = self._states[self._current_state_name]
         return GenerationStateResolution(
-            state_name=state.name,
+            source_state_name=state.name,
+            target_state_name=state.name,
             operators=state.operators,
         )
 
@@ -100,7 +101,8 @@ class ConfiguredGeneticStateController(
         matching_rule = current_state.resolve_transition(context)
         if matching_rule is None:
             return GenerationStateResolution(
-                state_name=current_state.name,
+                source_state_name=current_state.name,
+                target_state_name=current_state.name,
                 operators=current_state.operators,
             )
 
@@ -112,7 +114,8 @@ class ConfiguredGeneticStateController(
         next_state = self._states[matching_rule.target_state]
         self._current_state_name = next_state.name
         return GenerationStateResolution(
-            state_name=next_state.name,
+            source_state_name=current_state.name,
+            target_state_name=next_state.name,
             operators=next_state.operators,
             transition_label=matching_rule.label,
         )

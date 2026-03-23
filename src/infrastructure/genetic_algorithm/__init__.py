@@ -35,9 +35,9 @@ from .selection import (
     TournamentSelectionStrategy,
 )
 from .specifications import (
-    ImprovementBelowSpecification,
-    ProgressAtLeastSpecification,
-    StaleAtLeastSpecification,
+    NoImprovementForGenerationsSpecification,
+    StateImprovementAtLeastSpecification,
+    WindowImprovementBelowSpecification,
 )
 from .state_controllers import (
     ConfiguredGeneticStateController,
@@ -63,10 +63,10 @@ __all__ = [
     "RoulleteSelectionStrategy",
     "StochasticUniversalSamplingSelectionStrategy",
     "ConfiguredGeneticStateController",
-    "ImprovementBelowSpecification",
-    "ProgressAtLeastSpecification",
+    "NoImprovementForGenerationsSpecification",
+    "StateImprovementAtLeastSpecification",
     "SwapAndRedistributeMutationStrategy",
-    "StaleAtLeastSpecification",
     "TournamentSelectionStrategy",
     "TwoOptMutationStrategy",
+    "WindowImprovementBelowSpecification",
 ]

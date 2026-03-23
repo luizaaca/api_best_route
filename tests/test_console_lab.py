@@ -110,14 +110,15 @@ class DummyOptimizer:
         GenerationRecord(
             generation=1,
             state_name="baseline",
+            target_state_name="baseline",
             transition_label=None,
             best_fitness=12.5,
-            stale_generations=0,
-            improvement_ratio=0.0,
             elapsed_time_ms=5.0,
             selection_name="roulette",
             crossover_name="order",
             mutation_name="inversion",
+            no_improvement_generations=0,
+            state_improvement_ratio=0.0,
             mutation_probability=0.6,
             reseed_applied=False,
             metrics={"population_size": 10},
@@ -192,9 +193,36 @@ class DummyBundleExecutionRunner:
         _ = max_generations
         _ = max_processing_time
         _ = logger
-        _ = on_generation_evaluated
         if on_generation is not None:
             on_generation(DummyOptimizer._GENERATION_RECORDS[0])
+        if on_generation_evaluated is not None:
+            vehicle_route = VehicleRouteInfo.from_route_segments_info(
+                vehicle_id=1,
+                route_info=RouteSegmentsInfo.from_segments(
+                    [
+                        RouteSegment(
+                            start=1,
+                            end=1,
+                            eta=0,
+                            length=0,
+                            path=[],
+                            segment=[1],
+                            name="Origin",
+                            coords=(0.0, 0.0),
+                            cost=0.0,
+                        )
+                    ]
+                ),
+            )
+            on_generation_evaluated(
+                DummyOptimizer._GENERATION_RECORDS[0],
+                cast(
+                    Any,
+                    SimpleNamespace(
+                        _route_info=FleetRouteInfo.from_vehicle_routes([vehicle_route])
+                    ),
+                ),
+            )
         return DummyOptimizer(problem).solve([], 1, 1, 1)
 
 
@@ -856,16 +884,43 @@ def test_lab_benchmark_runner_emits_verbose_runtime_messages(
         ):
             if logger is not None:
                 logger("Running optimizer with vehicle_count=1")
-            return super().run(
-                problem=problem,
-                seed_data=seed_data,
-                state_controller=state_controller,
-                population_size=population_size,
-                max_generations=max_generations,
-                max_processing_time=max_processing_time,
-                logger=logger,
-                on_generation=on_generation,
-                on_generation_evaluated=on_generation_evaluated,
+            transition_record = GenerationRecord(
+                generation=2,
+                state_name="baseline",
+                target_state_name="intensify",
+                transition_label="move-to-intensify",
+                best_fitness=11.0,
+                elapsed_time_ms=6.0,
+                selection_name="rank",
+                crossover_name="pmx",
+                mutation_name="two_opt",
+                no_improvement_generations=2,
+                state_improvement_ratio=0.09,
+                mutation_probability=0.4,
+            )
+            if on_generation is not None:
+                on_generation(transition_record)
+            if on_generation_evaluated is not None:
+                vehicle_route = VehicleRouteInfo.from_route_segments_info(
+                    vehicle_id=1,
+                    route_info=RouteSegmentsInfo.from_segments([]),
+                )
+                on_generation_evaluated(
+                    transition_record,
+                    cast(
+                        Any,
+                        SimpleNamespace(
+                            _route_info=FleetRouteInfo.from_vehicle_routes(
+                                [vehicle_route]
+                            )
+                        ),
+                    ),
+                )
+            return DummyOptimizer(problem).solve(
+                [],
+                max_generations,
+                max_processing_time,
+                1,
             )
 
     runner = LabBenchmarkRunner(
@@ -883,6 +938,7 @@ def test_lab_benchmark_runner_emits_verbose_runtime_messages(
     assert "Resolved 1 run(s)" in output
     assert "Starting run 1/1: 'verbose-run'" in output
     assert "Building adaptive execution bundle for run 'verbose-run'" in output
+    assert "transition 'move-to-intensify' (baseline -> intensify)" in output
     assert "Run 'verbose-run' finished successfully" in output
 
 

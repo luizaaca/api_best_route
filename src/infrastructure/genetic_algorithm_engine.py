@@ -83,6 +83,7 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
         self,
         generation: int,
         context: GenerationContext,
+        target_state_name: str,
         transition_label: str | None,
         selection_name: str,
         crossover_name: str,
@@ -95,10 +96,11 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
         return GenerationRecord(
             generation=generation,
             state_name=context.state_name or self._state_controller.current_state_name,
+            target_state_name=target_state_name,
             transition_label=transition_label,
             best_fitness=context.best_fitness,
-            stale_generations=context.stale_generations,
-            improvement_ratio=context.improvement_ratio,
+            no_improvement_generations=context.no_improvement_generations,
+            state_improvement_ratio=context.state_improvement_ratio,
             elapsed_time_ms=context.elapsed_time_ms,
             selection_name=selection_name,
             crossover_name=crossover_name,
@@ -106,6 +108,7 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
             population_generator_name=population_generator_name,
             mutation_probability=mutation_probability,
             reseed_applied=reseed_applied,
+            metrics=dict(context.metrics),
         )
 
     def solve(
@@ -140,8 +143,11 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
         best_evaluated: TEvaluated | None = None
         best_fitness = float("inf")
         previous_best_fitness: float | None = None
-        stale_generations = 0
+        no_improvement_generations = 0
         generations_run = 0
+        state_entry_generation = 1
+        state_entry_best_fitness: float | None = None
+        state_best_fitness_history: list[float] = []
         start_time = perf_counter()
 
         while generations_run < max_generations:
@@ -169,19 +175,34 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
             if best_evaluated is None or current_best_fitness < best_fitness:
                 best_evaluated = current_best
                 best_fitness = current_best_fitness
-                stale_generations = 0
+            if (
+                previous_best_fitness is None
+                or current_best_fitness < previous_best_fitness
+            ):
+                no_improvement_generations = 0
             else:
-                stale_generations += 1
+                no_improvement_generations += 1
 
+            if state_entry_best_fitness is None:
+                state_entry_best_fitness = current_best_fitness
+
+            state_best_fitness_history.append(current_best_fitness)
+            state_elapsed_generations = generations_run - state_entry_generation + 1
             context = GenerationContext(
                 generation=generations_run,
                 max_generations=max_generations,
                 best_fitness=current_best_fitness,
                 previous_best_fitness=previous_best_fitness,
-                stale_generations=stale_generations,
+                no_improvement_generations=no_improvement_generations,
                 elapsed_generations=generations_run,
                 elapsed_time_ms=elapsed_time_ms,
                 state_name=self._state_controller.current_state_name,
+                state_entry_generation=state_entry_generation,
+                state_entry_best_fitness=state_entry_best_fitness,
+                state_elapsed_generations=state_elapsed_generations,
+                metrics={
+                    "state_best_fitness_history": tuple(state_best_fitness_history),
+                },
             )
             resolution = self._state_controller.resolve(context)
             operators = resolution.operators
@@ -221,21 +242,11 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
                     reseed_applied = True
 
             population = new_population[:population_size]
-            previous_best_fitness = current_best_fitness
 
             record = self._build_generation_record(
                 generation=generations_run,
-                context=GenerationContext(
-                    generation=context.generation,
-                    max_generations=context.max_generations,
-                    best_fitness=context.best_fitness,
-                    previous_best_fitness=context.previous_best_fitness,
-                    stale_generations=context.stale_generations,
-                    elapsed_generations=context.elapsed_generations,
-                    elapsed_time_ms=context.elapsed_time_ms,
-                    state_name=resolution.state_name,
-                    metrics=context.metrics,
-                ),
+                context=context,
+                target_state_name=resolution.target_state_name,
                 transition_label=resolution.transition_label,
                 selection_name=operators.selection.name,
                 crossover_name=operators.crossover.name,
@@ -248,17 +259,17 @@ class GeneticAlgorithm(Generic[TSolution, TEvaluated, TSeedData, TResult]):
                 ),
                 reseed_applied=reseed_applied,
             )
-            self._log(
-                (
-                    f"Generation {record.generation}: state={record.state_name}, "
-                    f"best_fitness={record.best_fitness}, stale={record.stale_generations}, "
-                    f"mutation_probability={record.mutation_probability:.4f}"
-                )
-            )
             if self._on_generation is not None:
                 self._on_generation(record)
             if self._on_generation_evaluated is not None:
                 self._on_generation_evaluated(record, current_best)
+
+            previous_best_fitness = current_best_fitness
+            if resolution.transition_label is not None:
+                state_entry_generation = generations_run + 1
+                state_entry_best_fitness = current_best_fitness
+                state_best_fitness_history = []
+                no_improvement_generations = 0
 
         if best_evaluated is None:
             return self._problem.build_empty_result()

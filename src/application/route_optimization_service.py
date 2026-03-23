@@ -87,6 +87,14 @@ class RouteOptimizationService:
             evaluated_solution: Best evaluated route solution of the generation.
             plotter: Optional plotter used to visualize progress.
         """
+        if record.transition_label is not None:
+            target_state_name = record.target_state_name or "unknown"
+            self._log(
+                (
+                    f"Generation {record.generation}: transition "
+                    f"'{record.transition_label}' ({record.state_name} -> {target_state_name})"
+                )
+            )
         self._log(
             (
                 f"Generation {record.generation}: Best fitness = {record.best_fitness} "

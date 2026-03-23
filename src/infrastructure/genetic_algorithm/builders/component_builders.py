@@ -56,9 +56,9 @@ from src.infrastructure.genetic_algorithm.selection import (
     TournamentSelectionStrategy,
 )
 from src.infrastructure.genetic_algorithm.specifications import (
-    ImprovementBelowSpecification,
-    ProgressAtLeastSpecification,
-    StaleAtLeastSpecification,
+    NoImprovementForGenerationsSpecification,
+    StateImprovementAtLeastSpecification,
+    WindowImprovementBelowSpecification,
 )
 
 IgnoredParamsReporter: TypeAlias = Callable[[str, str, dict[str, Any]], None]
@@ -231,14 +231,17 @@ def build_specification(config: Mapping[str, Any]) -> IGeneticSpecification:
     normalized_name = _normalize_component_name(str(config["name"]))
     resolved_params = _copy_params(config.get("params"))
 
-    if normalized_name == "progress_at_least":
-        return ProgressAtLeastSpecification(
+    if normalized_name == "state_improvement_at_least":
+        return StateImprovementAtLeastSpecification(
             threshold=float(resolved_params["threshold"])
         )
-    if normalized_name == "stale_at_least":
-        return StaleAtLeastSpecification(threshold=int(resolved_params["threshold"]))
-    if normalized_name == "improvement_below":
-        return ImprovementBelowSpecification(
-            threshold=float(resolved_params["threshold"])
+    if normalized_name == "no_improvement_for_generations":
+        return NoImprovementForGenerationsSpecification(
+            threshold=int(resolved_params["threshold"])
+        )
+    if normalized_name == "window_improvement_below":
+        return WindowImprovementBelowSpecification(
+            threshold=float(resolved_params["threshold"]),
+            window_size=int(resolved_params["window_size"]),
         )
     raise ValueError(f"Unknown adaptive specification: {config['name']}")

@@ -57,16 +57,19 @@ Important fields include:
 - `max_generations`
 - `best_fitness`
 - `previous_best_fitness`
-- `stale_generations`
+- `no_improvement_generations`
 - `elapsed_generations`
 - `elapsed_time_ms`
 - `state_name`
+- `state_entry_generation`
+- `state_entry_best_fitness`
+- `state_elapsed_generations`
 - `metrics`
 
 Useful derived values:
 
-- `progress_ratio`
-- `improvement_ratio`
+- `state_improvement_ratio`
+- `improvement_over_window(window_size)`
 - `metric(name, default)`
 
 ### `GenerationRecord`
@@ -78,9 +81,10 @@ It captures:
 - generation number;
 - active state;
 - transition label;
+- source state when a transition happens;
 - best fitness;
-- stale generations;
-- improvement ratio;
+- no-improvement generations in the current state;
+- state-local accumulated improvement;
 - elapsed time;
 - active operators;
 - mutation probability;
@@ -154,7 +158,7 @@ Its lifecycle is:
 4. stop early if the population is empty;
 5. evaluate the population through the problem adapter;
 6. rank the evaluated population by fitness;
-7. keep track of the best solution and stale generations;
+7. keep track of the best solution and the state-local transition metrics;
 8. resolve the adaptive state for the current generation;
 9. create the next population using selection, crossover, and mutation;
 10. optionally apply reseeding or injection;
@@ -185,6 +189,12 @@ The intended semantics are:
 - a transition rule uses AND semantics across its specifications;
 - a state uses ordered OR semantics across its rules;
 - the first matching rule wins.
+
+The transition vocabulary is state-local:
+
+- `state_improvement_at_least` checks improvement accumulated since the state became active;
+- `window_improvement_below` checks whether recent accumulated improvement over `n` generations fell below a threshold;
+- `no_improvement_for_generations` checks an absolute count of consecutive generations without improvement inside the current state.
 
 This keeps the engine generic while still allowing domain-specific adaptive behavior.
 

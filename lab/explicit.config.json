@@ -84,11 +84,11 @@
                         },
                         "transition_rules": [
                             {
-                                "label": "switch-to-refine-after-progress",
+                                "label": "switch-to-refine-on-state-improvement",
                                 "target_state": "refine",
                                 "specifications": [
                                     {
-                                        "name": "progress_at_least",
+                                        "name": "state_improvement_at_least",
                                         "params": {
                                             "threshold": 0.28
                                         }
@@ -96,13 +96,13 @@
                                 ]
                             },
                             {
-                                "label": "switch-to-refine-after-stall",
+                                "label": "switch-to-refine-after-no-improvement",
                                 "target_state": "refine",
                                 "specifications": [
                                     {
-                                        "name": "stale_at_least",
+                                        "name": "no_improvement_for_generations",
                                         "params": {
-                                            "threshold": 40
+                                            "threshold": 18
                                         }
                                     }
                                 ]
@@ -156,25 +156,25 @@
                         },
                         "transition_rules": [
                             {
-                                "label": "move-to-balance-after-progress",
+                                "label": "move-to-balance-on-state-improvement",
                                 "target_state": "balance",
                                 "specifications": [
                                     {
-                                        "name": "progress_at_least",
+                                        "name": "state_improvement_at_least",
                                         "params": {
-                                            "threshold": 0.22
+                                            "threshold": 0.04
                                         }
                                     }
                                 ]
                             },
                             {
-                                "label": "move-to-balance-after-stall",
+                                "label": "move-to-balance-after-no-improvement",
                                 "target_state": "balance",
                                 "specifications": [
                                     {
-                                        "name": "stale_at_least",
+                                        "name": "no_improvement_for_generations",
                                         "params": {
-                                            "threshold": 30
+                                            "threshold": 14
                                         }
                                     }
                                 ]
@@ -201,23 +201,23 @@
                         },
                         "transition_rules": [
                             {
-                                "label": "move-to-polish-after-progress",
+                                "label": "move-to-polish-on-state-improvement",
                                 "target_state": "polish",
                                 "specifications": [
                                     {
-                                        "name": "progress_at_least",
+                                        "name": "state_improvement_at_least",
                                         "params": {
-                                            "threshold": 0.6
+                                            "threshold": 0.25
                                         }
                                     }
                                 ]
                             },
                             {
-                                "label": "move-to-polish-after-stall",
+                                "label": "move-to-polish-after-no-improvement",
                                 "target_state": "polish",
                                 "specifications": [
                                     {
-                                        "name": "stale_at_least",
+                                        "name": "no_improvement_for_generations",
                                         "params": {
                                             "threshold": 50
                                         }
@@ -225,13 +225,14 @@
                                 ]
                             },
                             {
-                                "label": "move-to-polish-on-low-improvement",
+                                "label": "move-to-polish-on-low-window-improvement",
                                 "target_state": "polish",
                                 "specifications": [
                                     {
-                                        "name": "improvement_below",
+                                        "name": "window_improvement_below",
                                         "params": {
-                                            "threshold": 0.015
+                                            "threshold": 0.01,
+                                            "window_size": 18
                                         }
                                     }
                                 ]
@@ -291,11 +292,11 @@
                         },
                         "transition_rules": [
                             {
-                                "label": "move-to-balance-after-progress",
+                                "label": "move-to-balance-on-state-improvement",
                                 "target_state": "balance",
                                 "specifications": [
                                     {
-                                        "name": "progress_at_least",
+                                        "name": "state_improvement_at_least",
                                         "params": {
                                             "threshold": 0.18
                                         }
@@ -303,11 +304,11 @@
                                 ]
                             },
                             {
-                                "label": "move-to-balance-after-stall",
+                                "label": "move-to-balance-after-no-improvement",
                                 "target_state": "balance",
                                 "specifications": [
                                     {
-                                        "name": "stale_at_least",
+                                        "name": "no_improvement_for_generations",
                                         "params": {
                                             "threshold": 30
                                         }
@@ -336,25 +337,26 @@
                         },
                         "transition_rules": [
                             {
-                                "label": "move-to-refine-after-progress",
+                                "label": "move-to-refine-on-state-improvement",
                                 "target_state": "refine",
                                 "specifications": [
                                     {
-                                        "name": "progress_at_least",
+                                        "name": "state_improvement_at_least",
                                         "params": {
-                                            "threshold": 0.48
+                                            "threshold": 0.15
                                         }
                                     }
                                 ]
                             },
                             {
-                                "label": "move-to-refine-on-low-improvement",
+                                "label": "move-to-refine-on-low-window-improvement",
                                 "target_state": "refine",
                                 "specifications": [
                                     {
-                                        "name": "improvement_below",
+                                        "name": "window_improvement_below",
                                         "params": {
-                                            "threshold": 0.02
+                                            "threshold": 0.012,
+                                            "window_size": 18
                                         }
                                     }
                                 ]
@@ -381,25 +383,26 @@
                         },
                         "transition_rules": [
                             {
-                                "label": "move-to-rescue-after-stall",
+                                "label": "move-to-rescue-after-no-improvement",
                                 "target_state": "rescue",
                                 "specifications": [
                                     {
-                                        "name": "stale_at_least",
+                                        "name": "no_improvement_for_generations",
                                         "params": {
-                                            "threshold": 60
+                                            "threshold": 30
                                         }
                                     }
                                 ]
                             },
                             {
-                                "label": "move-to-rescue-on-low-improvement",
+                                "label": "move-to-rescue-on-low-window-improvement",
                                 "target_state": "rescue",
                                 "specifications": [
                                     {
-                                        "name": "improvement_below",
+                                        "name": "window_improvement_below",
                                         "params": {
-                                            "threshold": 0.008
+                                            "threshold": 0.004,
+                                            "window_size": 40
                                         }
                                     }
                                 ]
@@ -431,25 +434,25 @@
                         },
                         "transition_rules": [
                             {
-                                "label": "recover-to-balance-on-progress",
+                                "label": "recover-to-balance-on-state-improvement",
                                 "target_state": "balance",
                                 "specifications": [
                                     {
-                                        "name": "progress_at_least",
+                                        "name": "state_improvement_at_least",
                                         "params": {
-                                            "threshold": 0.85
+                                            "threshold": 0.1
                                         }
                                     }
                                 ]
                             },
                             {
-                                "label": "recover-to-balance-after-stall",
+                                "label": "recover-to-balance-after-no-improvement",
                                 "target_state": "balance",
                                 "specifications": [
                                     {
-                                        "name": "stale_at_least",
+                                        "name": "no_improvement_for_generations",
                                         "params": {
-                                            "threshold": 20
+                                            "threshold": 30
                                         }
                                     }
                                 ]

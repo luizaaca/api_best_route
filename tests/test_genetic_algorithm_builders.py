@@ -31,7 +31,7 @@ from src.infrastructure.genetic_algorithm.mutation import InversionMutationStrat
 from src.infrastructure.genetic_algorithm.population import HybridPopulationGenerator
 from src.infrastructure.genetic_algorithm.selection import TournamentSelectionStrategy
 from src.infrastructure.genetic_algorithm.specifications import (
-    ImprovementBelowSpecification,
+    WindowImprovementBelowSpecification,
 )
 from src.infrastructure.tsp_optimizer_factory import TSPOptimizerFactory
 from src.domain.models.geo_graph.route_node import RouteNode
@@ -89,7 +89,10 @@ def test_shared_component_builders_resolve_expected_types():
         params={"heuristic_ratio": 0.7},
     )
     specification = build_specification(
-        {"name": "improvement_below", "params": {"threshold": 0.02}}
+        {
+            "name": "window_improvement_below",
+            "params": {"threshold": 0.02, "window_size": 5},
+        }
     )
 
     assert isinstance(selection, TournamentSelectionStrategy)
@@ -97,7 +100,7 @@ def test_shared_component_builders_resolve_expected_types():
     assert isinstance(crossover, OrderCrossoverStrategy)
     assert isinstance(mutation, InversionMutationStrategy)
     assert isinstance(generator, HybridPopulationGenerator)
-    assert isinstance(specification, ImprovementBelowSpecification)
+    assert isinstance(specification, WindowImprovementBelowSpecification)
 
 
 def test_shared_builders_report_ignored_params_when_requested():
@@ -219,8 +222,8 @@ def test_route_adaptive_state_controller_builder_applies_transition_rules():
                             "target_state": "intensify",
                             "specifications": [
                                 {
-                                    "name": "progress_at_least",
-                                    "params": {"threshold": 0.5},
+                                    "name": "state_improvement_at_least",
+                                    "params": {"threshold": 0.08},
                                 }
                             ],
                         }
@@ -243,7 +246,8 @@ def test_route_adaptive_state_controller_builder_applies_transition_rules():
     )
 
     initial_resolution = controller.get_initial_resolution()
-    assert initial_resolution.state_name == "baseline"
+    assert initial_resolution.source_state_name == "baseline"
+    assert initial_resolution.target_state_name == "baseline"
     assert initial_resolution.operators.selection.name == "RoulleteSelectionStrategy"
 
     transitioned = controller.resolve(
@@ -252,13 +256,17 @@ def test_route_adaptive_state_controller_builder_applies_transition_rules():
             max_generations=10,
             best_fitness=10.0,
             previous_best_fitness=12.0,
-            stale_generations=0,
+            no_improvement_generations=0,
             elapsed_generations=5,
             elapsed_time_ms=100.0,
             state_name="baseline",
+            state_entry_generation=1,
+            state_entry_best_fitness=11.0,
+            state_elapsed_generations=5,
         )
     )
 
-    assert transitioned.state_name == "intensify"
+    assert transitioned.source_state_name == "baseline"
+    assert transitioned.target_state_name == "intensify"
     assert transitioned.transition_label == "late-search"
     assert transitioned.operators.selection.name == "TournamentSelectionStrategy"

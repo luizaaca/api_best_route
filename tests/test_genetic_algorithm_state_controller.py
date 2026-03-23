@@ -32,9 +32,9 @@ from src.domain.models.genetic_algorithm.engine.generation_operators import (
 )
 from src.domain.models.genetic_algorithm.engine.transition_rule import TransitionRule
 from src.infrastructure.genetic_algorithm.specifications import (
-    ImprovementBelowSpecification,
-    ProgressAtLeastSpecification,
-    StaleAtLeastSpecification,
+    NoImprovementForGenerationsSpecification,
+    StateImprovementAtLeastSpecification,
+    WindowImprovementBelowSpecification,
 )
 from src.infrastructure.genetic_algorithm.state_controllers.configured_state_controller import (
     ConfiguredGeneticStateController,
@@ -150,15 +150,30 @@ def test_transition_rule_uses_and_semantics_for_internal_specifications():
         max_generations=10,
         best_fitness=100.0,
         previous_best_fitness=101.0,
-        stale_generations=3,
+        no_improvement_generations=3,
+        state_entry_generation=1,
+        state_entry_best_fitness=110.0,
+        state_elapsed_generations=8,
+        metrics={
+            "state_best_fitness_history": (
+                109.0,
+                108.0,
+                106.0,
+                104.0,
+                103.0,
+                102.0,
+                101.0,
+                100.0,
+            )
+        },
     )
     rule = TransitionRule(
         label="advance",
         target_state="late",
         specifications=[
-            ProgressAtLeastSpecification(0.7),
-            StaleAtLeastSpecification(3),
-            ImprovementBelowSpecification(0.02),
+            StateImprovementAtLeastSpecification(0.08),
+            NoImprovementForGenerationsSpecification(3),
+            WindowImprovementBelowSpecification(0.035, window_size=3),
         ],
     )
 
@@ -169,7 +184,22 @@ def test_transition_rule_uses_and_semantics_for_internal_specifications():
         max_generations=10,
         best_fitness=90.0,
         previous_best_fitness=110.0,
-        stale_generations=3,
+        no_improvement_generations=3,
+        state_entry_generation=1,
+        state_entry_best_fitness=110.0,
+        state_elapsed_generations=8,
+        metrics={
+            "state_best_fitness_history": (
+                108.0,
+                104.0,
+                99.0,
+                96.0,
+                94.0,
+                93.0,
+                92.0,
+                90.0,
+            )
+        },
     )
 
     assert rule.matches(context) is False
@@ -185,12 +215,12 @@ def test_configured_state_returns_first_matching_rule_only():
             TransitionRule(
                 label="first-match",
                 target_state="intensification",
-                specifications=[ProgressAtLeastSpecification(0.3)],
+                specifications=[StateImprovementAtLeastSpecification(0.15)],
             ),
             TransitionRule(
                 label="second-match",
                 target_state="exploitation",
-                specifications=[ProgressAtLeastSpecification(0.2)],
+                specifications=[StateImprovementAtLeastSpecification(0.1)],
             ),
         ],
     )
@@ -198,6 +228,9 @@ def test_configured_state_returns_first_matching_rule_only():
         generation=4,
         max_generations=10,
         best_fitness=10.0,
+        state_entry_generation=1,
+        state_entry_best_fitness=12.0,
+        state_elapsed_generations=4,
     )
 
     matched = state.resolve_transition(context)
@@ -220,7 +253,8 @@ def test_configured_controller_returns_initial_state_before_first_generation():
 
     resolution = controller.get_initial_resolution()
 
-    assert resolution.state_name == "exploration"
+    assert resolution.source_state_name == "exploration"
+    assert resolution.target_state_name == "exploration"
     assert resolution.transition_label is None
     assert resolution.operators.mutation_probability == 0.5
 
@@ -238,7 +272,7 @@ def test_configured_controller_keeps_state_when_no_rule_matches():
                     TransitionRule(
                         label="later",
                         target_state="intensification",
-                        specifications=[ProgressAtLeastSpecification(0.9)],
+                        specifications=[StateImprovementAtLeastSpecification(0.2)],
                     )
                 ],
             ),
@@ -249,11 +283,15 @@ def test_configured_controller_keeps_state_when_no_rule_matches():
         generation=2,
         max_generations=10,
         best_fitness=10.0,
+        state_entry_generation=1,
+        state_entry_best_fitness=10.5,
+        state_elapsed_generations=2,
     )
 
     resolution = controller.resolve(context)
 
-    assert resolution.state_name == "exploration"
+    assert resolution.source_state_name == "exploration"
+    assert resolution.target_state_name == "exploration"
     assert resolution.transition_label is None
     assert controller.current_state_name == "exploration"
 
@@ -271,12 +309,12 @@ def test_configured_controller_applies_first_matching_transition_and_label():
                     TransitionRule(
                         label="progress-threshold",
                         target_state="intensification",
-                        specifications=[ProgressAtLeastSpecification(0.4)],
+                        specifications=[StateImprovementAtLeastSpecification(0.15)],
                     ),
                     TransitionRule(
                         label="fallback",
                         target_state="other",
-                        specifications=[ProgressAtLeastSpecification(0.2)],
+                        specifications=[StateImprovementAtLeastSpecification(0.05)],
                     ),
                 ],
             ),
@@ -288,11 +326,15 @@ def test_configured_controller_applies_first_matching_transition_and_label():
         generation=5,
         max_generations=10,
         best_fitness=10.0,
+        state_entry_generation=1,
+        state_entry_best_fitness=12.0,
+        state_elapsed_generations=5,
     )
 
     resolution = controller.resolve(context)
 
-    assert resolution.state_name == "intensification"
+    assert resolution.source_state_name == "exploration"
+    assert resolution.target_state_name == "intensification"
     assert resolution.transition_label == "progress-threshold"
     assert resolution.operators.mutation_probability == 0.2
     assert controller.current_state_name == "intensification"
@@ -311,7 +353,7 @@ def test_configured_controller_raises_for_unknown_target_state():
                     TransitionRule(
                         label="broken",
                         target_state="missing",
-                        specifications=[ProgressAtLeastSpecification(0.4)],
+                        specifications=[StateImprovementAtLeastSpecification(0.15)],
                     )
                 ],
             )
@@ -321,6 +363,9 @@ def test_configured_controller_raises_for_unknown_target_state():
         generation=5,
         max_generations=10,
         best_fitness=10.0,
+        state_entry_generation=1,
+        state_entry_best_fitness=12.0,
+        state_elapsed_generations=5,
     )
 
     try:

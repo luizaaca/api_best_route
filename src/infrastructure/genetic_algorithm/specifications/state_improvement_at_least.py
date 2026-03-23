@@ -1,4 +1,4 @@
-"""Improvement-ratio specification for adaptive GA transitions."""
+"""State-local improvement specification for adaptive GA transitions."""
 
 from __future__ import annotations
 
@@ -13,23 +13,23 @@ from src.domain.models.genetic_algorithm.engine.generation_context import (
 
 
 @dataclass(slots=True)
-class ImprovementBelowSpecification(IGeneticSpecification):
-    """Match once the relative improvement falls below a threshold."""
+class StateImprovementAtLeastSpecification(IGeneticSpecification):
+    """Match once the current state accumulated enough improvement."""
 
-    _name: str = "improvement_below"
+    _name: str = "state_improvement_at_least"
 
     def __init__(self, threshold: float) -> None:
         """Initialize the specification.
 
         Args:
-            threshold: Minimum improvement ratio to match, between 0 and 1.
+            threshold: Minimum state-local improvement ratio to match, between 0 and 1.
 
         Raises:
             ValueError: When the threshold is outside the [0, 1] range.
         """
         if not (0 <= threshold <= 1):
             raise ValueError(
-                "ImprovementBelowSpecification threshold must be in [0, 1]"
+                "StateImprovementAtLeastSpecification threshold must be in [0, 1]"
             )
         self._threshold = threshold
 
@@ -39,5 +39,5 @@ class ImprovementBelowSpecification(IGeneticSpecification):
         return self._name
 
     def matches(self, context: GenerationContext) -> bool:
-        """Return whether the improvement ratio is below the configured threshold."""
-        return context.improvement_ratio < self._threshold
+        """Return whether state-local improvement reached the threshold."""
+        return context.state_improvement_ratio >= self._threshold
