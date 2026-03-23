@@ -5,8 +5,9 @@ destinations and returns an optimized route plan using a genetic algorithm.
 """
 
 from typing import Any, cast
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
 from api.schemas import (
     FleetTotals,
@@ -19,9 +20,12 @@ from api.schemas import (
 from api.dependencies import get_adaptive_ga_config, get_route_optimization_service
 from src.application.route_optimization_service import RouteOptimizationService
 
+logger = logging.getLogger("api.main")
+logging.basicConfig(level=logging.INFO)
+
 app = FastAPI(
     title="TSP Genetic Algorithm API",
-    description="API para otimização de rotas usando Algoritmo Genético, considerando prioridades e ETA via OpenStreetMap.",
+    description="API for route optimization using Genetic Algorithm, considering priorities and ETA via OpenStreetMap.",
     version="1.0.0",
 )
 
@@ -32,6 +36,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_request_payload(request: Request, call_next):
+    body = await request.body()
+    if body:
+        logger.info("REQUEST PAYLOAD: %s", body.decode("utf-8"))
+    return await call_next(request)
 
 
 @app.on_event("startup")
@@ -139,12 +151,12 @@ async def optimize_route(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Erro na otimização: {str(e)}",
+            detail=f"Error in optimization: {str(e)}",
         )
 
 
 @app.get("/")
 async def root():
     return {
-        "message": "API TSP Genetic Algorithm está rodando. Acesse /docs para a documentação interativa."
+        "message": "TSP Genetic Algorithm API is running. Access /docs for interactive documentation."
     }

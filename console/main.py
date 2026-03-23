@@ -146,12 +146,24 @@ def run_console_example(
     destinations: list[tuple[str | tuple[float, float], int]] = [
         ("Edifício Copan, São Paulo", 1),
         ("Mercado Municipal de São Paulo", 2),
-        ((-23.5465, -46.6367), 3),
-        ((-23.561543, -46.656197), 2),
-        ((-23.544534, -46.66503), 1),
-        ((-23.534346, -46.64046), 3),
-        ((-23.532278, -46.657468), 2),
-        ((-23.531978, -46.634383), 1),
+        ((-23.5465, -46.6367), 3),  # Giuseppe Verdi, Rua Líbero Badaró
+        ((-23.561543, -46.656197), 5),  # Masp, Avenida Paulista
+        ((-23.544534, -46.66503), 5),  # Pacaembu, Estádio do Pacaembu
+        ((-23.534346, -46.64046), 3),  # Sala São Paulo, Julio Prestes
+        ((-23.532278, -46.657468), 5),  # 27, Rua Olímpia de Almeida Prado, Sta Cecília
+        ((-23.531978, -46.634383), 1),  # 186, Rua Ribeiro de Lima, Bairro da Luz
+        ("Praça da Liberdade, São Paulo", 5),
+        ("Parque da Aclimação, São Paulo", 2),
+        ("Parque Augusta, São Paulo", 4),
+        ("Parque Ibirapuera, São Paulo", 5),
+        ("Pinacoteca do Estado de São Paulo, São Paulo", 3),
+        ("Largo do Arouche, São Paulo", 4),
+        ("Mesquita do Brás, São Paulo", 2),
+        ("Rodoviária do Tietê, São Paulo", 1),
+        ("Avenida Professora Ida Kolb, São Paulo", 1),
+        ("Allianz Parque, São Paulo", 4),
+        ("Cemitério São Paulo, Rua Cardeal Arcoverde, São Paulo", 2),
+        ("Cohab Ehis Bresser II, São Paulo", 3),
     ]
 
     weight_type = "eta"
@@ -162,31 +174,27 @@ def run_console_example(
         destinations=destinations,
         max_generation=max_generation,
         max_processing_time=max_processing_time,
-        vehicle_count=2,  # example value
-        population_size=10,
+        vehicle_count=4,  # example value
+        population_size=15,
         weight_type=weight_type,
         cost_type=cost_type,
         adaptive_config=adaptive_config,
     )
     # Format the result for console display.
-    print("\nResumo da otimização:")
+    print("\nOptimization Summary:")
     for vehicle_route in result.best_route.routes_by_vehicle:
         print(
-            f"Veículo {vehicle_route.vehicle_id}: "
+            f"Vehicle {vehicle_route.vehicle_id}: "
             f"{[seg.name for seg in vehicle_route.segments]}"
         )
-        print(f"  Distância: {vehicle_route.total_length:.1f} m")
+        print(f"  Distance: {vehicle_route.total_length:.1f} m")
         print(f"  ETA: {vehicle_route.total_eta/60:.1f} min")
-        print(f"  Custo: {(vehicle_route.total_cost or 0.0):.2f}")
-    print(f"Distância total: {result.best_route.total_length:.1f} m")
-    print(
-        f"Tempo mínimo entre veículos: {result.best_route.min_vehicle_eta/60:.1f} min"
-    )
-    print(
-        f"Tempo máximo entre veículos: {result.best_route.max_vehicle_eta/60:.1f} min"
-    )
-    print(f"Custo total: {(result.best_route.total_cost or 0.0):.2f}")
-    input("\nPressione Enter para sair...")
+        print(f"  Cost: {(vehicle_route.total_cost or 0.0):.2f}")
+    print(f"Total Distance: {result.best_route.total_length:.1f} m")
+    print(f"Minimum Vehicle ETA: {result.best_route.min_vehicle_eta/60:.1f} min")
+    print(f"Maximum Vehicle ETA: {result.best_route.max_vehicle_eta/60:.1f} min")
+    print(f"Total Cost: {(result.best_route.total_cost or 0.0):.2f}")
+    input("\nPress Enter to exit...")
 
 
 def run_lab_benchmark(config_file: str) -> None:

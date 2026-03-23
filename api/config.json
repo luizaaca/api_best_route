@@ -15,7 +15,7 @@
                 "name": "inversion",
                 "params": {}
             },
-            "mutation_probability": 0.55,
+            "mutation_probability": 0.7,
             "population_generator": {
                 "name": "hybrid",
                 "params": {
@@ -30,7 +30,7 @@
                         {
                             "name": "state_improvement_at_least",
                             "params": {
-                                "threshold": 0.38
+                                "threshold": 0.18
                             }
                         }
                     ]
@@ -111,42 +111,6 @@
                             "params": {
                                 "threshold": 0.02,
                                 "window_size": 30
-                            }
-                        }
-                    ]
-                }
-            ]
-        },
-        {
-            "name": "rescue",
-            "selection": {
-                "name": "tournament",
-                "params": {
-                    "tournament_size": 3
-                }
-            },
-            "crossover": {
-                "name": "order",
-                "params": {}
-            },
-            "mutation": {
-                "name": "insertion",
-                "params": {}
-            },
-            "mutation_probability": 0.75,
-            "population_generator": {
-                "name": "heuristic"
-            },
-            "injection_size": 5,
-            "transition_rules": [
-                {
-                    "label": "recover-to-balance-on-state-improvement",
-                    "target_state": "balance",
-                    "specifications": [
-                        {
-                            "name": "state_improvement_at_least",
-                            "params": {
-                                "threshold": 0.02
                             }
                         }
                     ]
