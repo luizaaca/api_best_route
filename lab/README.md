@@ -258,9 +258,17 @@ Fixed values are represented explicitly:
 - `insertion`
 - `two_opt`
 
+Note: Hands-on, interactive notebooks that demonstrate the concrete operator
+implementations (selection, crossover and mutation) are available in the
+`concepts/` directory. See:
+
+- `concepts/crossover_operator_examples.ipynb`
+- `concepts/mutation_operator_examples.ipynb`
+- `concepts/selection_operator_examples.ipynb`
+
 ## Supported Operator Params
 
-Unsupported params no longer fail known operators in lab mode. Instead, the runner ignores them and emits an informational runtime message when `output.verbose=true`.
+Unsupported params does not fail with known operators in lab mode. Instead, the runner ignores them and emits an informational runtime message when `output.verbose=true`.
 
 ### Population generators
 

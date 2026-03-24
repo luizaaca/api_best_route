@@ -21,7 +21,8 @@ The `concepts/` directory contains Jupyter notebooks with hands-on examples and 
 - [`concepts/crossover_operator_examples.ipynb`](concepts/crossover_operator_examples.ipynb): Crossover operator demonstrations (Order, Cycle, PMX, Edge Recombination)
 - [`concepts/mutation_operator_examples.ipynb`](concepts/mutation_operator_examples.ipynb): Mutation operator demonstrations (Insertion, Inversion, Two-Opt, Swap/Redistribute)
 - [`concepts/selection_operator_examples.ipynb`](concepts/selection_operator_examples.ipynb): Selection operator demonstrations (Roulette, Rank, SUS, Tournament)
-- [`concepts/stateful_ga_phase_example.ipynb`](concepts/stateful_ga_phase_example.ipynb): Example of stateful/adaptive GA phases (Exploration, Intensification, Exploitation)
+- [`concepts/stateful_ga_phase_example.ipynb`](concepts/stateful_ga_phase_example.ipynb): Example of stateful/adaptive GA phases(Exploration, Intensification, Exploitation)
+- [`concepts/osmnx_exploration.ipynb`](concepts/osmnx_exploration.ipynb): OSMnx exploration notebook showing graph creation, projection, weighting functions and route plotting examples
 
 These notebooks are a practical reference for understanding and experimenting with the GA building blocks and adaptive strategies implemented in the codebase.
 
