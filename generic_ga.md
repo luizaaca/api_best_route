@@ -203,3 +203,15 @@ This keeps the engine generic while still allowing domain-specific adaptive beha
 The route application provides one concrete `IGeneticProblem` implementation, one concrete `IGeneticSeedData` model, one concrete `IGeneticSolution` model, and one concrete `IGeneticStateController` family.
 
 That route specialization is documented separately in `routes_optimization.md`.
+
+
+## Interactive Notebooks — Operator and Phase Examples
+
+For hands-on demonstrations of the genetic algorithm operators and adaptive phase strategies described here, see the Jupyter notebooks in the [`concepts/`](concepts/) directory:
+
+- [`concepts/crossover_operator_examples.ipynb`](concepts/crossover_operator_examples.ipynb): Crossover operator demonstrations (Order, Cycle, PMX, Edge Recombination)
+- [`concepts/mutation_operator_examples.ipynb`](concepts/mutation_operator_examples.ipynb): Mutation operator demonstrations (Insertion, Inversion, Two-Opt, Swap/Redistribute)
+- [`concepts/selection_operator_examples.ipynb`](concepts/selection_operator_examples.ipynb): Selection operator demonstrations (Roulette, Rank, SUS, Tournament)
+- [`concepts/stateful_ga_phase_example.ipynb`](concepts/stateful_ga_phase_example.ipynb): Example of stateful/adaptive GA phases (Exploration, Intensification, Exploitation)
+
+These notebooks illustrate the core GA concepts and are a recommended starting point for experimentation and learning.

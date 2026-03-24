@@ -15,11 +15,11 @@
                 "name": "inversion",
                 "params": {}
             },
-            "mutation_probability": 0.8,
+            "mutation_probability": 0.7,
             "population_generator": {
                 "name": "hybrid",
                 "params": {
-                    "heuristic_ratio": 0.6
+                    "heuristic_ratio": 0.3
                 }
             },
             "transition_rules": [
@@ -30,7 +30,7 @@
                         {
                             "name": "state_improvement_at_least",
                             "params": {
-                                "threshold": 0.18
+                                "threshold": 0.1
                             }
                         }
                     ]
@@ -40,8 +40,10 @@
         {
             "name": "balance",
             "selection": {
-                "name": "rank",
-                "params": {}
+                "name": "tournament",
+                "params": {
+                    "tournament_size": 3
+                }
             },
             "crossover": {
                 "name": "pmx",
@@ -76,7 +78,7 @@
                             "name": "window_improvement_below",
                             "params": {
                                 "threshold": 0.12,
-                                "window_size": 30
+                                "window_size": 100
                             }
                         }
                     ]

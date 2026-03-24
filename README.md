@@ -5,6 +5,7 @@
 
 `API Best Route` is a route-optimization service built around a multi-vehicle Genetic Algorithm over OpenStreetMap street-network data. It resolves locations, builds a projected road graph, computes an adjacency matrix of route segments, and optimizes visit order across one or more vehicles.
 
+
 ## Documentation
 
 - [`architecture.md`](architecture.md) — high-level architecture, layering, and design patterns
@@ -12,6 +13,17 @@
 - [`routes_optimization.md`](routes_optimization.md) — route-domain models, graph pipeline, and route metrics
 - [`lab/README.md`](lab/README.md) — full lab-mode contract and examples
 - [`changelog/`](changelog/) — versioned release notes
+
+## Genetic Algorithm Concepts — Interactive Notebooks
+
+The `concepts/` directory contains Jupyter notebooks with hands-on examples and explanations of the main genetic algorithm operators and adaptive phases used in this project:
+
+- [`concepts/crossover_operator_examples.ipynb`](concepts/crossover_operator_examples.ipynb): Crossover operator demonstrations (Order, Cycle, PMX, Edge Recombination)
+- [`concepts/mutation_operator_examples.ipynb`](concepts/mutation_operator_examples.ipynb): Mutation operator demonstrations (Insertion, Inversion, Two-Opt, Swap/Redistribute)
+- [`concepts/selection_operator_examples.ipynb`](concepts/selection_operator_examples.ipynb): Selection operator demonstrations (Roulette, Rank, SUS, Tournament)
+- [`concepts/stateful_ga_phase_example.ipynb`](concepts/stateful_ga_phase_example.ipynb): Example of stateful/adaptive GA phases (Exploration, Intensification, Exploitation)
+
+These notebooks are a practical reference for understanding and experimenting with the GA building blocks and adaptive strategies implemented in the codebase.
 
 ## Install
 

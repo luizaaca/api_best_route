@@ -4,6 +4,7 @@ This module provides cached factory functions used by the API to wire up the
 route optimization service with adaptive GA infrastructure implementations.
 """
 
+import json
 import logging
 from collections.abc import Mapping
 from functools import lru_cache
@@ -28,6 +29,8 @@ from src.infrastructure.tsp_optimizer_factory import TSPOptimizerFactory
 from src.domain.models.route_optimization.route_ga_execution_bundle import (
     RouteGAExecutionBundle,
 )
+
+logger = logging.getLogger("api.route_optimization_service")
 
 
 @lru_cache
@@ -71,7 +74,14 @@ def get_adaptive_ga_config() -> dict[str, Any]:
         FileNotFoundError: If the required config file does not exist.
         ValueError: If the config file contents are invalid.
     """
-    return load_adaptive_ga_config()
+    logger.debug("Loading adaptive GA configuration from disk...")
+    config = load_adaptive_ga_config()
+    logger.debug(
+        "Adaptive GA configuration loaded successfully:\n%s",
+        json.dumps(config, indent=2),
+    )
+
+    return config
 
 
 def _build_adaptive_execution_bundle(
@@ -121,9 +131,6 @@ def _build_adaptive_execution_bundle(
         population_size=population_size,
         ga_family=ga_family,
     )
-
-
-logger = logging.getLogger("api.route_optimization_service")
 
 
 def get_route_optimization_service() -> RouteOptimizationService:
