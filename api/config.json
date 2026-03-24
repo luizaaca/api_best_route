@@ -15,7 +15,7 @@
                 "name": "inversion",
                 "params": {}
             },
-            "mutation_probability": 0.7,
+            "mutation_probability": 0.8,
             "population_generator": {
                 "name": "hybrid",
                 "params": {
@@ -100,22 +100,7 @@
             "mutation_probability": 0.16,
             "population_generator": {
                 "name": "random"
-            },
-            "transition_rules": [
-                {
-                    "label": "move-to-rescue-on-low-window-improvement",
-                    "target_state": "rescue",
-                    "specifications": [
-                        {
-                            "name": "window_improvement_below",
-                            "params": {
-                                "threshold": 0.02,
-                                "window_size": 30
-                            }
-                        }
-                    ]
-                }
-            ]
+            }
         }
     ]
 }

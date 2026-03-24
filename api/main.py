@@ -4,6 +4,7 @@ This application serves a single endpoint that accepts origins and
 destinations and returns an optimized route plan using a genetic algorithm.
 """
 
+import json
 from typing import Any, cast
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +22,7 @@ from api.dependencies import get_adaptive_ga_config, get_route_optimization_serv
 from src.application.route_optimization_service import RouteOptimizationService
 
 logger = logging.getLogger("api.main")
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 app = FastAPI(
     title="TSP Genetic Algorithm API",
@@ -42,7 +43,14 @@ app.add_middleware(
 async def log_request_payload(request: Request, call_next):
     body = await request.body()
     if body:
-        logger.info("REQUEST PAYLOAD: %s", body.decode("utf-8"))
+        decoded = body.decode("utf-8")
+        try:
+            parsed = json.loads(decoded)
+            logger.debug(
+                "REQUEST PAYLOAD:\n%s", json.dumps(parsed, indent=2, ensure_ascii=False)
+            )
+        except Exception:
+            logger.debug("REQUEST PAYLOAD (raw): %s", decoded)
     return await call_next(request)
 
 

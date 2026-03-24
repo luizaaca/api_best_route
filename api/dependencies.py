@@ -4,6 +4,7 @@ This module provides cached factory functions used by the API to wire up the
 route optimization service with adaptive GA infrastructure implementations.
 """
 
+import logging
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import Any
@@ -122,6 +123,9 @@ def _build_adaptive_execution_bundle(
     )
 
 
+logger = logging.getLogger("api.route_optimization_service")
+
+
 def get_route_optimization_service() -> RouteOptimizationService:
     """Return the RouteOptimizationService configured with default dependencies."""
     return RouteOptimizationService(
@@ -130,4 +134,5 @@ def get_route_optimization_service() -> RouteOptimizationService:
         execution_bundle_factory=_build_adaptive_execution_bundle,
         execution_runner=GeneticAlgorithmExecutionRunner(),
         plotter_factory=None,
+        logger=logger,
     )

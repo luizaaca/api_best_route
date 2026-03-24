@@ -1,5 +1,6 @@
 """Application service that orchestrates route optimization workflows."""
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -46,7 +47,7 @@ class RouteOptimizationService:
             OptimizationResult,
         ],
         plotter_factory: Callable[..., IPlotter] | None = None,
-        logger: Callable[[str], None] | None = None,
+        logger: Callable[[str], None] | logging.Logger | None = None,
     ):
         """Initialize the service with its dependencies.
 
@@ -67,7 +68,10 @@ class RouteOptimizationService:
         )
         self._execution_runner = execution_runner
         self._plotter_factory: Callable[..., IPlotter] | None = plotter_factory
-        self._logger = logger
+        if isinstance(logger, logging.Logger):
+            self._logger = logger.debug
+        else:
+            self._logger = logger
 
     def _log(self, message: str) -> None:
         """Emit one runtime message when a logger is configured."""
@@ -141,18 +145,18 @@ class RouteOptimizationService:
         if adaptive_config is None:
             raise ValueError("adaptive_config is required")
 
-        print("Initializing graph and route nodes...")
+        self._log("Initializing graph and route nodes...")
         context = self._graph_generator.initialize(origin, destinations)
 
-        print("Creating route calculator...")
+        self._log("Creating route calculator...")
         route_calculator = self._route_calculator_factory(context.graph)
 
         plotter = None
         if self._plotter_factory:
-            print("Creating plotter...")
+            self._log("Creating plotter...")
             plotter = self._plotter_factory(context)
 
-        print("Creating execution bundle with route calculator...")
+        self._log("Creating execution bundle with route calculator...")
         execution_bundle = self._execution_bundle_factory(
             route_calculator,
             context.route_nodes,
@@ -163,10 +167,10 @@ class RouteOptimizationService:
             adaptive_config=adaptive_config,
         )
 
-        print("Creating coordinate converter...")
+        self._log("Creating coordinate converter...")
         coordinate_converter = self._graph_generator.build_coordinate_converter(context)
 
-        print("Running optimization...")
+        self._log("Running optimization...")
         self._log(f"Running optimizer with vehicle_count={vehicle_count}")
         generation_records: list[GenerationRecord] = []
         result = self._execution_runner.run(
@@ -191,7 +195,7 @@ class RouteOptimizationService:
             self._log(f"  Vehicle {info.vehicle_id}: {nodes}")
         self._log(f"Total aggregated cost: {result.best_route.total_cost or 0.0}")
 
-        print("Converting optimized route coordinates back to lat/lon...")
+        self._log("Converting optimized route coordinates back to lat/lon...")
         converted_route = self._convert_fleet_route_coordinates(
             result.best_route,
             coordinate_converter,

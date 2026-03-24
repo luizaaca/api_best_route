@@ -26,6 +26,15 @@ pip install -r requirements.txt
 uvicorn api.main:app --reload
 ```
 
+> Debug example
+>
+> ```bash
+> uvicorn api.main:app --reload --log-level debug
+> ```
+>
+> This enables debug-level logging, including request payload details from the
+> middleware and internal service trace logs.
+>
 The API is config-driven and requires `api/config.json` at startup. That file defines the adaptive GA state graph used by the API composition root.
 
 The interactive API documentation is available at `/docs`.
