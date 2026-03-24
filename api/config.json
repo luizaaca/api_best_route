@@ -12,7 +12,7 @@
                 "params": {}
             },
             "mutation": {
-                "name": "inversion",
+                "name": "swap_redistribute",
                 "params": {}
             },
             "mutation_probability": 0.7,
