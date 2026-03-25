@@ -61,28 +61,88 @@ api_best_route/
 
 ## System composition
 
+### 1) Arquitetura geral (visão macro)
+
 ```mermaid
-flowchart TD
-    A[FastAPI / Console / Lab] --> B[RouteOptimizationService]
-    B --> C[Graph generator]
-    B --> D[Route calculator]
-    B --> E[RouteGAExecutionBundle factory]
-    B --> F[Optional plotter]
+flowchart TB
+	subgraph Entrypoints
+		API[FastAPI / API]
+		Console[Console]
+		Lab[Lab / Benchmarks]
+	end
 
-    C --> G[OSMnxGraphGenerator]
-    D --> H[RouteCalculator]
-    E --> I[RouteGAExecutionBundle]
-    I --> J[GeneticAlgorithmExecutionRunner]
-    J --> K[GeneticAlgorithm]
-    K --> L[TSPGeneticProblem]
-    L --> M[OptimizationResult]
+	subgraph Application
+		ROSvc[RouteOptimizationService]
+	end
 
-    G --> N[CachedGeocodingResolver]
-    N --> O[SQLiteGeocodingCache]
-    N --> P[PhotonGeocodingResolver]
+	subgraph Infrastructure
+		GraphGen[OSMnxGraphGenerator]
+		RouteCalc[RouteCalculator]
+		BundleFactory[RouteGAExecutionBundle Factory]
+		Runner[GeneticAlgorithmExecutionRunner]
+		GA[GeneticAlgorithm Engine]
+		TSP[TSPGeneticProblem]
+	end
 
-    H --> Q[CachedAdjacencyMatrixBuilder]
-    Q --> R[SQLiteAdjacencySegmentCache]
+	Entrypoints --> ROSvc
+	ROSvc --> GraphGen
+	ROSvc --> RouteCalc
+	ROSvc --> BundleFactory
+	BundleFactory --> Runner
+	Runner --> GA
+	GA --> TSP
+	GraphGen --> CachedGeocode[CachedGeocodingResolver]
+	RouteCalc --> CachedAdjacency[CachedAdjacencyMatrixBuilder]
+```
+
+
+### 2) Modelo de composição (factories e strategies)
+
+```mermaid
+flowchart LR
+	Dependencies["Composition root (api/dependencies.py, console/main.py)"] -->|cria| OptimizerFactory["tsp_optimizer_factory"]
+	OptimizerFactory -->|resolve| CrossoverFactory["crossover_strategy_factory"]
+	OptimizerFactory -->|resolve| MutationFactory["mutation_strategy_factory"]
+	OptimizerFactory -->|resolve| SelectionFactory["selection_strategy_factory"]
+	OptimizerFactory -->|cria| ExecutionBundle["RouteGAExecutionBundle"]
+	ExecutionBundle -->|fornece| Problem["TSPGeneticProblem"]
+	ExecutionBundle -->|fornece| StateController["IGeneticStateController"]
+	ExecutionBundle -->|fornece| SeedData["RoutePopulationSeedData"]
+	StateController -->|injeta| Operators["selection, crossover, mutation, population_generator"]
+```
+
+### 3) Decomposição do motor GA (componentes)
+
+```mermaid
+flowchart TB
+	GAEngine["GeneticAlgorithm Engine"] --> ProblemAdapter["IGeneticProblem / TSPGeneticProblem"]
+	GAEngine --> StateController["IGeneticStateController"]
+	GAEngine --> Operators["selection, crossover, mutation, pop-gen"]
+	GAEngine --> Population["Population Generator"]
+	GAEngine --> Evaluator["Problem.evaluate_population"]
+	Evaluator --> ProblemAdapter
+```
+
+### 4) Fluxo de cálculo de rota (sequence simplified)
+
+```mermaid
+sequenceDiagram
+	participant Client
+	participant API
+	participant ROSvc
+	participant GraphGen
+	participant RouteCalc
+	participant Runner
+	participant GA
+	Client->>API: POST /optimize_route
+	API->>ROSvc: optimize(origin, destinations, config)
+	ROSvc->>GraphGen: initialize(origin, destinations)
+	ROSvc->>RouteCalc: build adjacency matrix
+	ROSvc->>Runner: create bundle & run
+	Runner->>GA: solve(seed_data, population_size...)
+	GA-->>Runner: OptimizationResult
+	Runner-->>ROSvc: Result
+	ROSvc-->>API: Optimized routes (lat/lon)
 ```
 
 ## Design patterns in use
