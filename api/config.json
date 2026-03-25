@@ -34,6 +34,18 @@
                             }
                         }
                     ]
+                },
+                {
+                    "label": "move-to-balance-on-stale",
+                    "target_state": "balance",
+                    "specifications": [
+                        {
+                            "name": "no_improvement_for_generations",
+                            "params": {
+                                "threshold": 20
+                            }
+                        }
+                    ]
                 }
             ]
         },

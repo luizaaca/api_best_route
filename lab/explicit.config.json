@@ -48,14 +48,14 @@
         "cost_type": "priority"
     },
     "output": {
-        "plot": true,
+        "plot": false,
         "verbose": true,
         "show_best_run_details": true
     },
     "defaults": {
         "vehicle_count": 2,
         "max_processing_time": 30000,
-        "population_size": 12,
+        "population_size": 15,
         "max_generation": 100
     },
     "experiments": [

@@ -24,7 +24,7 @@
             },
             "transition_rules": [
                 {
-                    "label": "move-to-balance-on-state-improvement",
+                    "label": "move-to-balance-on-window_improvement_below",
                     "target_state": "balance",
                     "specifications": [
                         {
