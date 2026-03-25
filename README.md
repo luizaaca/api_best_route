@@ -71,6 +71,7 @@ The API is config-driven and requires `api/config.json` at startup. That file de
   <figcaption>API config file</figcaption>
 </figure>
 <br/>
+<br/>
 
 The interactive API documentation is available on Swagger UI at `http://localhost:{port}/docs`.
 
@@ -88,6 +89,7 @@ The console example uses `console/example.config.json` and the same route-optimi
   <img src="https://github.com/user-attachments/assets/b8fd37c5-a513-4c8d-9ba7-b23fb5a47f3c" alt="Console configuration" style="width:50vw;max-width:100%;height:auto;" />
   <figcaption>Console config file</figcaption>
 </figure>
+<br/>
 <br/>
 
 Arguments:
