@@ -66,9 +66,10 @@ uvicorn api.main:app --reload
 The API is config-driven and requires `api/config.json` at startup. That file defines the adaptive GA state graph used by the API composition root.
 
 <br/>
-<figure style="display:block; width:60vw; max-width:100%;">
-  <img src="https://github.com/user-attachments/assets/164a2403-90a9-476a-b0c3-30eccc73f1be" alt="API config file" style="display:block; width:100%; height:auto;" />
-  <figcaption style="display:block; text-align:left; margin-top:0.25rem;">
+<figure>
+  <img src="https://github.com/user-attachments/assets/164a2403-90a9-476a-b0c3-30eccc73f1be" alt="API config file" style="display:block; width:50%; height:auto;" />
+  <figcaption>
+    <br/>
     API config file
   </figcaption>
 </figure>
@@ -87,11 +88,12 @@ python -m console.main --max-generation 500 --max-processing-time 300000
 The console example uses `console/example.config.json` and the same route-optimization composition as the API.
 
 <br/>
-<figure style="display:block; width:50vw; max-width:100%;">
+<figure>
   <img src="https://github.com/user-attachments/assets/b8fd37c5-a513-4c8d-9ba7-b23fb5a47f3c"
        alt="Console configuration"
-       style="display:block; width:100%; height:auto;" />
-  <figcaption style="display:block; text-align:left; margin-top:0.25rem;">
+       style="display:block; width:50%; height:auto;" />
+  <figcaption>
+    <br/>
     Console config file
   </figcaption>
 </figure>
