@@ -15,6 +15,7 @@
 - [`routes_optimization.md`](routes_optimization.md) — route-domain models, graph pipeline, and route metrics
 - [`lab/README.md`](lab/README.md) — full lab-mode contract and examples
 - [`changelog/`](changelog/) — versioned release notes
+ - [`configuration_manual.md`](configuration_manual.md) — configuration manual for API, Console and Lab (explicit mode)
 
 ## Genetic Algorithm Concepts — Interactive Notebooks
 
