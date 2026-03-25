@@ -5,7 +5,10 @@
 
 `API Best Route` is a route-optimization service built around a multi-vehicle Genetic Algorithm over OpenStreetMap street-network data. It resolves locations, builds a projected road graph, computes an adjacency matrix of route segments, and optimizes visit order across one or more vehicles.
 
-<img width="1304" height="919" alt="image" src="https://github.com/user-attachments/assets/9ddc64c2-d9ff-4547-80d4-f7a23e06eba3" />
+<figure>
+  <img src="https://github.com/user-attachments/assets/9ddc64c2-d9ff-4547-80d4-f7a23e06eba3" alt="Console with plot view" style="max-width:100%;height:auto;" />
+  <figcaption>Running console with plot view</figcaption>
+</figure>
 
 
 ## Documentation
@@ -41,7 +44,10 @@ pip install -r requirements.txt
 ```bash
 uvicorn api.main:app --reload
 ```
-<img width="1634" height="928" alt="image" src="https://github.com/user-attachments/assets/ccbd54af-157c-4092-af3c-27fa56f25a24" />
+<figure>
+  <img src="https://github.com/user-attachments/assets/ccbd54af-157c-4092-af3c-27fa56f25a24" alt="API Swagger UI" style="max-width:100%;height:auto;" />
+  <figcaption>Swagger at /docs</figcaption>
+</figure>
 
 
 > Debug example
