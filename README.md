@@ -5,6 +5,8 @@
 
 `API Best Route` is a route-optimization service built around a multi-vehicle Genetic Algorithm over OpenStreetMap street-network data. It resolves locations, builds a projected road graph, computes an adjacency matrix of route segments, and optimizes visit order across one or more vehicles.
 
+<img width="1304" height="919" alt="image" src="https://github.com/user-attachments/assets/9ddc64c2-d9ff-4547-80d4-f7a23e06eba3" />
+
 
 ## Documentation
 
