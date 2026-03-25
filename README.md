@@ -64,11 +64,12 @@ uvicorn api.main:app --reload
 >
 The API is config-driven and requires `api/config.json` at startup. That file defines the adaptive GA state graph used by the API composition root.
 
+<br/>
 <figure>
   <img src="https://github.com/user-attachments/assets/164a2403-90a9-476a-b0c3-30eccc73f1be" alt="API config file" style="width:50vw;max-width:100%;height:auto;" />
   <figcaption>API config file</figcaption>
 </figure>
-
+<br/>
 
 The interactive API documentation is available on Swagger UI at `http://localhost:{port}/docs`.
 
@@ -81,6 +82,7 @@ python -m console.main --max-generation 500 --max-processing-time 300000
 
 The console example uses `console/example.config.json` and the same route-optimization composition as the API.
 
+<br/>
 <figure>
   <img src="https://github.com/user-attachments/assets/b8fd37c5-a513-4c8d-9ba7-b23fb5a47f3c" alt="Console configuration" style="width:50vw;max-width:100%;height:auto;" />
   <figcaption>Console config file</figcaption>
