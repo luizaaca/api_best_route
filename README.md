@@ -52,6 +52,7 @@ uvicorn api.main:app --reload
   <figcaption>Swagger at http://localhost:{port}/docs</figcaption>
 </figure>
 <br/>
+
 > Debug example
 >
 > ```bash
