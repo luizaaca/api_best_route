@@ -40,6 +40,8 @@ pip install -r requirements.txt
 ```bash
 uvicorn api.main:app --reload
 ```
+<img width="1634" height="928" alt="image" src="https://github.com/user-attachments/assets/ccbd54af-157c-4092-af3c-27fa56f25a24" />
+
 
 > Debug example
 >
@@ -52,7 +54,10 @@ uvicorn api.main:app --reload
 >
 The API is config-driven and requires `api/config.json` at startup. That file defines the adaptive GA state graph used by the API composition root.
 
-The interactive API documentation is available at `/docs`.
+<img width="680" height="550" alt="image" src="https://github.com/user-attachments/assets/164a2403-90a9-476a-b0c3-30eccc73f1be" />
+
+
+The interactive API documentation is available at `http://127.0.0.1:8000/docs` or equivalent.
 
 ## Run the Console Example
 
@@ -62,6 +67,9 @@ python -m console.main --max-generation 500 --max-processing-time 300000
 ```
 
 The console example uses `console/example.config.json` and the same route-optimization composition as the API.
+
+<img width="600" height="300" alt="image" src="https://github.com/user-attachments/assets/b8fd37c5-a513-4c8d-9ba7-b23fb5a47f3c" />
+
 
 Arguments:
 
