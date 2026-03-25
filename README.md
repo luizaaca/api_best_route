@@ -5,10 +5,12 @@
 
 `API Best Route` is a route-optimization service built around a multi-vehicle Genetic Algorithm over OpenStreetMap street-network data. It resolves locations, builds a projected road graph, computes an adjacency matrix of route segments, and optimizes visit order across one or more vehicles.
 
+<br/>
 <figure>
   <img src="https://github.com/user-attachments/assets/9ddc64c2-d9ff-4547-80d4-f7a23e06eba3" alt="Console with plot view" style="max-width:100%;height:auto;" />
   <figcaption>Running console with plot view</figcaption>
 </figure>
+<br/>
 
 
 ## Documentation
@@ -44,12 +46,12 @@ pip install -r requirements.txt
 ```bash
 uvicorn api.main:app --reload
 ```
+<br/>
 <figure>
   <img src="https://github.com/user-attachments/assets/ccbd54af-157c-4092-af3c-27fa56f25a24" alt="API Swagger UI" style="max-width:100%;height:auto;" />
-  <figcaption>Swagger at /docs</figcaption>
+  <figcaption>Swagger at http://localhost:{port}/docs</figcaption>
 </figure>
-
-
+<br/>
 > Debug example
 >
 > ```bash
@@ -61,10 +63,13 @@ uvicorn api.main:app --reload
 >
 The API is config-driven and requires `api/config.json` at startup. That file defines the adaptive GA state graph used by the API composition root.
 
-<img width="680" height="550" alt="image" src="https://github.com/user-attachments/assets/164a2403-90a9-476a-b0c3-30eccc73f1be" />
+<figure>
+  <img src="https://github.com/user-attachments/assets/164a2403-90a9-476a-b0c3-30eccc73f1be" alt="API config file" style="width:50vw;max-width:100%;height:auto;" />
+  <figcaption>API config file</figcaption>
+</figure>
 
 
-The interactive API documentation is available at `http://127.0.0.1:8000/docs` or equivalent.
+The interactive API documentation is available on Swagger UI at `http://localhost:{port}/docs`.
 
 ## Run the Console Example
 
@@ -75,8 +80,11 @@ python -m console.main --max-generation 500 --max-processing-time 300000
 
 The console example uses `console/example.config.json` and the same route-optimization composition as the API.
 
-<img width="600" height="300" alt="image" src="https://github.com/user-attachments/assets/b8fd37c5-a513-4c8d-9ba7-b23fb5a47f3c" />
-
+<figure>
+  <img src="https://github.com/user-attachments/assets/b8fd37c5-a513-4c8d-9ba7-b23fb5a47f3c" alt="Console configuration" style="width:50vw;max-width:100%;height:auto;" />
+  <figcaption>Console config file</figcaption>
+</figure>
+<br/>
 
 Arguments:
 
