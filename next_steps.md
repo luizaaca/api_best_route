@@ -22,14 +22,14 @@
 # 4.2 Desacoplar construção da matrix do GA [X]
 - remover do `TSPGeneticAlgorithm` a responsabilidade de montar a matrix de adjacência. A matrix passa a ser construída na composição da infraestrutura e injetada no otimizador.
 
-# 5. Estudar mudanças na seleção dos pais
+# 5. Estudar mudanças na seleção dos pais [X]
 - implementar seleção por torneio, onde um grupo de indivíduos é selecionado aleatoriamente e o melhor entre eles é escolhido como pai, para aumentar a pressão seletiva e melhorar a qualidade das soluções geradas, em comparação com a seleção por roleta.
 - estruturar a seleção como estratégia configurável, permitindo comparar roleta, torneio e futuras abordagens sem alterar o fluxo principal do GA.
 
-# 5.1 Estudar novas estratégias de cruzamento
+# 5.1 Estudar novas estratégias de cruzamento [X]
 - implementar novas estratégias de cruzamento além do order crossover atual do cenário multi-veículo, permitindo comparar abordagens mais conservadoras ou mais exploratórias para redistribuição de destinos entre veículos.
 
-# 6. Melhorar mutação
+# 6. Melhorar mutação [X]
 - implementar mutação de swap com intensidade aleatória, onde dois destinos são trocados de posição na rota, além da mutação de inversão já existente, para aumentar a diversidade das soluções geradas e evitar convergência prematura.
 - permitir múltiplas estratégias de mutação configuráveis, com seleção por parâmetro para facilitar benchmark e experimentação.
 
@@ -45,7 +45,7 @@
 # 8.2 Cache de matriz de adjacência [X]
 - implementar cache específico para a matriz de adjacência, evitando reconstrução completa a cada requisição e melhorando a performance do serviço, especialmente para rotas com destinos recorrentes.
 
-# 9. Melhorar testes unitários
+# 9. Melhorar testes unitários [X]
 - criar testes unitários para as funções principais do código, como a função de cálculo de distância.
 
 # 9.1 Cria console app dinamico estilo app de linha de comando [X]
@@ -61,10 +61,11 @@
 - melhorar report e logs (incluir level e permitir vários adaptadores com diferentes levels)
 - criar opção para exportar os resultados e logs do processo de otimização em formatos estruturados como JSON, facilitando a análise posterior e a integração com outras ferramentas, além da saída tradicional no console.
 
-# 9.4 Implementar GA Adaptativo []
+# 9.4 Implementar GA Adaptativo [X]
 - implementar um algoritmo genético adaptativo que ajuste dinamicamente os parâmetros de mutação e cruzamento com base no progresso da otimização, para melhorar a eficiência e a qualidade das soluções geradas ao longo do tempo.
+
+# 9.5 Redesenhar schema adaptativo do lab []
 - redesenhar o schema adaptativo de `grid` e `random search` no lab, definindo um contrato final mais claro para composição de estados e removendo as suposições transitórias atuais.
-- endurecer as validações do lab para os modos adaptativos após esse redesign, evitando que formatos intermediários virem contrato permanente.
 
 # 10. Usar abstract factory para criar classes de acordo com tipo de busca
 - implementar uma fabrica abstrata que crie as instancias de otimizadores, plotters e outras dependências de acordo com o modo de operação:

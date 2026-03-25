@@ -21,6 +21,7 @@
 - [`lab/README.md`](lab/README.md) — full lab-mode contract and examples
 - [`changelog/`](changelog/) — versioned release notes
  - [`configuration_manual.md`](configuration_manual.md) — configuration manual for API, Console and Lab (explicit mode)
+ - [`population_generation.md`](population_generation.md) — documentation of population generators (Random, Heuristic, Hybrid)
 
 ## Genetic Algorithm Concepts — Interactive Notebooks
 
