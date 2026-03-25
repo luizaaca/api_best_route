@@ -115,12 +115,10 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-	GAEngine["GeneticAlgorithm Engine"] --> ProblemAdapter["IGeneticProblem / TSPGeneticProblem"]
+	GAEngine["GeneticAlgorithm Engine"] --> ProblemAdapter["IGeneticProblem"]
 	GAEngine --> StateController["IGeneticStateController"]
-	GAEngine --> Operators["selection, crossover, mutation, pop-gen"]
-	GAEngine --> Population["Population Generator"]
-	GAEngine --> Evaluator["Problem.evaluate_population"]
-	Evaluator --> ProblemAdapter
+	GAEngine --> Operators["ISelection, ICrossover, IMutation, IPopulationGenerator"]
+    GAEngine --> Callback[ICallback: log, plot, etc.]
 ```
 
 ### 4) Fluxo de cálculo de rota (sequence simplified)
